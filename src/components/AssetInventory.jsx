@@ -236,6 +236,7 @@ const AssetInventory = () => {
         const headers = [
             'Número de Placa',
             'Centro de Costes',
+            'Site',
             'Ubicación',
             'Responsable',
             'Asignado',
@@ -254,6 +255,7 @@ const AssetInventory = () => {
             ...filteredActivos.map(activo => [
                 activo.numero_placa,
                 activo.centro_costes,
+                activo.site || '',
                 activo.ubicacion,
                 activo.responsable,
                 activo.asignado || '',
