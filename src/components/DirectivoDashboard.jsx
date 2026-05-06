@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     Chart as ChartJS,
@@ -240,6 +240,7 @@ const DetailModal = ({ activo, onClose }) => {
 
 const DirectivoDashboard = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState(
         location.pathname.includes('/inventario') ? 'inventario' : 'dashboard'
     );
@@ -505,7 +506,7 @@ const DirectivoDashboard = () => {
                         return (
                             <button
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
+                                onClick={() => navigate(tab.id === 'inventario' ? '/directivo/inventario' : '/directivo')}
                                 className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                                     activeTab === tab.id
                                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
