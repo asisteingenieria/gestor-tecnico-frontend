@@ -243,6 +243,10 @@ const DirectivoDashboard = () => {
     const [activeTab, setActiveTab] = useState(
         location.pathname.includes('/inventario') ? 'inventario' : 'dashboard'
     );
+
+    useEffect(() => {
+        setActiveTab(location.pathname.includes('/inventario') ? 'inventario' : 'dashboard');
+    }, [location.pathname]);
     const [stats, setStats] = useState(null);
     const [chartData, setChartData] = useState(null);
     const [activos, setActivos] = useState([]);
