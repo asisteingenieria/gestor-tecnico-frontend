@@ -117,6 +117,7 @@ export const AuthProvider = ({ children }) => {
         isAnonimo: user?.role === 'anonimo',
         isGestorActivos: user?.role === 'gestorActivos',
         isTecnicoInventario: user?.role === 'tecnicoInventario',
+        isDirectivoFinanciero: user?.role === 'directivoFinanciero',
         canSupervise: user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'coordinador' || user?.role === 'administrativo' || user?.role === 'jefe_operaciones',
         canCreateIncidents: user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'coordinador' || user?.role === 'jefe_operaciones',
         // Permisos para activos

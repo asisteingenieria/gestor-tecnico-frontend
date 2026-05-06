@@ -27,6 +27,8 @@ import ScriptParser from './components/ScriptParser';
 import TecnicoInventarioLayout from './components/TecnicoInventarioLayout';
 import TecnicoInventarioEdicion from './components/TecnicoInventarioEdicion';
 import AssetComponentHistory from './components/AssetComponentHistory';
+import DirectivoFinancieroLayout from './components/DirectivoFinancieroLayout';
+import DirectivoDashboard from './components/DirectivoDashboard';
 
 // Componente para determinar el layout según el rol
 const LayoutWrapper = ({ children }) => {
@@ -42,6 +44,10 @@ const LayoutWrapper = ({ children }) => {
 
   if (user?.role === 'tecnicoInventario') {
     return <TecnicoInventarioLayout>{children}</TecnicoInventarioLayout>;
+  }
+
+  if (user?.role === 'directivoFinanciero') {
+    return <DirectivoFinancieroLayout>{children}</DirectivoFinancieroLayout>;
   }
 
   return <Layout>{children}</Layout>;
@@ -88,6 +94,10 @@ const RedirectByRole = () => {
     return <Navigate to="/inventario-tecnico" replace />;
   }
 
+  if (user?.role === 'directivoFinanciero') {
+    return <Navigate to="/directivo" replace />;
+  }
+
   return <Navigate to="/dashboard" replace />;
 };
 
@@ -115,6 +125,10 @@ const DashboardRoute = () => {
 
   if (user?.role === 'tecnicoInventario') {
     return <Navigate to="/inventario-tecnico" replace />;
+  }
+
+  if (user?.role === 'directivoFinanciero') {
+    return <Navigate to="/directivo" replace />;
   }
 
   return <Dashboard />;
@@ -226,6 +240,30 @@ const TecnicoInventarioRoute = ({ children }) => {
   return children;
 };
 
+// Componente para rutas que requieren rol de directivoFinanciero
+const DirectivoFinancieroRoute = ({ children }) => {
+  const { isDirectivoFinanciero, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  if (!isDirectivoFinanciero) {
+    return (
+      <div className="text-center py-12">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Acceso Denegado</h1>
+        <p className="text-gray-600">Solo los directivos financieros pueden acceder a esta sección.</p>
+      </div>
+    );
+  }
+
+  return children;
+};
+
 // Componente placeholder para rutas que aún no están implementadas
 const ComingSoon = ({ title }) => (
   <div className="text-center py-12">
@@ -288,6 +326,10 @@ function App() {
 
               {/* Rutas de técnico de inventario */}
               <Route path="inventario-tecnico" element={<TecnicoInventarioRoute><TecnicoInventarioEdicion /></TecnicoInventarioRoute>} />
+
+              {/* Rutas de directivo financiero */}
+              <Route path="directivo" element={<DirectivoFinancieroRoute><DirectivoDashboard /></DirectivoFinancieroRoute>} />
+              <Route path="directivo/inventario" element={<DirectivoFinancieroRoute><DirectivoDashboard /></DirectivoFinancieroRoute>} />
             </Route>
 
             {/* Ruta catch-all */}
