@@ -423,7 +423,45 @@ const DirectivoDashboard = () => {
             }]
         };
 
-        return { barrasUbicacion, donaTipo, barrasValor, pieEstado, polarProveedor, lineaMeses };
+        // Barras horizontales: Top 10 activos más costosos
+        const top10 = [...activos]
+            .filter(a => a.valor && Number(a.valor) > 0)
+            .sort((a, b) => Number(b.valor) - Number(a.valor))
+            .slice(0, 10);
+
+        const top10Colors = [
+            'rgba(16,185,129,0.85)',
+            'rgba(20,184,166,0.85)',
+            'rgba(59,130,246,0.85)',
+            'rgba(99,102,241,0.85)',
+            'rgba(139,92,246,0.85)',
+            'rgba(168,85,247,0.85)',
+            'rgba(236,72,153,0.85)',
+            'rgba(245,158,11,0.85)',
+            'rgba(249,115,22,0.85)',
+            'rgba(239,68,68,0.85)'
+        ];
+
+        const top10Chart = {
+            labels: top10.map(a => a.numero_placa),
+            datasets: [{
+                label: 'Valor',
+                data: top10.map(a => Number(a.valor)),
+                backgroundColor: top10Colors.slice(0, top10.length),
+                borderColor: top10Colors.slice(0, top10.length).map(c => c.replace('0.85', '1')),
+                borderWidth: 1.5,
+                borderRadius: 6,
+                borderSkipped: false
+            }]
+        };
+
+        const top10Meta = top10.map(a => ({
+            tipo: TIPO_LABELS[a.tipo_activo] || a.tipo_activo,
+            ubicacion: a.ubicacion,
+            responsable: a.responsable
+        }));
+
+        return { barrasUbicacion, donaTipo, barrasValor, pieEstado, polarProveedor, lineaMeses, top10Chart, top10Meta };
     };
 
     const charts = buildCharts();
@@ -617,17 +655,107 @@ const DirectivoDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Charts row 3 - full width */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center">
-                            <TrendingUp className="h-4 w-4 text-purple-600 mr-2" />
-                            Tendencia de Adquisiciones (últimos 12 meses)
-                        </h3>
-                        <div className="h-72">
-                            {charts.lineaMeses && chartData?.porMes?.length > 0
-                                ? <Line data={charts.lineaMeses} options={LINE_OPTIONS} />
-                                : <div className="h-full flex items-center justify-center text-gray-400 text-sm">No hay datos de adquisiciones en el último año</div>
-                            }
+                    {/* Charts row 3 - Top 10 + Tendencia */}
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        {/* Top 10 activos más costosos */}
+                        <div className="lg:col-span-3 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <div className="flex items-center justify-between mb-5">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-gray-800 flex items-center">
+                                        <DollarSign className="h-4 w-4 text-emerald-600 mr-2" />
+                                        Top 10 Activos más Costosos
+                                    </h3>
+                                    <p className="text-xs text-gray-400 mt-0.5">Ordenados por valor de adquisición</p>
+                                </div>
+                                {charts.top10Chart && (
+                                    <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">
+                                        {charts.top10Chart.labels.length} activos
+                                    </span>
+                                )}
+                            </div>
+
+                            {charts.top10Chart && charts.top10Chart.labels.length > 0 ? (
+                                <div className="h-80">
+                                    <Bar
+                                        data={charts.top10Chart}
+                                        options={{
+                                            indexAxis: 'y',
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            plugins: {
+                                                legend: { display: false },
+                                                tooltip: {
+                                                    backgroundColor: 'rgba(17,24,39,0.95)',
+                                                    titleColor: '#f9fafb',
+                                                    bodyColor: '#d1fae5',
+                                                    borderColor: 'rgba(16,185,129,0.3)',
+                                                    borderWidth: 1,
+                                                    cornerRadius: 10,
+                                                    padding: 12,
+                                                    callbacks: {
+                                                        title: (items) => items[0].label,
+                                                        label: (ctx) => {
+                                                            const meta = charts.top10Meta?.[ctx.dataIndex];
+                                                            return [
+                                                                `  Valor: $${ctx.raw.toLocaleString('es-CO')}`,
+                                                                meta ? `  Tipo: ${meta.tipo}` : '',
+                                                                meta ? `  Ubicación: ${meta.ubicacion}` : ''
+                                                            ].filter(Boolean);
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            scales: {
+                                                x: {
+                                                    beginAtZero: true,
+                                                    grid: { color: 'rgba(0,0,0,0.04)' },
+                                                    ticks: {
+                                                        font: { size: 10 },
+                                                        callback: (v) => formatCurrency(v)
+                                                    },
+                                                    border: { display: false }
+                                                },
+                                                y: {
+                                                    grid: { display: false },
+                                                    ticks: {
+                                                        font: { size: 11, weight: '500' },
+                                                        color: '#374151'
+                                                    },
+                                                    border: { display: false }
+                                                }
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="h-80 flex flex-col items-center justify-center text-gray-400">
+                                    <DollarSign className="h-10 w-10 mb-3 opacity-30" />
+                                    <p className="text-sm">No hay activos con valor registrado</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Tendencia de adquisiciones */}
+                        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <div className="mb-5">
+                                <h3 className="text-sm font-semibold text-gray-800 flex items-center">
+                                    <TrendingUp className="h-4 w-4 text-purple-600 mr-2" />
+                                    Tendencia de Adquisiciones
+                                </h3>
+                                <p className="text-xs text-gray-400 mt-0.5">Últimos 12 meses</p>
+                            </div>
+                            <div className="h-80">
+                                {charts.lineaMeses && chartData?.porMes?.length > 0
+                                    ? <Line data={charts.lineaMeses} options={LINE_OPTIONS} />
+                                    : (
+                                        <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                                            <TrendingUp className="h-10 w-10 mb-3 opacity-30" />
+                                            <p className="text-sm">Sin adquisiciones registradas</p>
+                                            <p className="text-xs mt-1">en el último año</p>
+                                        </div>
+                                    )
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -734,7 +862,7 @@ const DirectivoDashboard = () => {
                                         }[estado] || 'bg-gray-100 text-gray-700';
 
                                         return (
-                                            <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                                            <tr key={a.id} onClick={() => setSelectedActivo(a)} className="hover:bg-emerald-50 transition-colors cursor-pointer">
                                                 <td className="px-4 py-3 font-mono text-xs font-semibold text-gray-800 whitespace-nowrap">{a.numero_placa}</td>
                                                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{TIPO_LABELS[a.tipo_activo] || a.tipo_activo || '—'}</td>
                                                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.site || '—'}</td>
