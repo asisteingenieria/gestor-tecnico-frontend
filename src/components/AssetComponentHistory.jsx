@@ -22,7 +22,9 @@ import {
     XCircle,
     ChevronDown,
     AlertTriangle,
-    Archive
+    Archive,
+    CheckCircle,
+    Clock
 } from 'lucide-react';
 
 const FIELD_COLORS = {
@@ -83,6 +85,10 @@ const AssetComponentHistory = () => {
     const [enBodega, setEnBodega] = useState([]);
     const [loadingEnBodega, setLoadingEnBodega] = useState(false);
     const [showEnBodega, setShowEnBodega] = useState(true);
+    const [pendientesBaja, setPendientesBaja] = useState([]);
+    const [loadingPendientesBaja, setLoadingPendientesBaja] = useState(false);
+    const [showPendientesBaja, setShowPendientesBaja] = useState(true);
+    const [processingBajaId, setProcessingBajaId] = useState(null);
     const [bodegaFilters, setBodegaFilters] = useState({
         numeroPlaca: '',
         tipoActivo: '',
@@ -127,6 +133,18 @@ const AssetComponentHistory = () => {
         }
     }, []);
 
+    const fetchPendientesBaja = useCallback(async () => {
+        try {
+            setLoadingPendientesBaja(true);
+            const res = await assetHistoryService.getPendientesBaja();
+            setPendientesBaja(res.data.data || []);
+        } catch (err) {
+            console.error('Error al cargar solicitudes de baja:', err);
+        } finally {
+            setLoadingPendientesBaja(false);
+        }
+    }, []);
+
     const fetchHistorial = useCallback(async (offset = 0) => {
         try {
             setLoadingTable(true);
@@ -151,7 +169,7 @@ const AssetComponentHistory = () => {
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
-            await Promise.all([fetchStats(), fetchHistorial(0), fetchNoProductivos(), fetchEnBodega()]);
+            await Promise.all([fetchStats(), fetchHistorial(0), fetchNoProductivos(), fetchEnBodega(), fetchPendientesBaja()]);
             setLoading(false);
         };
         loadData();
@@ -164,7 +182,7 @@ const AssetComponentHistory = () => {
     const handleRefresh = async () => {
         setLoading(true);
         setError(null);
-        await Promise.all([fetchStats(), fetchHistorial(0), fetchNoProductivos(), fetchEnBodega()]);
+        await Promise.all([fetchStats(), fetchHistorial(0), fetchNoProductivos(), fetchEnBodega(), fetchPendientesBaja()]);
         setLoading(false);
     };
 
@@ -181,6 +199,35 @@ const AssetComponentHistory = () => {
             alert(err.response?.data?.msg || 'Error al dar de baja el activo');
         } finally {
             setProcessingBaja(false);
+        }
+    };
+
+    const handleAprobarSolicitudBaja = async (activo) => {
+        if (!window.confirm(`¿Confirma dar de baja definitivamente el activo ${activo.numeroPlaca}? Esta acción es irreversible.`)) return;
+        try {
+            setProcessingBajaId(activo.id);
+            await assetHistoryService.darDeBaja(activo.id);
+            await fetchPendientesBaja();
+            await fetchNoProductivos();
+        } catch (err) {
+            console.error('Error al aprobar baja:', err);
+            alert(err.response?.data?.msg || 'Error al aprobar la baja');
+        } finally {
+            setProcessingBajaId(null);
+        }
+    };
+
+    const handleRechazarSolicitudBaja = async (activo) => {
+        if (!window.confirm(`¿Rechazar la solicitud de baja de ${activo.numeroPlaca}? El activo volverá a estado funcional.`)) return;
+        try {
+            setProcessingBajaId(activo.id);
+            await assetHistoryService.rechazarSolicitudBaja(activo.id);
+            await fetchPendientesBaja();
+        } catch (err) {
+            console.error('Error al rechazar solicitud:', err);
+            alert(err.response?.data?.msg || 'Error al rechazar la solicitud');
+        } finally {
+            setProcessingBajaId(null);
         }
     };
 
@@ -403,6 +450,129 @@ const AssetComponentHistory = () => {
                     )}
                 </div>
             )}
+
+            {/* Solicitudes de Baja Pendientes */}
+            <div className="bg-white rounded-xl shadow-sm border-2 border-amber-300">
+                <button
+                    onClick={() => setShowPendientesBaja(!showPendientesBaja)}
+                    className="w-full flex items-center justify-between px-5 py-4 text-sm font-medium text-gray-700 hover:bg-amber-50 rounded-xl"
+                >
+                    <div className="flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-amber-500" />
+                        <span className="text-base font-semibold">Solicitudes de Baja Pendientes</span>
+                        {pendientesBaja.length > 0 ? (
+                            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full animate-pulse">
+                                {pendientesBaja.length} pendiente{pendientesBaja.length !== 1 ? 's' : ''}
+                            </span>
+                        ) : (
+                            <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                Sin solicitudes
+                            </span>
+                        )}
+                    </div>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showPendientesBaja ? 'rotate-180' : ''}`} />
+                </button>
+                {showPendientesBaja && (
+                    <div className="border-t border-amber-200">
+                        {loadingPendientesBaja ? (
+                            <div className="flex items-center justify-center py-8">
+                                <RefreshCw className="h-5 w-5 text-amber-400 animate-spin" />
+                                <span className="ml-2 text-gray-500 text-sm">Cargando...</span>
+                            </div>
+                        ) : pendientesBaja.length === 0 ? (
+                            <div className="text-center py-8">
+                                <CheckCircle className="h-10 w-10 mx-auto text-green-300 mb-2" />
+                                <p className="text-gray-500 text-sm">No hay solicitudes de baja pendientes</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-amber-50">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Placa</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca / Modelo</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clasificación</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Solicitado por</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha solicitud</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {pendientesBaja.map((activo) => (
+                                            <tr key={activo.id} className="hover:bg-amber-50 transition-colors">
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    {activo.numeroPlaca}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                                    {activo.tipoActivo}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                                    {activo.ubicacion || '—'}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-600 max-w-[180px] truncate" title={activo.marcaModelo}>
+                                                    {activo.marcaModelo || '—'}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                        activo.clasificacion === 'Activo productivo'
+                                                            ? 'bg-green-100 text-green-800'
+                                                            : 'bg-orange-100 text-orange-800'
+                                                    }`}>
+                                                        {activo.clasificacion || '—'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                                    {activo.solicitadoPor || '—'}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                                    {activo.fechaSolicitud ? formatDate(activo.fechaSolicitud) : '—'}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => handleOpenAssetModal(activo.id, activo.numeroPlaca, activo.tipoActivo)}
+                                                            className="inline-flex items-center px-2.5 py-1.5 border border-blue-300 rounded-lg text-xs font-medium text-blue-700 bg-white hover:bg-blue-50 transition-colors"
+                                                        >
+                                                            <History className="h-3.5 w-3.5 mr-1" />
+                                                            Historial
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleAprobarSolicitudBaja(activo)}
+                                                            disabled={processingBajaId === activo.id}
+                                                            className="inline-flex items-center px-2.5 py-1.5 border border-red-300 rounded-lg text-xs font-medium text-red-700 bg-white hover:bg-red-50 disabled:opacity-50 transition-colors"
+                                                        >
+                                                            {processingBajaId === activo.id ? (
+                                                                <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" />
+                                                            ) : (
+                                                                <XCircle className="h-3.5 w-3.5 mr-1" />
+                                                            )}
+                                                            Aprobar Baja
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleRechazarSolicitudBaja(activo)}
+                                                            disabled={processingBajaId === activo.id}
+                                                            className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                                                        >
+                                                            {processingBajaId === activo.id ? (
+                                                                <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" />
+                                                            ) : (
+                                                                <X className="h-3.5 w-3.5 mr-1" />
+                                                            )}
+                                                            Rechazar
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Activos No Productivos */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200">

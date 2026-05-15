@@ -135,7 +135,9 @@ export const assetHistoryService = {
     getObservaciones: (id) => api.get(`/activos-tecnico/${id}/inventario`),
     getNoProductivos: () => api.get('/activos-tecnico/no-productivos'),
     getEnBodega: () => api.get('/activos-tecnico/en-bodega'),
+    getPendientesBaja: () => api.get('/activos-tecnico/pendientes-baja'),
     darDeBaja: (id) => api.put(`/activos-tecnico/${id}/dar-de-baja`),
+    rechazarSolicitudBaja: (id) => api.put(`/activos-tecnico/${id}/estado-mantenimiento`, { nuevoEstado: 'funcional' }),
     actualizarEstadoMantenimiento: (id, nuevoEstado) => api.put(`/activos-tecnico/${id}/estado-mantenimiento`, { nuevoEstado })
 };
 

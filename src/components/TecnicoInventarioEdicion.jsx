@@ -19,7 +19,9 @@ import {
     ChevronDown,
     ChevronUp,
     User,
-    Calendar
+    Calendar,
+    AlertTriangle,
+    XCircle
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
@@ -244,18 +246,20 @@ const TecnicoInventarioEdicion = () => {
         }
     };
 
-    // Cambia el estado del activo (mantenimiento, bodega, funcional)
+    // Cambia el estado del activo (mantenimiento, bodega, funcional, pendiente_baja)
     const handleCambiarEstado = async (nuevoEstado) => {
         try {
             setUpdatingEstado(true);
             await assetHistoryService.actualizarEstadoMantenimiento(selectedActivo.id, nuevoEstado);
             setSelectedActivo(prev => ({ ...prev, estado: nuevoEstado }));
+            setActivos(prev => prev.map(a => a.id === selectedActivo.id ? { ...a, estado: nuevoEstado } : a));
             const mensajes = {
                 en_mantenimiento: 'Activo puesto en mantenimiento',
                 funcional: 'Activo marcado como funcional',
-                bodega: 'Activo enviado a bodega'
+                bodega: 'Activo enviado a bodega',
+                pendiente_baja: 'Solicitud de baja enviada al administrador para aprobación'
             };
-            setMessage({ type: 'success', text: mensajes[nuevoEstado] });
+            setMessage({ type: 'success', text: mensajes[nuevoEstado] || 'Estado actualizado' });
         } catch (error) {
             setMessage({ type: 'error', text: error.response?.data?.msg || 'Error al actualizar estado' });
         } finally {
@@ -426,9 +430,10 @@ const TecnicoInventarioEdicion = () => {
                                             selectedActivo.estado === 'en_reparacion' ? 'bg-orange-100 text-orange-800' :
                                             selectedActivo.estado === 'bodega' ? 'bg-indigo-100 text-indigo-800' :
                                             selectedActivo.estado === 'dado_de_baja' ? 'bg-red-100 text-red-800' :
+                                            selectedActivo.estado === 'pendiente_baja' ? 'bg-amber-100 text-amber-800' :
                                             'bg-gray-100 text-gray-800'
                                         }`}>
-                                            {selectedActivo.estado || 'funcional'}
+                                            {selectedActivo.estado === 'pendiente_baja' ? 'Baja pendiente (admin)' : selectedActivo.estado || 'funcional'}
                                         </span>
                                     </p>
                                     {componentes.find(c => c.campo === 'clasificacion') && (
@@ -461,7 +466,7 @@ const TecnicoInventarioEdicion = () => {
                             ) : (
                                 <button
                                     onClick={() => handleCambiarEstado('en_mantenimiento')}
-                                    disabled={updatingEstado || selectedActivo.estado === 'dado_de_baja' || selectedActivo.estado === 'bodega'}
+                                    disabled={updatingEstado || selectedActivo.estado === 'dado_de_baja' || selectedActivo.estado === 'bodega' || selectedActivo.estado === 'pendiente_baja'}
                                     className="w-full mb-4 flex items-center justify-center px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors font-medium"
                                 >
                                     {updatingEstado ? (
@@ -483,7 +488,7 @@ const TecnicoInventarioEdicion = () => {
                                     {updatingEstado ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Tag className="h-4 w-4 mr-2" />}
                                     Sacar de Bodega
                                 </button>
-                            ) : selectedActivo.estado !== 'dado_de_baja' && selectedActivo.estado !== 'en_mantenimiento' && (
+                            ) : selectedActivo.estado !== 'dado_de_baja' && selectedActivo.estado !== 'en_mantenimiento' && selectedActivo.estado !== 'pendiente_baja' && (
                                 <button
                                     onClick={() => handleCambiarEstado('bodega')}
                                     disabled={updatingEstado}
@@ -491,6 +496,35 @@ const TecnicoInventarioEdicion = () => {
                                 >
                                     {updatingEstado ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Tag className="h-4 w-4 mr-2" />}
                                     Enviar a Bodega
+                                </button>
+                            )}
+
+                            {/* Solicitar / Cancelar baja */}
+                            {selectedActivo.estado === 'pendiente_baja' ? (
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg mb-2">
+                                        <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                                        <span className="text-sm text-amber-800 font-medium">
+                                            Baja solicitada — pendiente de aprobación del administrador
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={() => handleCambiarEstado('funcional')}
+                                        disabled={updatingEstado}
+                                        className="w-full flex items-center justify-center px-4 py-2 border border-amber-400 text-amber-700 bg-white rounded-lg hover:bg-amber-50 disabled:opacity-50 transition-colors text-sm font-medium"
+                                    >
+                                        {updatingEstado ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />}
+                                        Cancelar Solicitud de Baja
+                                    </button>
+                                </div>
+                            ) : selectedActivo.estado !== 'dado_de_baja' && selectedActivo.estado !== 'en_mantenimiento' && selectedActivo.estado !== 'bodega' && (
+                                <button
+                                    onClick={() => handleCambiarEstado('pendiente_baja')}
+                                    disabled={updatingEstado}
+                                    className="w-full mb-4 flex items-center justify-center px-4 py-2 border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors text-sm font-medium"
+                                >
+                                    {updatingEstado ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
+                                    Solicitar Dar de Baja
                                 </button>
                             )}
 
