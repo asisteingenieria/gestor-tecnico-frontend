@@ -115,8 +115,8 @@ const TecnicoInventarioLayout = () => {
                             <h4 className="text-sm font-medium text-emerald-800 mb-2">Permisos</h4>
                             <ul className="text-xs text-emerald-700 space-y-1">
                                 <li>• Editar componentes de hardware</li>
-                                <li>• CPU, Portátiles y Servidores</li>
-                                <li>• Procesador, RAM, Disco, SO</li>
+                                <li>• Todos los activos tecnológicos</li>
+                                <li>• Solicitar baja al administrador</li>
                             </ul>
                         </div>
                     </div>

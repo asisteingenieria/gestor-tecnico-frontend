@@ -8,6 +8,8 @@ import {
     Monitor,
     Server,
     Laptop,
+    Printer,
+    Tv,
     Save,
     AlertCircle,
     CheckCircle,
@@ -21,7 +23,8 @@ import {
     User,
     Calendar,
     AlertTriangle,
-    XCircle
+    XCircle,
+    Package
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
@@ -90,14 +93,13 @@ const TecnicoInventarioEdicion = () => {
     // Obtener icono según tipo de activo
     const getAssetIcon = (tipoActivo) => {
         switch (tipoActivo) {
-            case 'ECC-CPU':
-                return <Monitor className="h-5 w-5 text-blue-500" />;
-            case 'ECC-POR':
-                return <Laptop className="h-5 w-5 text-purple-500" />;
-            case 'ECC-SER':
-                return <Server className="h-5 w-5 text-orange-500" />;
-            default:
-                return <Cpu className="h-5 w-5 text-gray-500" />;
+            case 'ECC-CPU': return <Monitor className="h-5 w-5 text-blue-500" />;
+            case 'ECC-POR': return <Laptop className="h-5 w-5 text-purple-500" />;
+            case 'ECC-SER': return <Server className="h-5 w-5 text-orange-500" />;
+            case 'ECC-MON': return <Tv className="h-5 w-5 text-cyan-500" />;
+            case 'ECC-IMP': return <Printer className="h-5 w-5 text-green-500" />;
+            case 'ECC-TV':  return <Tv className="h-5 w-5 text-pink-500" />;
+            default:        return <Package className="h-5 w-5 text-gray-500" />;
         }
     };
 
@@ -106,7 +108,11 @@ const TecnicoInventarioEdicion = () => {
         const names = {
             'ECC-CPU': 'Computadora',
             'ECC-POR': 'Portátil',
-            'ECC-SER': 'Servidor'
+            'ECC-SER': 'Servidor',
+            'ECC-MON': 'Monitor',
+            'ECC-IMP': 'Impresora',
+            'ECC-TV':  'Televisor',
+            'OTHER':   'Otro'
         };
         return names[tipoActivo] || tipoActivo;
     };
@@ -336,7 +342,7 @@ const TecnicoInventarioEdicion = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="Buscar por número de placa (ej: ECC-CPU-001)"
+                            placeholder="Buscar por número de placa (ej: ECC-CPU-001, ECC-MON-001...)"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
@@ -363,7 +369,7 @@ const TecnicoInventarioEdicion = () => {
                             <div className="text-center py-8 text-gray-500">
                                 <Cpu className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                                 <p>No se encontraron activos</p>
-                                <p className="text-sm">Solo se muestran CPU, Portátiles y Servidores</p>
+                                <p className="text-sm">Busca por número de placa</p>
                             </div>
                         ) : (
                             activos.map((activo) => (
