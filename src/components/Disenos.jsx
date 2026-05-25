@@ -633,12 +633,12 @@ const formatOverdue = (fecha) => {
 
 const formatTimeUntil = (fecha) => {
     const diffMs = new Date(fecha).getTime() - Date.now();
-    const totalHours = Math.floor(diffMs / 3600000);
+    const totalMins = Math.floor(diffMs / 60000);
+    const totalHours = Math.floor(totalMins / 60);
     const days = Math.floor(totalHours / 24);
     if (days > 0) return `${days}d ${totalHours % 24}h`;
-    if (totalHours > 0) return `${totalHours}h`;
-    const mins = Math.floor(diffMs / 60000);
-    return `${mins}m`;
+    if (totalHours > 0) return `${totalHours}h ${totalMins % 60}m`;
+    return `${totalMins}m`;
 };
 
 const toDatetimeLocal = (dateStr) => {
