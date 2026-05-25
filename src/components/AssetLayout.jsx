@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-    Menu, 
-    X, 
+import {
+    Menu,
+    X,
     Package,
     Plus,
     ClipboardList,
     BarChart3,
     FileText,
     LogOut,
-    User
+    User,
+    Users
 } from 'lucide-react';
 
 const AssetLayout = () => {
@@ -48,6 +49,12 @@ const AssetLayout = () => {
             href: '/activos/charts',
             icon: BarChart3,
             current: location.pathname === '/activos/charts'
+        },
+        {
+            name: 'Agentes',
+            href: '/activos/agentes',
+            icon: Users,
+            current: location.pathname === '/activos/agentes'
         }
     ];
 

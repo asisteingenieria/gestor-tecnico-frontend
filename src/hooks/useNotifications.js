@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { incidentService } from '../services/api';
+import { incidentService, disenoService } from '../services/api';
 
 export const useNotifications = (user) => {
     const [notifications, setNotifications] = useState([]);
@@ -7,23 +7,27 @@ export const useNotifications = (user) => {
     const lastCheckRef = useRef(new Date());
     const intervalRef = useRef(null);
 
+    const getNotifiedDisenoIds = () => {
+        try { return new Set(JSON.parse(sessionStorage.getItem('notifiedDisenoIds') || '[]')); }
+        catch { return new Set(); }
+    };
+    const saveNotifiedDisenoId = (id) => {
+        try {
+            const ids = getNotifiedDisenoIds();
+            ids.add(id);
+            sessionStorage.setItem('notifiedDisenoIds', JSON.stringify([...ids]));
+        } catch {}
+    };
+
     // Solicitar permisos de notificación del navegador y preparar audio
     useEffect(() => {
-        if (user && user.role === 'technician') {
+        if (user && (user.role === 'technician' || user.role === 'disenador')) {
             if ('Notification' in window && Notification.permission === 'default') {
-                Notification.requestPermission().then((permission) => {
-                    if (permission === 'granted') {
-                        console.log('Notificaciones habilitadas');
-                    }
-                });
+                Notification.requestPermission();
             }
-            
-            // Preparar audio en la primera interacción del usuario
-            const enableAudio = async (event) => {
-                console.log('👆 Usuario hizo clic, habilitando audio...', event.target);
+
+            const enableAudio = async () => {
                 initAudio();
-                
-                // Probar reproducir un sonido silencioso para habilitar el audio
                 try {
                     if (audioRef.current) {
                         audioRef.current.volume = 0.01;
@@ -32,11 +36,8 @@ export const useNotifications = (user) => {
                         audioRef.current.currentTime = 0;
                         audioRef.current.volume = 0.7;
                         audioEnabledRef.current = true;
-                        console.log('✅ Audio habilitado correctamente');
                     }
-                } catch (error) {
-                    console.warn('⚠️ No se pudo habilitar el audio:', error);
-                }
+                } catch {}
                 
                 // Remover los listeners
                 document.removeEventListener('click', enableAudio, true);
@@ -84,68 +85,34 @@ export const useNotifications = (user) => {
     const audioRef = useRef(null);
     const audioEnabledRef = useRef(false);
 
-    // Función para inicializar el audio
     const initAudio = () => {
         if (!audioRef.current) {
-            // Usar tu archivo de sonido personalizado
             audioRef.current = new Audio('/notification.mp3');
             audioRef.current.volume = 0.7;
             audioRef.current.preload = 'auto';
-            console.log('🎵 Audio inicializado con notification.mp3');
         }
     };
 
-    // Función para reproducir sonido de notificación
     const playNotificationSound = async () => {
-        console.log('🔊 Intentando reproducir sonido de notificación...');
-        console.log('🎵 Audio habilitado:', audioEnabledRef.current);
-        
-        if (!audioEnabledRef.current) {
-            console.warn('❌ Audio no habilitado por el usuario aún. Haz clic en cualquier lugar primero.');
-            return;
-        }
-        
+        if (!audioEnabledRef.current) return;
         try {
             initAudio();
-            
-            if (!audioRef.current) {
-                console.warn('❌ Audio no disponible');
-                return;
-            }
-            
-            // Reiniciar el audio al principio
+            if (!audioRef.current) return;
             audioRef.current.currentTime = 0;
-            
-            // Intentar reproducir
             await audioRef.current.play();
-            console.log('✅ Sonido de notificación reproducido correctamente');
-            
-        } catch (error) {
-            console.warn('❌ No se pudo reproducir el sonido de notificación:', error);
-            
-            // Método de respaldo: crear un beep simple
+        } catch {
             try {
-                const beep = () => {
-                    const context = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = context.createOscillator();
-                    const gainNode = context.createGain();
-                    
-                    oscillator.connect(gainNode);
-                    gainNode.connect(context.destination);
-                    
-                    oscillator.frequency.value = 800;
-                    gainNode.gain.setValueAtTime(0.3, context.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.3);
-                    
-                    oscillator.start(context.currentTime);
-                    oscillator.stop(context.currentTime + 0.3);
-                };
-                
-                beep();
-                console.log('✅ Sonido de respaldo reproducido');
-            } catch (fallbackError) {
-                console.warn('❌ Método de respaldo de audio también falló:', fallbackError);
-            }
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 800;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.3);
+            } catch {}
         }
     };
 
@@ -160,14 +127,8 @@ export const useNotifications = (user) => {
         return labels[type] || type;
     };
 
-    // Función para verificar nuevas incidencias
     const checkForNewIncidents = async () => {
-        if (!user || user.role !== 'technician') {
-            console.log('Usuario no es técnico, saltando verificación de notificaciones');
-            return;
-        }
-
-        console.log('🔔 Verificando nuevas incidencias...', new Date().toLocaleTimeString());
+        if (!user || user.role !== 'technician') return;
 
         try {
             // Obtener tanto mis incidencias como las pendientes
@@ -194,11 +155,7 @@ export const useNotifications = (user) => {
             // Combinar ambos tipos de incidencias nuevas
             const allNewIncidents = [...newAssignedIncidents, ...newPendingIncidents];
 
-            console.log(`📊 Nuevas asignadas: ${newAssignedIncidents.length}, Nuevas pendientes: ${newPendingIncidents.length}, Total nuevas: ${allNewIncidents.length}`);
-
             if (allNewIncidents.length > 0) {
-                console.log('🎵 Nuevas incidencias encontradas, reproduciendo sonido y mostrando notificaciones');
-                // Agregar nuevas notificaciones
                 const newNotifications = allNewIncidents.map(incident => ({
                     id: `incident-${incident.id}-${Date.now()}`,
                     incidentId: incident.id,
@@ -231,17 +188,71 @@ export const useNotifications = (user) => {
     // Configurar polling cada 30 segundos para técnicos
     useEffect(() => {
         if (user && user.role === 'technician') {
-            // Verificar inmediatamente
             checkForNewIncidents();
-            
-            // Configurar polling cada 30 segundos
             intervalRef.current = setInterval(checkForNewIncidents, 30000);
-            
             return () => {
-                if (intervalRef.current) {
-                    clearInterval(intervalRef.current);
-                }
+                if (intervalRef.current) clearInterval(intervalRef.current);
             };
+        }
+    }, [user]);
+
+    // Verificar nuevos diseños asignados para diseñadores
+    const checkForNewDisenos = async () => {
+        if (!user || user.role !== 'disenador') return;
+
+        try {
+            const res = await disenoService.getAll({ estado: 'en_progreso' });
+            const disenos = res.data.data || [];
+
+            const notifiedIds = getNotifiedDisenoIds();
+            const newDisenos = disenos.filter(d =>
+                d.disenador_id === user.id && !notifiedIds.has(d.id)
+            );
+
+            if (newDisenos.length > 0) {
+                newDisenos.forEach(d => saveNotifiedDisenoId(d.id));
+
+                const newNotifications = newDisenos.map(d => ({
+                    id: `diseno-${d.id}-${Date.now()}`,
+                    disenoId: d.id,
+                    title: 'Diseño asignado',
+                    message: d.nombre,
+                    timestamp: new Date(),
+                    read: false,
+                    type: 'diseno',
+                    diseno: d
+                }));
+
+                setNotifications(prev => [...newNotifications, ...prev].slice(0, 10));
+                setUnreadCount(prev => prev + newNotifications.length);
+
+                newDisenos.forEach(d => {
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        const notif = new Notification('Nuevo diseño asignado', {
+                            body: `Se te asignó: ${d.nombre}\n${d.descripcion?.substring(0, 100) || ''}`,
+                            icon: '/vite.svg',
+                            tag: `diseno-${d.id}`,
+                            requireInteraction: true
+                        });
+                        setTimeout(() => notif.close(), 10000);
+                    }
+                });
+
+                playNotificationSound();
+            }
+
+            lastCheckRef.current = new Date();
+        } catch (error) {
+            console.error('Error verificando nuevos diseños:', error);
+        }
+    };
+
+    // Configurar polling cada 30 segundos para diseñadores
+    useEffect(() => {
+        if (user && user.role === 'disenador') {
+            checkForNewDisenos();
+            const id = setInterval(checkForNewDisenos, 30000);
+            return () => clearInterval(id);
         }
     }, [user]);
 

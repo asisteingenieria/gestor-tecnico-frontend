@@ -29,6 +29,8 @@ import TecnicoInventarioEdicion from './components/TecnicoInventarioEdicion';
 import AssetComponentHistory from './components/AssetComponentHistory';
 import DirectivoFinancieroLayout from './components/DirectivoFinancieroLayout';
 import DirectivoDashboard from './components/DirectivoDashboard';
+import AgentManagement from './components/AgentManagement';
+import Disenos from './components/Disenos';
 
 // Componente para determinar el layout según el rol
 const LayoutWrapper = ({ children }) => {
@@ -72,8 +74,6 @@ const AnonymousRoute = ({ children }) => {
 const RedirectByRole = () => {
   const { user, loading } = useAuth();
   
-  console.log('RedirectByRole - user:', user, 'loading:', loading);
-  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -96,6 +96,10 @@ const RedirectByRole = () => {
 
   if (user?.role === 'directivoFinanciero') {
     return <Navigate to="/directivo" replace />;
+  }
+
+  if (user?.role === 'disenador') {
+    return <Navigate to="/disenos" replace />;
   }
 
   return <Navigate to="/dashboard" replace />;
@@ -105,8 +109,6 @@ const RedirectByRole = () => {
 const DashboardRoute = () => {
   const { user, loading } = useAuth();
   
-  console.log('DashboardRoute - user:', user, 'loading:', loading);
-  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -129,6 +131,10 @@ const DashboardRoute = () => {
 
   if (user?.role === 'directivoFinanciero') {
     return <Navigate to="/directivo" replace />;
+  }
+
+  if (user?.role === 'disenador') {
+    return <Navigate to="/disenos" replace />;
   }
 
   return <Dashboard />;
@@ -275,7 +281,7 @@ const ComingSoon = ({ title }) => (
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen bg-gray-50">
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -323,9 +329,14 @@ function App() {
               <Route path="activos" element={<GestorActivosRoute><AssetManagement /></GestorActivosRoute>} />
               <Route path="activos/inventario" element={<GestorActivosRoute><AssetInventory /></GestorActivosRoute>} />
               <Route path="activos/charts" element={<GestorActivosRoute><AssetCharts /></GestorActivosRoute>} />
+              <Route path="activos/agentes" element={<GestorActivosRoute><AgentManagement /></GestorActivosRoute>} />
 
               {/* Rutas de técnico de inventario */}
               <Route path="inventario-tecnico" element={<TecnicoInventarioRoute><TecnicoInventarioEdicion /></TecnicoInventarioRoute>} />
+
+              {/* Rutas de diseños */}
+              <Route path="disenos" element={<NonAnonymousRoute><Disenos /></NonAnonymousRoute>} />
+              <Route path="disenos/completados" element={<NonAnonymousRoute><Disenos defaultFiltro="completado" /></NonAnonymousRoute>} />
 
               {/* Rutas de directivo financiero */}
               <Route path="directivo" element={<DirectivoFinancieroRoute><DirectivoDashboard /></DirectivoFinancieroRoute>} />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, X, Check, Trash2, Volume2 } from 'lucide-react';
+import { Bell, X, Check, Trash2, Volume2, Palette } from 'lucide-react';
 
 const NotificationBell = ({ notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications, testNotificationSound }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -98,26 +98,32 @@ const NotificationBell = ({ notifications, unreadCount, markAsRead, markAllAsRea
                                             <div
                                                 key={notification.id}
                                                 className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                                                    notification.read 
-                                                        ? 'bg-gray-50 border-gray-200' 
-                                                        : 'bg-blue-50 border-blue-200'
+                                                    notification.read
+                                                        ? 'bg-gray-50 border-gray-200'
+                                                        : notification.type === 'diseno'
+                                                            ? 'bg-purple-50 border-purple-200'
+                                                            : 'bg-blue-50 border-blue-200'
                                                 }`}
                                                 onClick={() => {
-                                                    if (!notification.read) {
-                                                        markAsRead(notification.id);
-                                                    }
+                                                    if (!notification.read) markAsRead(notification.id);
                                                 }}
                                             >
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center space-x-2">
+                                                        <div className="flex items-center gap-2">
+                                                            {notification.type === 'diseno'
+                                                                ? <Palette className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                                                                : <Bell className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                            }
                                                             <h4 className={`text-sm font-medium ${
                                                                 notification.read ? 'text-gray-700' : 'text-gray-900'
                                                             }`}>
                                                                 {notification.title}
                                                             </h4>
                                                             {!notification.read && (
-                                                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                                <div className={`w-2 h-2 rounded-full shrink-0 ${
+                                                                    notification.type === 'diseno' ? 'bg-purple-500' : 'bg-blue-500'
+                                                                }`} />
                                                             )}
                                                         </div>
                                                         <p className={`text-sm mt-1 ${
@@ -125,7 +131,12 @@ const NotificationBell = ({ notifications, unreadCount, markAsRead, markAllAsRea
                                                         }`}>
                                                             {notification.message}
                                                         </p>
-                                                        {notification.incident && (
+                                                        {notification.type === 'diseno' && notification.diseno?.descripcion && (
+                                                            <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+                                                                {notification.diseno.descripcion}
+                                                            </p>
+                                                        )}
+                                                        {notification.type !== 'diseno' && notification.incident && (
                                                             <p className="text-xs text-gray-400 mt-1 truncate">
                                                                 {notification.incident.description}
                                                             </p>
@@ -145,7 +156,7 @@ const NotificationBell = ({ notifications, unreadCount, markAsRead, markAllAsRea
                             {notifications.length > 0 && (
                                 <div className="mt-3 pt-3 border-t border-gray-200">
                                     <p className="text-xs text-gray-500 text-center">
-                                        Se verifican nuevas incidencias cada 30 segundos
+                                        Se verifican nuevas notificaciones cada 30 segundos
                                     </p>
                                 </div>
                             )}

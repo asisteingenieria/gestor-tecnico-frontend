@@ -141,4 +141,36 @@ export const assetHistoryService = {
     actualizarEstadoMantenimiento: (id, nuevoEstado) => api.put(`/activos-tecnico/${id}/estado-mantenimiento`, { nuevoEstado })
 };
 
+// === SERVICIOS DE AGENTES ===
+export const agenteService = {
+    getAll: () => api.get('/agentes'),
+    getById: (id) => api.get(`/agentes/${id}`),
+    create: (data) => api.post('/agentes', data),
+    update: (id, data) => api.put(`/agentes/${id}`, data),
+    delete: (id) => api.delete(`/agentes/${id}`),
+    getActivos: (id) => api.get(`/agentes/${id}/activos`)
+};
+
+// === SERVICIOS DE DISEÑOS ===
+export const disenoService = {
+    getAll: (params = {}) => api.get('/disenos', { params }),
+    getById: (id) => api.get(`/disenos/${id}`),
+    getDisenadores: () => api.get('/disenos/disenadores'),
+    create: (formData) => api.post('/disenos', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    update: (id, formData) => api.put(`/disenos/${id}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    assign: (id, disenador_id) => api.put(`/disenos/${id}/assign`, { disenador_id }),
+    setFechaEstimada: (id, fecha_estimada) => api.put(`/disenos/${id}/fecha-estimada`, { fecha_estimada }),
+    complete: (id) => api.put(`/disenos/${id}/complete`),
+    toggleEspera: (id) => api.put(`/disenos/${id}/espera`),
+    return: (id, formData) => api.put(`/disenos/${id}/return`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    getDevoluciones: (id) => api.get(`/disenos/${id}/devoluciones`),
+    deleteImagen: (id, imagenId) => api.delete(`/disenos/${id}/imagenes/${imagenId}`),
+    downloadImagenes: (id) => api.get(`/disenos/${id}/imagenes/download`, { responseType: 'blob' }),
+    downloadEntregas: (id) => api.get(`/disenos/${id}/entregas/download`, { responseType: 'blob' }),
+    uploadEntrega: (id, formData) => api.post(`/disenos/${id}/entregas`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    replaceEntregas: (id, formData) => api.put(`/disenos/${id}/entregas/replace`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    deleteEntrega: (id, archivoId) => api.delete(`/disenos/${id}/entregas/${archivoId}`),
+    delete: (id) => api.delete(`/disenos/${id}`)
+};
+
 export default api;
