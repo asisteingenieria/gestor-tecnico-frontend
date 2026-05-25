@@ -27,14 +27,15 @@ import {
     FileText,
     Zap,
     History,
-    Trophy
+    Trophy,
+    Palette
 } from 'lucide-react';
 
 const Layout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [hearts, setHearts] = useState([]);
     const [sparks, setSparks] = useState([]);
-    const { user, logout, isAdmin, isSupervisor, isCoordinador, isJefeOperaciones, isTechnician, canSupervise } = useAuth();
+    const { user, logout, isAdmin, isSupervisor, isCoordinador, isJefeOperaciones, isTechnician, isDisenador, canSupervise } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -128,6 +129,10 @@ const Layout = () => {
         { name: 'Incidencias Devueltas', href: '/incidents/returned', icon: RotateCcw, roles: ['admin', 'supervisor', 'coordinador', 'jefe_operaciones', 'administrativo'], showBadge: true },
         { name: 'Historial Aprobadas', href: '/incidents/approved', icon: CheckCircle, roles: ['admin', 'supervisor', 'coordinador', 'jefe_operaciones', 'technician', 'administrativo'] },
         
+        // Diseños
+        { name: 'Diseños', href: '/disenos', icon: Palette, roles: ['admin', 'coordinador', 'supervisor', 'jefe_operaciones', 'administrativo', 'technician', 'disenador'] },
+        { name: 'Diseños Completados', href: '/disenos/completados', icon: CheckCircle, roles: ['disenador', 'admin'] },
+
         // Gestión (solo admin)
         { name: 'Usuarios', href: '/users', icon: Users, roles: ['admin'] },
         { name: 'Estaciones', href: '/workstations', icon: Monitor, roles: ['admin'] },
@@ -289,6 +294,7 @@ const Layout = () => {
                                     user?.role === 'coordinador' ? 'Coordinador' :
                                     user?.role === 'jefe_operaciones' ? 'Jefe Operaciones' :
                                     user?.role === 'administrativo' ? 'Administrativo' :
+                                    user?.role === 'disenador' ? 'Diseñador' :
                                     'Técnico'
                                 )}
                             </p>
@@ -339,8 +345,8 @@ const Layout = () => {
                                 <AlertsDropdown />
                             )}
                             
-                            {/* Notification Bell for Technicians */}
-                            {isTechnician && (
+                            {/* Notification Bell for Technicians and Designers */}
+                            {(isTechnician || isDisenador) && (
                                 <NotificationBell
                                     notifications={notifications}
                                     unreadCount={unreadCount}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { LogIn, User, Lock, AlertCircle, Eye, EyeOff, Wrench, Shield, Zap } from 'lucide-react';
 
 const Login = () => {
@@ -13,7 +13,8 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [focusedField, setFocusedField] = useState('');
     
-    const { login, isAuthenticated } = useAuth();
+    const { login, isAuthenticated, user } = useAuth();
+    const navigate = useNavigate();
 
     useEffect(() => {
         const particles = document.querySelector('.particles');
@@ -30,6 +31,11 @@ const Login = () => {
     }, []);
 
     if (isAuthenticated) {
+        if (user?.role === 'anonimo') return <Navigate to="/chat" replace />;
+        if (user?.role === 'gestorActivos') return <Navigate to="/activos" replace />;
+        if (user?.role === 'tecnicoInventario') return <Navigate to="/inventario-tecnico" replace />;
+        if (user?.role === 'directivoFinanciero') return <Navigate to="/directivo" replace />;
+        if (user?.role === 'disenador') return <Navigate to="/disenos" replace />;
         return <Navigate to="/dashboard" replace />;
     }
 
@@ -47,11 +53,21 @@ const Login = () => {
         setError('');
 
         const result = await login(formData.username, formData.password);
-        
+
         if (!result.success) {
             setError(result.message);
+            setLoading(false);
+            return;
         }
-        
+
+        const role = result.user?.role;
+        if (role === 'anonimo') navigate('/chat', { replace: true });
+        else if (role === 'gestorActivos') navigate('/activos', { replace: true });
+        else if (role === 'tecnicoInventario') navigate('/inventario-tecnico', { replace: true });
+        else if (role === 'directivoFinanciero') navigate('/directivo', { replace: true });
+        else if (role === 'disenador') navigate('/disenos', { replace: true });
+        else navigate('/dashboard', { replace: true });
+
         setLoading(false);
     };
 
@@ -194,7 +210,7 @@ const Login = () => {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .particles {
                     pointer-events: none;
                 }

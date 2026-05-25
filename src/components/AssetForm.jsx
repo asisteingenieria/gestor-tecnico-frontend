@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '../services/api';
 import { X, Upload, Calendar, Building, User, Tag, FileText, Save } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
@@ -36,14 +37,26 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
         almacenamiento: '',
         sistema_operativo: '',
         pulgadas: '',
-        estado: 'funcional'
+        estado: 'funcional',
+        agente_id: ''
     });
 
     const [responsables, setResponsables] = useState([]);
+    const [agentes, setAgentes] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [fileName, setFileName] = useState('');
     const [assetType, setAssetType] = useState('');
+
+    const calcularTipo = (valor) => {
+        if (valor === '' || valor === null || valor === undefined) return null;
+        return parseFloat(valor) >= 400000 ? 'activo' : 'gasto';
+    };
+
+    const formatDateForInput = (dateStr) => {
+        if (!dateStr) return '';
+        return dateStr.split('T')[0];
+    };
 
     const ubicaciones = [
         'Claro', 'Obama', 'IT', 'Contratación', 'Reclutamiento', 'Selección', 'Finanzas'
@@ -111,6 +124,7 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
     useEffect(() => {
         if (isOpen) {
             fetchResponsables();
+            fetchAgentes();
             if (activo) {
                 // Si estamos editando, cargar datos del activo
                 setFormData({
@@ -120,12 +134,12 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
                     responsable: activo.responsable || '',
                     proveedor: activo.proveedor || '',
                     valor: activo.valor || '',
-                    fecha_compra: activo.fecha_compra || '',
+                    fecha_compra: formatDateForInput(activo.fecha_compra),
                     numero_social: activo.numero_social || '',
                     poliza: activo.poliza || '',
                     aseguradora: activo.aseguradora || '',
                     garantia: activo.garantia || 'No',
-                    fecha_vencimiento_garantia: activo.fecha_vencimiento_garantia || '',
+                    fecha_vencimiento_garantia: formatDateForInput(activo.fecha_vencimiento_garantia),
                     orden_compra: activo.orden_compra || '',
                     clasificacion: activo.clasificacion || '',
                     clasificacion_activo_fijo: activo.clasificacion_activo_fijo || '',
@@ -144,7 +158,8 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
                     almacenamiento: activo.almacenamiento || '',
                     sistema_operativo: activo.sistema_operativo || '',
                     pulgadas: activo.pulgadas || '',
-                    estado: activo.estado || 'funcional'
+                    estado: activo.estado || 'funcional',
+                    agente_id: activo.agente_id || ''
                 });
                 setFileName(activo.adjunto_archivo || '');
                 setAssetType(detectAssetType(activo.numero_placa));
@@ -181,7 +196,8 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
                     almacenamiento: '',
                     sistema_operativo: '',
                     pulgadas: '',
-                    estado: 'funcional'
+                    estado: 'funcional',
+                    agente_id: ''
                 });
                 setFileName('');
                 setAssetType('');
@@ -196,6 +212,15 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
             setResponsables(response.data.responsables);
         } catch (error) {
             console.error('Error al cargar responsables:', error);
+        }
+    };
+
+    const fetchAgentes = async () => {
+        try {
+            const response = await api.get('/agentes');
+            setAgentes(response.data.agentes);
+        } catch (error) {
+            console.error('Error al cargar agentes:', error);
         }
     };
 
@@ -650,6 +675,29 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
                             </p>
                         </div>
 
+                        {/* Agente del Call Center */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Agente del Call Center
+                            </label>
+                            <select
+                                name="agente_id"
+                                value={formData.agente_id}
+                                onChange={handleInputChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">Sin agente asignado</option>
+                                {agentes.map(agente => (
+                                    <option key={agente.id} value={agente.id}>
+                                        {agente.nombres} {agente.apellidos} — {agente.campana}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Agente del call center al que está asignado este activo (opcional)
+                            </p>
+                        </div>
+
                         {/* Proveedor */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -679,6 +727,15 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="0"
                             />
+                            {formData.valor !== '' && (
+                                <span className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    calcularTipo(formData.valor) === 'activo'
+                                        ? 'bg-green-100 text-green-800'
+                                        : 'bg-orange-100 text-orange-800'
+                                }`}>
+                                    {calcularTipo(formData.valor) === 'activo' ? 'Tipo: Activo (≥ $400.000)' : 'Tipo: Gasto (< $400.000)'}
+                                </span>
+                            )}
                         </div>
 
                         {/* Fecha de Compra */}

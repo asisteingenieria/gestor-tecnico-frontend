@@ -32,9 +32,7 @@ export const AuthProvider = ({ children }) => {
         const verifyToken = async () => {
             if (token) {
                 try {
-                    console.log('Verificando token...');
                     const response = await axios.get(`${API_BASE_URL}/auth/me`);
-                    console.log('Usuario verificado:', response.data);
                     setUser(response.data);
                 } catch (error) {
                     console.error('Token inválido:', error);
@@ -56,18 +54,14 @@ export const AuthProvider = ({ children }) => {
             });
 
             const { token: newToken, user: userData } = response.data;
-            console.log('Login exitoso, datos usuario:', userData);
-            
+
             localStorage.setItem('token', newToken);
             setToken(newToken);
             setUser(userData);
             setLoading(false);
 
-            return { success: true };
+            return { success: true, user: userData };
         } catch (error) {
-            console.error('Error en login:', error);
-            console.error('Response data:', error.response?.data);
-            console.error('Response status:', error.response?.status);
             setLoading(false);
             return { 
                 success: false, 
@@ -118,6 +112,7 @@ export const AuthProvider = ({ children }) => {
         isGestorActivos: user?.role === 'gestorActivos',
         isTecnicoInventario: user?.role === 'tecnicoInventario',
         isDirectivoFinanciero: user?.role === 'directivoFinanciero',
+        isDisenador: user?.role === 'disenador',
         canSupervise: user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'coordinador' || user?.role === 'administrativo' || user?.role === 'jefe_operaciones',
         canCreateIncidents: user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'coordinador' || user?.role === 'jefe_operaciones',
         // Permisos para activos

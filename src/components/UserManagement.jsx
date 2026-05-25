@@ -49,7 +49,8 @@ const UserManagement = () => {
         { value: 'jefe_operaciones', label: 'Jefe de Operaciones', color: 'bg-purple-100 text-purple-800' },
         { value: 'administrativo', label: 'Administrativo', color: 'bg-orange-100 text-orange-800' },
         { value: 'gestorActivos', label: 'Gestor de Activos', color: 'bg-indigo-100 text-indigo-800' },
-        { value: 'tecnicoInventario', label: 'Técnico Inventario', color: 'bg-teal-100 text-teal-800' }
+        { value: 'tecnicoInventario', label: 'Técnico Inventario', color: 'bg-teal-100 text-teal-800' },
+        { value: 'disenador', label: 'Diseñador', color: 'bg-purple-100 text-purple-800' }
     ];
 
     const sedes = [
@@ -203,7 +204,7 @@ const UserManagement = () => {
             }
             
             // Para gestores de activos y técnicos de inventario, no asignar sede ni departamento
-            if (submitData.role === 'gestorActivos' || submitData.role === 'tecnicoInventario') {
+            if (submitData.role === 'gestorActivos' || submitData.role === 'tecnicoInventario' || submitData.role === 'disenador') {
                 submitData.sede = null;
                 submitData.departamento = null;
             }
@@ -332,6 +333,7 @@ const UserManagement = () => {
                             <option value="jefe_operaciones">Jefes de Operaciones</option>
                             <option value="gestorActivos">Gestores de Activos</option>
                             <option value="tecnicoInventario">Técnicos Inventario</option>
+                            <option value="disenador">Diseñadores</option>
                         </select>
                     </div>
 
@@ -399,8 +401,8 @@ const UserManagement = () => {
                                                 <div className="flex items-center">
                                                     <MapPin className="h-4 w-4 mr-1" />
                                                     <span>
-                                                        {(user.role === 'gestorActivos' || user.role === 'tecnicoInventario')
-                                                            ? (user.role === 'gestorActivos' ? 'Gestión de Activos - Sin sede específica' : 'Técnico Inventario - Sin sede específica')
+                                                        {(user.role === 'gestorActivos' || user.role === 'tecnicoInventario' || user.role === 'disenador')
+                                                            ? (user.role === 'gestorActivos' ? 'Gestión de Activos - Sin sede específica' : user.role === 'disenador' ? 'Diseñador - Sin sede específica' : 'Técnico Inventario - Sin sede específica')
                                                             : `${sedes.find(s => s.value === user.sede)?.label || user.sede}${user.departamento ? ` - ${departamentos.find(d => d.value === user.departamento)?.label || user.departamento}` : ''}`
                                                         }
                                                     </span>
@@ -534,7 +536,7 @@ const UserManagement = () => {
                                 </div>
 
                                 {/* Sede - Solo mostrar si NO es gestorActivos */}
-                                {formData.role !== 'gestorActivos' && formData.role !== 'tecnicoInventario' && (
+                                {formData.role !== 'gestorActivos' && formData.role !== 'tecnicoInventario' && formData.role !== 'disenador' && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Sede *
@@ -591,6 +593,15 @@ const UserManagement = () => {
                                         <p className="text-sm text-indigo-700">
                                             <strong>Nota:</strong> Los gestores de activos tienen acceso exclusivo al módulo de gestión de activos. 
                                             No requieren sede ni departamento específico.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Mensaje informativo para diseñadores */}
+                                {formData.role === 'disenador' && (
+                                    <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+                                        <p className="text-sm text-purple-700">
+                                            Los diseñadores gestionan solicitudes de diseño. No requieren sede ni departamento específico.
                                         </p>
                                     </div>
                                 )}
