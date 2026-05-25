@@ -603,8 +603,11 @@ const formatBytes = (bytes) => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const BOGOTA_OFFSET_MS = -5 * 3600000; // UTC-5, sin horario de verano
+
 const formatDatetime = (dateStr) =>
     new Date(dateStr).toLocaleString('es-CO', {
+        timeZone: 'America/Bogota',
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit', hour12: true
     });
@@ -641,8 +644,8 @@ const formatTimeUntil = (fecha) => {
 const toDatetimeLocal = (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    const offset = d.getTimezoneOffset() * 60000;
-    return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+    // Resta 5 horas (UTC-5 Bogotá) sin depender del timezone del navegador
+    return new Date(d.getTime() + BOGOTA_OFFSET_MS).toISOString().slice(0, 16);
 };
 
 // Componente de tiempo transcurrido con actualización automática cada minuto
@@ -716,7 +719,11 @@ const DisenoDetailModal = ({
     const handleSaveFecha = async () => {
         setSavingFecha(true);
         try {
-            await onSetFechaEstimada(fechaInput || null);
+            // Trata el input como hora Bogotá (UTC-5) y convierte a UTC explícitamente
+            const isoUTC = fechaInput
+                ? new Date(new Date(fechaInput + ':00Z').getTime() - BOGOTA_OFFSET_MS).toISOString()
+                : null;
+            await onSetFechaEstimada(isoUTC);
             setEditingFecha(false);
         } catch {
             // error shown by parent
