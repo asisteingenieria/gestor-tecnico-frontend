@@ -625,10 +625,12 @@ const formatElapsed = (fromDate) => {
 
 const formatOverdue = (fecha) => {
     const diffMs = Date.now() - new Date(fecha).getTime();
-    const totalHours = Math.floor(diffMs / 3600000);
+    const totalMins = Math.floor(diffMs / 60000);
+    const totalHours = Math.floor(totalMins / 60);
     const days = Math.floor(totalHours / 24);
     if (days > 0) return `${days}d ${totalHours % 24}h`;
-    return `${totalHours}h`;
+    if (totalHours > 0) return `${totalHours}h ${totalMins % 60}m`;
+    return `${totalMins}m`;
 };
 
 const formatTimeUntil = (fecha) => {
@@ -646,6 +648,15 @@ const toDatetimeLocal = (dateStr) => {
     const d = new Date(dateStr);
     // Resta 5 horas (UTC-5 Bogotá) sin depender del timezone del navegador
     return new Date(d.getTime() + BOGOTA_OFFSET_MS).toISOString().slice(0, 16);
+};
+
+// Hook que fuerza un re-render cada minuto para recalcular contadores
+const useMinuteTick = () => {
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const id = setInterval(() => setTick(t => t + 1), 60000);
+        return () => clearInterval(id);
+    }, []);
 };
 
 // Componente de tiempo transcurrido con actualización automática cada minuto
@@ -668,6 +679,7 @@ const DisenoDetailModal = ({
     onSetFechaEstimada, canSetFechaEstimada,
     onDownloadAll, onDownloadAllEntregas
 }) => {
+    useMinuteTick();
     const [desc, setDescExpanded] = useState(false);
     const [completing, setCompleting] = useState(false);
     const [togglingEspera, setTogglingEspera] = useState(false);
@@ -1154,6 +1166,7 @@ const DisenoDetailModal = ({
 // ── Tarjeta de diseño ─────────────────────────────────────────────────────────
 const DisenoCard = ({ diseno, onView, onAssign, onDelete, isAdminOrCoord, onToggleEspera, canToggleEspera }) => {
     const [toggling, setToggling] = useState(false);
+    useMinuteTick();
     const isAtrasado = diseno.fecha_estimada &&
         new Date(diseno.fecha_estimada) < new Date() &&
         diseno.estado !== 'completado';
@@ -1224,6 +1237,7 @@ const DisenoCard = ({ diseno, onView, onAssign, onDelete, isAdminOrCoord, onTogg
                 <span className="flex items-center gap-1 text-blue-500 font-medium">
                     <Timer className="h-3.5 w-3.5" />
                     <ElapsedTime from={diseno.created_at} />
+                    <span className="font-normal text-blue-400">en proceso</span>
                 </span>
             )}
             {diseno.fecha_estimada && !isAtrasado && diseno.estado !== 'completado' && (
@@ -1361,6 +1375,12 @@ const Disenos = ({ defaultFiltro = '' }) => {
 
     useEffect(() => { load(); }, [filtro, fechaDesde, fechaHasta]);
 
+    // Refresco automático del servidor cada 5 minutos para mantener datos actualizados
+    useEffect(() => {
+        const id = setInterval(load, 5 * 60000);
+        return () => clearInterval(id);
+    }, [filtro, fechaDesde, fechaHasta]);
+
     const limpiarFechas = () => {
         setFechaDesde('');
         setFechaHasta('');
@@ -1437,6 +1457,7 @@ const Disenos = ({ defaultFiltro = '' }) => {
             await disenoService.setFechaEstimada(detailDiseno.id, fecha);
             const updated = await disenoService.getById(detailDiseno.id);
             setDetailDiseno(updated.data.data);
+            load();
         } catch (err) {
             alert(err.response?.data?.message || 'Error al guardar la fecha');
             throw err;
