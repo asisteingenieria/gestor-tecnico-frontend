@@ -1470,16 +1470,16 @@ const Disenos = ({ defaultFiltro = '' }) => {
     };
 
     const canComplete = (d) =>
-        isAdminOrCoord || (isDisenador && d.disenador_id === user?.id);
+        isDisenador && d.disenador_id === user?.id;
 
     const canReturn = (d) =>
-        !isAdmin && (isCoordinador || d.solicitante_id === user?.id);
+        !isAdmin && !isDisenador && d.solicitante_id === user?.id;
 
     const canDeleteImg = (d) =>
-        !isAdmin && (isCoordinador || d.solicitante_id === user?.id);
+        !isAdmin && !isDisenador && d.solicitante_id === user?.id;
 
     const canUploadEntrega = (d) =>
-        isAdminOrCoord || (isDisenador && d.disenador_id === user?.id);
+        isDisenador && d.disenador_id === user?.id;
 
     const canSetFechaEstimada = (d) =>
         isDisenador && d.disenador_id === user?.id;
@@ -1531,7 +1531,7 @@ const Disenos = ({ defaultFiltro = '' }) => {
                         }
                     </p>
                 </div>
-                {!isDisenador && !isAdmin && !isCompletadosPage && (
+                {!isAdmin && !isCompletadosPage && (
                     <button
                         onClick={() => setShowForm(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors self-start sm:self-auto"
@@ -1637,7 +1637,7 @@ const Disenos = ({ defaultFiltro = '' }) => {
                 <div className="text-center py-16 text-gray-400">
                     <Palette className="h-12 w-12 mx-auto mb-3 opacity-30" />
                     <p className="text-base font-medium">No hay solicitudes de diseño</p>
-                    {!isDisenador && !isAdmin && (
+                    {!isAdmin && (
                         <p className="text-sm mt-1">
                             <button onClick={() => setShowForm(true)} className="text-purple-600 hover:underline">
                                 Crea la primera solicitud
