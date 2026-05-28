@@ -448,6 +448,72 @@ const AsignarModal = ({ diseno, onClose, onSaved }) => {
     );
 };
 
+// ── Modal Completar Diseño ────────────────────────────────────────────────────
+const CompletarModal = ({ diseno, onClose, onCompleted }) => {
+    const [nota, setNota] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const submit = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            await disenoService.complete(diseno.id, nota.trim() || null);
+            onCompleted();
+        } catch (err) {
+            setError(err.response?.data?.message || 'Error al completar el diseño');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                <div className="flex items-center justify-between p-5 border-b">
+                    <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        Completar diseño
+                    </h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+                </div>
+                <div className="p-5 space-y-4">
+                    <p className="text-sm text-gray-600">
+                        Solicitud: <span className="font-medium">{diseno.nombre}</span>
+                    </p>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Nota para el solicitante <span className="text-gray-400 font-normal">(opcional)</span>
+                        </label>
+                        <textarea
+                            value={nota}
+                            onChange={e => setNota(e.target.value)}
+                            rows={4}
+                            placeholder="Ej: Los archivos incluyen versiones en PNG y AI. Cualquier ajuste, avísame."
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                        />
+                    </div>
+                    {error && (
+                        <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                            {error}
+                        </div>
+                    )}
+                </div>
+                <div className="flex gap-3 p-5 pt-0">
+                    <button onClick={onClose} disabled={loading} className="flex-1 py-2.5 px-4 border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60">
+                        Cancelar
+                    </button>
+                    <button onClick={submit} disabled={loading} className="flex-1 py-2.5 px-4 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        {loading ? 'Completando...' : 'Marcar como Completado'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ── Modal Devolver Diseño ─────────────────────────────────────────────────────
 const ReturnModal = ({ diseno, onClose, onReturned }) => {
     const [nota, setNota] = useState('');
@@ -681,7 +747,6 @@ const DisenoDetailModal = ({
 }) => {
     useMinuteTick();
     const [desc, setDescExpanded] = useState(false);
-    const [completing, setCompleting] = useState(false);
     const [togglingEspera, setTogglingEspera] = useState(false);
     const [uploadingEntrega, setUploadingEntrega] = useState(false);
     const [replacingEntregas, setReplacingEntregas] = useState(false);
@@ -744,11 +809,7 @@ const DisenoDetailModal = ({
         }
     };
 
-    const handleComplete = async () => {
-        setCompleting(true);
-        try { await onComplete(diseno.id); }
-        finally { setCompleting(false); }
-    };
+    const handleComplete = () => onComplete(diseno);
 
     const handleToggleEspera = async () => {
         setTogglingEspera(true);
@@ -968,6 +1029,17 @@ const DisenoDetailModal = ({
                                 )}
                             </div>
 
+                            {/* Nota de completado */}
+                            {diseno.nota_completado && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <p className="text-xs font-medium text-green-700 mb-1 flex items-center gap-1.5">
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                        Nota del diseñador al completar
+                                    </p>
+                                    <p className="text-sm text-green-800 whitespace-pre-wrap leading-relaxed">{diseno.nota_completado}</p>
+                                </div>
+                            )}
+
                             {/* Archivos de referencia */}
                             {diseno.imagenes?.length > 0 && (
                                 <div>
@@ -1096,9 +1168,9 @@ const DisenoDetailModal = ({
                             {(canComplete || canReturn) && (
                                 <div className="pt-2 border-t flex flex-col gap-2">
                                     {canComplete && ['en_progreso', 'devuelto'].includes(diseno.estado) && (
-                                        <button onClick={handleComplete} disabled={completing} className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-60 transition-colors">
+                                        <button onClick={handleComplete} className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
                                             <CheckCircle className="h-4 w-4" />
-                                            {completing ? 'Marcando...' : 'Marcar como Completado'}
+                                            Marcar como Completado
                                         </button>
                                     )}
                                     {canReturn && diseno.estado === 'completado' && (
@@ -1360,6 +1432,7 @@ const Disenos = ({ defaultFiltro = '' }) => {
     const [detailDiseno, setDetailDiseno] = useState(null);
     const [asignarDiseno, setAsignarDiseno] = useState(null);
     const [returnDiseno, setReturnDiseno] = useState(null);
+    const [completarDiseno, setCompletarDiseno] = useState(null);
 
     const load = async () => {
         try {
@@ -1392,15 +1465,9 @@ const Disenos = ({ defaultFiltro = '' }) => {
         setFechaHasta('');
     };
 
-    const handleComplete = async (id) => {
-        try {
-            await disenoService.complete(id);
-            const updated = await disenoService.getById(id);
-            setDetailDiseno(updated.data.data);
-            load();
-        } catch (err) {
-            alert(err.response?.data?.message || 'Error al completar');
-        }
+    const handleComplete = (d) => {
+        setDetailDiseno(null);
+        setCompletarDiseno(d);
     };
 
     const handleDeleteImagen = async (imagenId) => {
@@ -1717,6 +1784,14 @@ const Disenos = ({ defaultFiltro = '' }) => {
                     canSetFechaEstimada={canSetFechaEstimada(detailDiseno)}
                     onDownloadAll={handleDownloadAll}
                     onDownloadAllEntregas={handleDownloadAllEntregas}
+                />
+            )}
+
+            {completarDiseno && (
+                <CompletarModal
+                    diseno={completarDiseno}
+                    onClose={() => setCompletarDiseno(null)}
+                    onCompleted={() => { setCompletarDiseno(null); load(); }}
                 />
             )}
 
