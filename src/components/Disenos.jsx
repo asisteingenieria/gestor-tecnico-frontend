@@ -978,6 +978,9 @@ const DisenoDetailModal = ({
                                             {imageFiles.length > 0 && (
                                                 <span className="text-xs font-normal text-gray-400">· {imageFiles.length} imagen{imageFiles.length > 1 ? 'es' : ''}</span>
                                             )}
+                                            {diseno.solicitante_nombre && (
+                                                <span className="text-xs font-normal text-gray-400">· por {diseno.solicitante_nombre}</span>
+                                            )}
                                         </h3>
                                         <button onClick={handleDownloadAll} disabled={downloadingAll} className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-medium disabled:opacity-60 transition-colors">
                                             <Download className="h-3.5 w-3.5" />
@@ -997,6 +1000,9 @@ const DisenoDetailModal = ({
                                             Archivos entregados
                                             {diseno.entregas?.length > 0 && (
                                                 <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">{diseno.entregas.length}</span>
+                                            )}
+                                            {diseno.disenador_nombre && (
+                                                <span className="text-xs font-normal text-gray-400">· por {diseno.disenador_nombre}</span>
                                             )}
                                         </h3>
                                         {diseno.entregas?.length > 0 && (
