@@ -217,8 +217,8 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
 
     const fetchAgentes = async () => {
         try {
-            const response = await api.get('/agentes');
-            setAgentes(response.data.agentes);
+            const response = await api.get('/users-company');
+            setAgentes(response.data.empleados);
         } catch (error) {
             console.error('Error al cargar agentes:', error);
         }
@@ -689,7 +689,7 @@ const AssetForm = ({ isOpen, onClose, activo = null, onSuccess }) => {
                                 <option value="">Sin agente asignado</option>
                                 {agentes.map(agente => (
                                     <option key={agente.id} value={agente.id}>
-                                        {agente.nombres} {agente.apellidos} — {agente.campana}
+                                        {agente.nombre_completo} — {agente.numero_identificacion}
                                     </option>
                                 ))}
                             </select>

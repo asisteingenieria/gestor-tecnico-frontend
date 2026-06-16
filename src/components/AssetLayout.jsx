@@ -51,10 +51,10 @@ const AssetLayout = () => {
             current: location.pathname === '/activos/charts'
         },
         {
-            name: 'Agentes',
-            href: '/activos/agentes',
+            name: 'Empleados',
+            href: '/activos/empleados',
             icon: Users,
-            current: location.pathname === '/activos/agentes'
+            current: location.pathname === '/activos/empleados'
         }
     ];
 

@@ -1242,7 +1242,7 @@ const DisenoDetailModal = ({
 };
 
 // ── Tarjeta de diseño ─────────────────────────────────────────────────────────
-const DisenoCard = ({ diseno, onView, onAssign, onDelete, isAdminOrCoord, onToggleEspera, canToggleEspera }) => {
+const DisenoCard = ({ diseno, onView, onAssign, onDelete, isAdminOrCoord, canDelete, onToggleEspera, canToggleEspera }) => {
     const [toggling, setToggling] = useState(false);
     useMinuteTick();
     const isAtrasado = diseno.fecha_estimada &&
@@ -1388,22 +1388,22 @@ const DisenoCard = ({ diseno, onView, onAssign, onDelete, isAdminOrCoord, onTogg
                 Ver detalle
             </button>
             {isAdminOrCoord && (
-                <>
-                    <button
-                        onClick={() => onAssign(diseno)}
-                        title="Asignar diseñador"
-                        className="p-1.5 border border-blue-200 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
-                    >
-                        <UserCheck className="h-4 w-4" />
-                    </button>
-                    <button
-                        onClick={() => onDelete(diseno)}
-                        title="Eliminar"
-                        className="p-1.5 border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </button>
-                </>
+                <button
+                    onClick={() => onAssign(diseno)}
+                    title="Asignar diseñador"
+                    className="p-1.5 border border-blue-200 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                >
+                    <UserCheck className="h-4 w-4" />
+                </button>
+            )}
+            {canDelete && (
+                <button
+                    onClick={() => onDelete(diseno)}
+                    title="Eliminar"
+                    className="p-1.5 border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
             )}
         </div>
     </div>
@@ -1578,6 +1578,9 @@ const Disenos = ({ defaultFiltro = '' }) => {
     const canSetFechaEstimada = (d) =>
         isDisenador && d.disenador_id === user?.id;
 
+    const canDeleteDiseno = (d) =>
+        isAdminOrCoord || isDisenador;
+
     const canToggleEspera = (d) =>
         isDisenador && d.disenador_id === user?.id && ['en_progreso', 'en_espera'].includes(d.estado);
 
@@ -1746,6 +1749,7 @@ const Disenos = ({ defaultFiltro = '' }) => {
                             key={d.id}
                             diseno={d}
                             isAdminOrCoord={isAdminOrCoord}
+                            canDelete={canDeleteDiseno(d)}
                             onView={handleView}
                             onAssign={setAsignarDiseno}
                             onDelete={handleDelete}
