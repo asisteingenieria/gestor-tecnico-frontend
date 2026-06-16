@@ -141,14 +141,17 @@ export const assetHistoryService = {
     actualizarEstadoMantenimiento: (id, nuevoEstado) => api.put(`/activos-tecnico/${id}/estado-mantenimiento`, { nuevoEstado })
 };
 
-// === SERVICIOS DE AGENTES ===
-export const agenteService = {
-    getAll: () => api.get('/agentes'),
-    getById: (id) => api.get(`/agentes/${id}`),
-    create: (data) => api.post('/agentes', data),
-    update: (id, data) => api.put(`/agentes/${id}`, data),
-    delete: (id) => api.delete(`/agentes/${id}`),
-    getActivos: (id) => api.get(`/agentes/${id}/activos`)
+// === SERVICIOS DE EMPLEADOS (users_company) ===
+export const userCompanyService = {
+    getAll: () => api.get('/users-company'),
+    getById: (id) => api.get(`/users-company/${id}`),
+    create: (data) => api.post('/users-company', data),
+    update: (id, data) => api.put(`/users-company/${id}`, data),
+    delete: (id) => api.delete(`/users-company/${id}`),
+    getGastoTotal: () => api.get('/users-company/gasto-total'),
+    getActivos: (id) => api.get(`/users-company/${id}/activos`),
+    assignActivo: (id, activoId) => api.put(`/users-company/${id}/activos/${activoId}`),
+    unassignActivo: (id, activoId) => api.delete(`/users-company/${id}/activos/${activoId}`)
 };
 
 // === SERVICIOS DE DISEÑOS ===

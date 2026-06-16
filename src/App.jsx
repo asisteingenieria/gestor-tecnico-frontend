@@ -329,7 +329,7 @@ function App() {
               <Route path="activos" element={<GestorActivosRoute><AssetManagement /></GestorActivosRoute>} />
               <Route path="activos/inventario" element={<GestorActivosRoute><AssetInventory /></GestorActivosRoute>} />
               <Route path="activos/charts" element={<GestorActivosRoute><AssetCharts /></GestorActivosRoute>} />
-              <Route path="activos/agentes" element={<GestorActivosRoute><AgentManagement /></GestorActivosRoute>} />
+              <Route path="activos/empleados" element={<GestorActivosRoute><AgentManagement /></GestorActivosRoute>} />
 
               {/* Rutas de técnico de inventario */}
               <Route path="inventario-tecnico" element={<TecnicoInventarioRoute><TecnicoInventarioEdicion /></TecnicoInventarioRoute>} />
