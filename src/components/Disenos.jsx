@@ -323,7 +323,7 @@ const DisenoFormModal = ({ onClose, onSaved, initial = null }) => {
                             className="hidden"
                             onChange={addFiles}
                         />
-                        <p className="text-xs text-gray-400 mt-1">Puedes agregar varias tandas. Máx. 20 MB por archivo.</p>
+                        <p className="text-xs text-gray-400 mt-1">Puedes agregar varias tandas. Máx. 100 MB por archivo.</p>
 
                         {/* Lista de archivos seleccionados */}
                         {files.length > 0 && (
