@@ -85,13 +85,13 @@ const EquipoAsistencia = () => {
         if (tab !== 'todos') lista = lista.filter((e) => e.estado === tab);
         if (busqueda.trim()) {
             const q = busqueda.trim().toLowerCase();
-            lista = lista.filter((e) => e.nombre.toLowerCase().includes(q) || e.cedula?.includes(q));
+            lista = lista.filter((e) => (e.nombre || '').toLowerCase().includes(q) || e.cedula?.includes(q));
         }
         return [...lista].sort((a, b) => {
             const pa = (a.estado === 'ausente' || esTarde(a)) ? 0 : ORDEN_ESTADO[a.estado] ?? 9;
             const pb = (b.estado === 'ausente' || esTarde(b)) ? 0 : ORDEN_ESTADO[b.estado] ?? 9;
             if (pa !== pb) return pa - pb;
-            return a.nombre.localeCompare(b.nombre);
+            return (a.nombre || '').localeCompare(b.nombre || '');
         });
     }, [equipo, tab, busqueda]);
 
