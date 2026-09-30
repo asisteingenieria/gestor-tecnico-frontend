@@ -35,6 +35,15 @@ import RecursosHumanosLayout from './components/RecursosHumanosLayout';
 import NovedadesRRHH from './components/NovedadesRRHH';
 import Traspasos from './components/Traspasos';
 import PasivoVacacional from './components/PasivoVacacional';
+import AsistenciaLayout from './components/asistencia/AsistenciaLayout';
+import MiJornada from './components/asistencia/MiJornada';
+import MiHorario from './components/asistencia/MiHorario';
+import MiTrazabilidad from './components/asistencia/MiTrazabilidad';
+import MisEstadisticas from './components/asistencia/MisEstadisticas';
+import HorasExtra from './components/asistencia/HorasExtra';
+import EquipoAsistencia from './components/asistencia/EquipoAsistencia';
+import TrazabilidadEmpleado from './components/asistencia/TrazabilidadEmpleado';
+import GestionHorarios from './components/asistencia/GestionHorarios';
 
 // Componente para determinar el layout según el rol
 const LayoutWrapper = ({ children }) => {
@@ -58,6 +67,10 @@ const LayoutWrapper = ({ children }) => {
 
   if (user?.role === 'recursosHumanos') {
     return <RecursosHumanosLayout>{children}</RecursosHumanosLayout>;
+  }
+
+  if (user?.role === 'empleado' || user?.role === 'director_operaciones') {
+    return <AsistenciaLayout>{children}</AsistenciaLayout>;
   }
 
   return <Layout>{children}</Layout>;
@@ -114,6 +127,14 @@ const RedirectByRole = () => {
     return <Navigate to="/recursos-humanos" replace />;
   }
 
+  if (user?.role === 'empleado') {
+    return <Navigate to="/asistencia" replace />;
+  }
+
+  if (user?.role === 'director_operaciones') {
+    return <Navigate to="/operaciones" replace />;
+  }
+
   return <Navigate to="/dashboard" replace />;
 };
 
@@ -151,6 +172,14 @@ const DashboardRoute = () => {
 
   if (user?.role === 'recursosHumanos') {
     return <Navigate to="/recursos-humanos" replace />;
+  }
+
+  if (user?.role === 'empleado') {
+    return <Navigate to="/asistencia" replace />;
+  }
+
+  if (user?.role === 'director_operaciones') {
+    return <Navigate to="/operaciones" replace />;
   }
 
   return <Dashboard />;
@@ -310,6 +339,54 @@ const RecursosHumanosRoute = ({ children }) => {
   return children;
 };
 
+// Componente para rutas que requieren rol de empleado
+const EmpleadoRoute = ({ children }) => {
+  const { isEmpleado, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  if (!isEmpleado) {
+    return (
+      <div className="text-center py-12">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Acceso Denegado</h1>
+        <p className="text-gray-600">Solo los empleados pueden acceder a esta sección.</p>
+      </div>
+    );
+  }
+
+  return children;
+};
+
+// Componente para rutas que requieren rol de director de operaciones
+const DirectorOperacionesRoute = ({ children }) => {
+  const { isDirectorOperaciones, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  if (!isDirectorOperaciones) {
+    return (
+      <div className="text-center py-12">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Acceso Denegado</h1>
+        <p className="text-gray-600">Solo el director de operaciones puede acceder a esta sección.</p>
+      </div>
+    );
+  }
+
+  return children;
+};
+
 // Componente placeholder para rutas que aún no están implementadas
 const ComingSoon = ({ title }) => (
   <div className="text-center py-12">
@@ -386,6 +463,23 @@ function App() {
               {/* Rutas de directivo financiero */}
               <Route path="directivo" element={<DirectivoFinancieroRoute><DirectivoDashboard /></DirectivoFinancieroRoute>} />
               <Route path="directivo/inventario" element={<DirectivoFinancieroRoute><DirectivoDashboard /></DirectivoFinancieroRoute>} />
+
+              {/* Rutas de asistencia — empleado */}
+              <Route path="asistencia" element={<EmpleadoRoute><MiJornada /></EmpleadoRoute>} />
+              <Route path="asistencia/horario" element={<EmpleadoRoute><MiHorario /></EmpleadoRoute>} />
+              <Route path="asistencia/trazabilidad" element={<EmpleadoRoute><MiTrazabilidad /></EmpleadoRoute>} />
+              <Route path="asistencia/estadisticas" element={<EmpleadoRoute><MisEstadisticas /></EmpleadoRoute>} />
+              <Route path="asistencia/horas-extra" element={<EmpleadoRoute><HorasExtra /></EmpleadoRoute>} />
+
+              {/* Rutas de asistencia — director de operaciones */}
+              <Route path="operaciones" element={<DirectorOperacionesRoute><MiJornada /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/horario" element={<DirectorOperacionesRoute><MiHorario /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/trazabilidad" element={<DirectorOperacionesRoute><MiTrazabilidad /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/estadisticas" element={<DirectorOperacionesRoute><MisEstadisticas /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/equipo" element={<DirectorOperacionesRoute><EquipoAsistencia /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/equipo/:empleadoId/trazabilidad" element={<DirectorOperacionesRoute><TrazabilidadEmpleado /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/horarios" element={<DirectorOperacionesRoute><GestionHorarios /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/horas-extra" element={<DirectorOperacionesRoute><HorasExtra /></DirectorOperacionesRoute>} />
             </Route>
 
             {/* Ruta catch-all */}

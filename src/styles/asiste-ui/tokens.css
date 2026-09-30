@@ -1,0 +1,120 @@
+/* Asiste ING · Gestión Humana — design tokens (tema claro por defecto, oscuro con data-theme="dark") */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root, [data-theme="light"] {
+  --brand-navy: #1856a4;  /* Azul profundo del logo (vértice superior). Hover del botón primario, t */
+  --brand-blue: #1372b8;  /* Azul del wordmark ASISTE ING. Color de marca principal; enlaces e icon */
+  --brand-azure: #0a8ec4;  /* Azul medio del degradado. Solo gráficos y decoración, nunca texto sobr */
+  --brand-cyan: #01acd1;  /* Cian del logo. Acento: indicador activo, foco, barras de progreso. Nun */
+  --brand-aqua: #30bacf;  /* Aqua de la punta derecha del logo. Solo decoración y gráficos. */
+  --primary: var(--brand-blue);  /* Fondo de botón primario y elementos seleccionados. Blanco encima 5.1:1 */
+  --primary-hover: var(--brand-navy);  /* Hover/pressed del botón primario. */
+  --primary-soft: #e6f1fa;  /* Fondo de fila seleccionada, chip de filtro activo, icono de KPI. Texto */
+  --primary-soft-ink: var(--brand-navy);  /* Texto e iconos sobre primary-soft (6.3:1 / 7.2:1). */
+  --on-primary: #ffffff;  /* Texto sobre primary y sobre danger. */
+  --surface-0: #f4f7fb;  /* Fondo de la página (área de contenido). */
+  --surface-100: #ffffff;  /* Tarjetas, tabla, modales, barra superior clara. */
+  --surface-200: #eef3f9;  /* Encabezado de tabla, hover de fila, campos deshabilitados. */
+  --border: #dbe4ef;  /* Bordes de tarjetas, divisores de tabla, campos en reposo. */
+  --border-strong: #8c9db3;  /* Borde de campos de formulario (3:1 control). */
+  --ink: #0f1f35;  /* Texto principal sobre surface-0/100/200. */
+  --ink-muted: #52627a;  /* Texto secundario: correos, etiquetas de KPI, descripciones. */
+  --ink-subtle: #647389;  /* Placeholder, tipo de documento (CC), metadatos. 4.8:1 sobre blanco. */
+  --sidebar-bg: #0f2f5c;  /* Fondo del menú lateral oscuro (opción A) y barra superior navy (opción */
+  --sidebar-ink: #c9d8ee;  /* Texto de ítems del menú en reposo sobre sidebar-bg (9.2:1). */
+  --sidebar-active: #1b4a86;  /* Fondo del ítem activo del menú oscuro; blanco encima 8.9:1. */
+  --sidebar-indicator: var(--brand-cyan);  /* Barra de 3px a la izquierda del ítem activo; subrayado de pestaña acti */
+  --focus-ring: var(--brand-cyan);  /* Anillo de foco de 2px en todo control interactivo. */
+  --success: #2a7430;  /* Texto/icono de estado Activo. */
+  --success-soft: #e6f3e6;  /* Fondo del badge Activo. */
+  --warning: #8a5a00;  /* Estado Vacaciones / Incapacidad, novedades pendientes. */
+  --warning-soft: #fdf1dc;  /* Fondo del badge de advertencia. */
+  --danger: #c0362c;  /* Acción eliminar, estado Retirado, errores de validación. */
+  --danger-soft: #fbe7e5;  /* Fondo del badge Retirado y de la cabecera del modal de eliminación. */
+  --danger-solid: #c0362c;  /* Fondo del botón Eliminar confirmado; blanco encima 5.5:1. */
+  --cat-hogar: #1856a4;  /* Campaña HOGAR (texto del chip). */
+  --cat-hogar-soft: #e6f1fa;  /* Campaña HOGAR (fondo del chip). */
+  --cat-tyt: #06708a;  /* Campaña T&T (texto). */
+  --cat-tyt-soft: #dff5f9;  /* Campaña T&T (fondo). */
+  --cat-operacion: #8a5a00;  /* Campaña OPERACIÓN (texto). */
+  --cat-operacion-soft: #fdf1dc;  /* Campaña OPERACIÓN (fondo). */
+  --cat-tecnologia: #4b4fb3;  /* Campaña TECNOLOGÍA (texto). */
+  --cat-tecnologia-soft: #ecedfb;  /* Campaña TECNOLOGÍA (fondo). */
+  --cat-movil: #b23a67;  /* Campaña MÓVIL (texto). */
+  --cat-movil-soft: #fbe8ef;  /* Campaña MÓVIL (fondo). */
+  --lunch: #d8a13a;  /* Tramo de almuerzo en gráficos de asistencia (solo decorativo, siempre con leyenda) */
+  --scrim: rgba(8, 20, 39, 0.55);  /* Velo detrás de modales y drawers. */
+  --shadow-card: 0 1px 2px rgba(15, 47, 92, 0.06), 0 1px 3px rgba(15, 47, 92, 0.05);  /* Tarjetas y tabla en reposo. */
+  --shadow-pop: 0 8px 24px rgba(15, 47, 92, 0.12);  /* Menús desplegables, hover de tarjeta KPI. */
+  --shadow-modal: 0 24px 48px rgba(15, 47, 92, 0.22);  /* Modales y drawer lateral. */
+}
+
+[data-theme="dark"] {
+  --brand-navy: #5b93d9;  /* Azul profundo del logo (vértice superior). Hover del botón primario, t */
+  --brand-blue: #4ea3e6;  /* Azul del wordmark ASISTE ING. Color de marca principal; enlaces e icon */
+  --primary: #1372b8;  /* Fondo de botón primario y elementos seleccionados. Blanco encima 5.1:1 */
+  --primary-hover: #1856a4;  /* Hover/pressed del botón primario. */
+  --primary-soft: #12304f;  /* Fondo de fila seleccionada, chip de filtro activo, icono de KPI. Texto */
+  --primary-soft-ink: #8fc3ef;  /* Texto e iconos sobre primary-soft (6.3:1 / 7.2:1). */
+  --surface-0: #0b1524;  /* Fondo de la página (área de contenido). */
+  --surface-100: #111f33;  /* Tarjetas, tabla, modales, barra superior clara. */
+  --surface-200: #172a44;  /* Encabezado de tabla, hover de fila, campos deshabilitados. */
+  --border: #243a57;  /* Bordes de tarjetas, divisores de tabla, campos en reposo. */
+  --border-strong: #51698a;  /* Borde de campos de formulario (3:1 control). */
+  --ink: #e8eef7;  /* Texto principal sobre surface-0/100/200. */
+  --ink-muted: #9fb0c7;  /* Texto secundario: correos, etiquetas de KPI, descripciones. */
+  --ink-subtle: #7f93ae;  /* Placeholder, tipo de documento (CC), metadatos. 4.8:1 sobre blanco. */
+  --sidebar-bg: #081427;  /* Fondo del menú lateral oscuro (opción A) y barra superior navy (opción */
+  --sidebar-ink: #b3c3da;  /* Texto de ítems del menú en reposo sobre sidebar-bg (9.2:1). */
+  --sidebar-active: #15325a;  /* Fondo del ítem activo del menú oscuro; blanco encima 8.9:1. */
+  --sidebar-indicator: #5ec8e0;  /* Barra de 3px a la izquierda del ítem activo; subrayado de pestaña acti */
+  --focus-ring: #5ec8e0;  /* Anillo de foco de 2px en todo control interactivo. */
+  --success: #9ad69c;  /* Texto/icono de estado Activo. */
+  --success-soft: #18361a;  /* Fondo del badge Activo. */
+  --warning: #f2c46b;  /* Estado Vacaciones / Incapacidad, novedades pendientes. */
+  --warning-soft: #3a2a0c;  /* Fondo del badge de advertencia. */
+  --danger: #f59a90;  /* Acción eliminar, estado Retirado, errores de validación. */
+  --danger-soft: #3d1a18;  /* Fondo del badge Retirado y de la cabecera del modal de eliminación. */
+  --danger-solid: #c0362c;  /* Fondo del botón Eliminar confirmado; blanco encima 5.5:1. */
+  --cat-hogar: #8fc3ef;  /* Campaña HOGAR (texto del chip). */
+  --cat-hogar-soft: #12304f;  /* Campaña HOGAR (fondo del chip). */
+  --cat-tyt: #7fd6e6;  /* Campaña T&T (texto). */
+  --cat-tyt-soft: #0f3440;  /* Campaña T&T (fondo). */
+  --cat-operacion: #f2c46b;  /* Campaña OPERACIÓN (texto). */
+  --cat-operacion-soft: #3a2a0c;  /* Campaña OPERACIÓN (fondo). */
+  --cat-tecnologia: #aab0f5;  /* Campaña TECNOLOGÍA (texto). */
+  --cat-tecnologia-soft: #23264f;  /* Campaña TECNOLOGÍA (fondo). */
+  --cat-movil: #f3a0c1;  /* Campaña MÓVIL (texto). */
+  --cat-movil-soft: #40182a;  /* Campaña MÓVIL (fondo). */
+  --lunch: #e0b25a;  /* Tramo de almuerzo en gráficos de asistencia (solo decorativo, siempre con leyenda) */
+  --scrim: rgba(0, 0, 0, 0.6);  /* Velo detrás de modales y drawers. */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);  /* Tarjetas y tabla en reposo. */
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);  /* Menús desplegables, hover de tarjeta KPI. */
+  --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.6);  /* Modales y drawer lateral. */
+}
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --font-display: "Outfit", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-0);
+  color: var(--ink);
+  font: 400 14px/20px var(--font-sans);
+  word-spacing: 0.05em; /* Plus Jakarta Sans tiene un espacio estrecho */
+  -webkit-font-smoothing: antialiased;
+}

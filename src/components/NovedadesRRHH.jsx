@@ -3,22 +3,26 @@ import { useAuth } from '../context/AuthContext';
 import { novedadRrhhService } from '../services/api';
 import NovedadForm from './NovedadForm';
 import Pagination from './Pagination';
+import { nombrePropio, iniciales, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
 import { ClipboardList, Plus, Search, Edit3, Trash2, AlertCircle, FileCheck, ChevronDown, ChevronUp, Check, X as XIcon } from 'lucide-react';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 const DetailField = ({ label, value }) => (
     <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
-        <p className="text-sm text-gray-900 mt-0.5">{value ?? '—'}</p>
+        <p className="ai-overline" style={{ marginBottom: 4 }}>{label}</p>
+        <p style={{ fontSize: 13, color: 'var(--ink)' }}>{value ?? '—'}</p>
     </div>
 );
 
 const SoporteBadge = ({ label, ok }) => (
-    <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${ok ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
-        {ok ? <Check className="h-3 w-3" /> : <XIcon className="h-3 w-3" />}
+    <span
+        className={`ai-badge${ok ? ' ai-badge--success' : ''}`}
+        style={!ok ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
+    >
+        {ok ? <Check size={12} /> : <XIcon size={12} />}
         {label}
-    </div>
+    </span>
 );
 
 const NovedadesRRHH = () => {
@@ -32,6 +36,7 @@ const NovedadesRRHH = () => {
     const [selectedNovedad, setSelectedNovedad] = useState(null);
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
     useEffect(() => {
         fetchNovedades();
@@ -40,18 +45,6 @@ const NovedadesRRHH = () => {
     useEffect(() => {
         setPage(1);
     }, [searchTerm]);
-
-    if (!isRecursosHumanos) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="bg-white p-8 rounded-lg shadow-md text-center">
-                    <AlertCircle className="mx-auto h-16 w-16 text-red-500 mb-4" />
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Acceso Denegado</h2>
-                    <p className="text-gray-600">Solo Recursos Humanos puede acceder a esta sección.</p>
-                </div>
-            </div>
-        );
-    }
 
     const fetchNovedades = async () => {
         try {
@@ -101,10 +94,10 @@ const NovedadesRRHH = () => {
         (n.campania_nombre || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const fmtFecha = (v) => v ? new Date(v).toLocaleDateString('es-CO') : '—';
+    const fmtFecha = (v) => v ? new Date(v).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-    const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
     const toggleExpand = (id) => {
         setExpandedIds(prev => {
@@ -114,166 +107,193 @@ const NovedadesRRHH = () => {
         });
     };
 
-    if (loading) {
+    if (!isRecursosHumanos) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Cargando novedades...</p>
+            <div className="ai-scope">
+                <div className="ai-content" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+                    <div className="ai-card" style={{ padding: 32, textAlign: 'center', maxWidth: 360 }}>
+                        <AlertCircle size={40} style={{ margin: '0 auto 12px', color: 'var(--danger)' }} />
+                        <h2 style={{ font: '600 20px/28px var(--font-display)', margin: '0 0 6px' }}>Acceso denegado</h2>
+                        <p className="ai-muted">Solo Recursos Humanos puede acceder a esta sección.</p>
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="p-6">
-            <div className="mb-6">
-                <div className="flex justify-between items-start">
+        <div className="ai-scope">
+            <div className="ai-content">
+                <div className="ai-page-head">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Consolidado de Novedades</h1>
-                        <p className="text-gray-600">Incapacidades, licencias y demás novedades de RRHH por empleado</p>
+                        <h1 className="ai-page-title">Consolidado de novedades</h1>
+                        <p className="ai-page-sub">Incapacidades, licencias y demás novedades de RRHH por empleado</p>
                     </div>
-                    <button
-                        onClick={handleCreate}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                    >
-                        <Plus className="h-5 w-5" />
-                        Nueva Novedad
+                    <button onClick={handleCreate} className="ai-btn ai-btn--primary">
+                        <Plus size={16} />
+                        Nueva novedad
                     </button>
                 </div>
-            </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por empleado, identificación, tipo de novedad o campaña..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                </div>
-            </div>
-
-            {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-                    {error}
-                </div>
-            )}
-
-            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-3 w-10"></th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empleado</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campaña</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Novedad</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inicial</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Final</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Días</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Soportes</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsable</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {paginated.map((n) => {
-                                const soportes = [n.tiene_documento_original, n.tiene_copia_documento, n.tiene_historia_clinica, n.tiene_runt, n.tiene_furips, n.tiene_soat].filter(Boolean).length;
-                                return (
-                                    <React.Fragment key={n.idnovedad_rrhh}>
-                                    <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-4">
-                                            <button
-                                                onClick={() => toggleExpand(n.idnovedad_rrhh)}
-                                                className="text-gray-400 hover:text-gray-700"
-                                                title={expandedIds.has(n.idnovedad_rrhh) ? 'Ocultar detalle' : 'Ver detalle'}
-                                            >
-                                                {expandedIds.has(n.idnovedad_rrhh) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                            </button>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">{n.empleado_nombre}</div>
-                                            <div className="text-xs text-gray-400">{n.empleado_identificacion}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{n.campania_nombre || '—'}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                                {n.tipo_novedad_nombre}
-                                            </span>
-                                            {!!n.accidente_transito && (
-                                                <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                    accidente tránsito
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{fmtFecha(n.fecha_inicial)}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{fmtFecha(n.fecha_final)}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{n.total_dias ?? '—'}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${soportes > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                                <FileCheck className="h-3 w-3" /> {soportes}/6
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{n.responsable_nombre || '—'}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <div className="flex space-x-2">
-                                                <button onClick={() => handleEdit(n)} className="text-blue-600 hover:text-blue-900" title="Editar">
-                                                    <Edit3 className="h-4 w-4" />
-                                                </button>
-                                                <button onClick={() => handleDelete(n.idnovedad_rrhh)} className="text-red-600 hover:text-red-900" title="Eliminar">
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {expandedIds.has(n.idnovedad_rrhh) && (
-                                        <tr>
-                                            <td colSpan={9} className="bg-gray-50 px-8 py-5 border-t border-gray-100">
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                                    <DetailField label="Cargo" value={n.cargo_nombre} />
-                                                    <DetailField label="Centro de costo" value={n.centro_costo_nombre} />
-                                                    <DetailField label="Fecha de retorno" value={fmtFecha(n.fecha_retorno)} />
-                                                    <DetailField label="Fecha de recibido" value={fmtFecha(n.fecha_recibido)} />
-                                                    <DetailField label="Fecha de reporte" value={fmtFecha(n.fecha_reporte)} />
-                                                    <DetailField label="Origen de la incapacidad" value={n.origen_incapacidad} />
-                                                </div>
-                                                {(n.resumen_diagnostico || n.observaciones) && (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                                        {n.resumen_diagnostico && <DetailField label="Diagnóstico" value={n.resumen_diagnostico} />}
-                                                        {n.observaciones && <DetailField label="Observaciones" value={n.observaciones} />}
-                                                    </div>
-                                                )}
-                                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Soportes documentales</p>
-                                                <div className="flex flex-wrap gap-2">
-                                                    <SoporteBadge label="Documento original" ok={!!n.tiene_documento_original} />
-                                                    <SoporteBadge label="Copia del documento" ok={!!n.tiene_copia_documento} />
-                                                    <SoporteBadge label="Historia clínica" ok={!!n.tiene_historia_clinica} />
-                                                    <SoporteBadge label="RUNT" ok={!!n.tiene_runt} />
-                                                    <SoporteBadge label="FURIPS" ok={!!n.tiene_furips} />
-                                                    <SoporteBadge label="SOAT" ok={!!n.tiene_soat} />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                    </React.Fragment>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-
-                {filtered.length === 0 && (
-                    <div className="text-center py-12">
-                        <ClipboardList className="mx-auto h-12 w-12 text-gray-400" />
-                        <h3 className="mt-2 text-sm font-medium text-gray-900">No hay novedades</h3>
-                        <p className="mt-1 text-sm text-gray-500">Registra una nueva novedad para empezar.</p>
+                {error && (
+                    <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', width: 'fit-content' }}>
+                        <span className="ai-dot" />
+                        {error}
                     </div>
                 )}
 
-                <Pagination page={page} totalPages={totalPages} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+                <div className="ai-card">
+                    <div className="ai-toolbar">
+                        <div className="ai-search">
+                            <Search size={16} />
+                            <input
+                                type="text"
+                                placeholder="Buscar por empleado, identificación, tipo de novedad o campaña..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                style={{ border: 0, outline: 'none', background: 'transparent', flex: 1, font: 'inherit', color: 'inherit' }}
+                            />
+                        </div>
+                    </div>
+
+                    {loading ? (
+                        <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: 'var(--primary)' }} />
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div style={{ padding: 48, textAlign: 'center' }}>
+                            <ClipboardList size={36} style={{ margin: '0 auto 10px', color: 'var(--ink-subtle)' }} />
+                            <p style={{ fontWeight: 600, margin: 0 }}>No hay novedades</p>
+                            <p className="ai-muted" style={{ marginTop: 4 }}>Registra una nueva novedad para empezar.</p>
+                        </div>
+                    ) : (
+                        <table className="ai-table ai-table--dense">
+                            <thead>
+                                <tr>
+                                    <th style={{ width: 36 }}></th>
+                                    <th>Empleado</th>
+                                    <th>Campaña</th>
+                                    <th>Novedad</th>
+                                    <th>Inicial</th>
+                                    <th>Final</th>
+                                    <th>Días</th>
+                                    <th>Soportes</th>
+                                    <th>Responsable</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginated.map((n) => {
+                                    const soportes = [n.tiene_documento_original, n.tiene_copia_documento, n.tiene_historia_clinica, n.tiene_runt, n.tiene_furips, n.tiene_soat].filter(Boolean).length;
+                                    const chip = claseCampania(n.campania_nombre);
+                                    const isExpanded = expandedIds.has(n.idnovedad_rrhh);
+                                    return (
+                                        <React.Fragment key={n.idnovedad_rrhh}>
+                                            <tr>
+                                                <td>
+                                                    <button
+                                                        onClick={() => toggleExpand(n.idnovedad_rrhh)}
+                                                        className="ai-icon-btn"
+                                                        aria-label={isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
+                                                    >
+                                                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                    </button>
+                                                </td>
+                                                <td>
+                                                    <div className="ai-person">
+                                                        <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(n.empleado_nombre)}</span>
+                                                        <div>
+                                                            <div className="ai-person-name">{nombrePropio(n.empleado_nombre)}</div>
+                                                            <div className="ai-person-sub">{n.empleado_identificacion}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {n.campania_nombre ? (
+                                                        <span className={`ai-chip${chip ? ` ${chip}` : ''}`}>{primeraMayuscula(n.campania_nombre)}</span>
+                                                    ) : <span className="ai-muted">—</span>}
+                                                </td>
+                                                <td>
+                                                    <span className="ai-badge ai-badge--info">
+                                                        <span className="ai-dot" />
+                                                        {n.tipo_novedad_nombre}
+                                                    </span>
+                                                    {!!n.accidente_transito && (
+                                                        <span className="ai-badge ai-badge--danger" style={{ marginLeft: 6 }}>
+                                                            <span className="ai-dot" />
+                                                            accidente tránsito
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="ai-muted">{fmtFecha(n.fecha_inicial)}</td>
+                                                <td className="ai-muted">{fmtFecha(n.fecha_final)}</td>
+                                                <td className="ai-num">{n.total_dias ?? '—'}</td>
+                                                <td>
+                                                    <span
+                                                        className={`ai-badge${soportes > 0 ? ' ai-badge--success' : ''}`}
+                                                        style={soportes === 0 ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
+                                                    >
+                                                        <FileCheck size={12} /> {soportes}/6
+                                                    </span>
+                                                </td>
+                                                <td className="ai-muted">{n.responsable_nombre ? nombrePropio(n.responsable_nombre) : '—'}</td>
+                                                <td className="ai-td-actions">
+                                                    <div className="ai-row-actions">
+                                                        <button onClick={() => handleEdit(n)} className="ai-icon-btn" aria-label="Editar">
+                                                            <Edit3 size={16} />
+                                                        </button>
+                                                        <button onClick={() => handleDelete(n.idnovedad_rrhh)} className="ai-icon-btn ai-icon-btn--danger" aria-label="Eliminar">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {isExpanded && (
+                                                <tr>
+                                                    <td colSpan={10} style={{ background: 'var(--surface-0)' }}>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16, marginBottom: 16 }}>
+                                                            <DetailField label="Cargo" value={n.cargo_nombre} />
+                                                            <DetailField label="Centro de costo" value={n.centro_costo_nombre} />
+                                                            <DetailField label="Fecha de retorno" value={fmtFecha(n.fecha_retorno)} />
+                                                            <DetailField label="Fecha de recibido" value={fmtFecha(n.fecha_recibido)} />
+                                                            <DetailField label="Fecha de reporte" value={fmtFecha(n.fecha_reporte)} />
+                                                            <DetailField label="Origen de la incapacidad" value={n.origen_incapacidad} />
+                                                        </div>
+                                                        {(n.resumen_diagnostico || n.observaciones) && (
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16, marginBottom: 16 }}>
+                                                                {n.resumen_diagnostico && <DetailField label="Diagnóstico" value={n.resumen_diagnostico} />}
+                                                                {n.observaciones && <DetailField label="Observaciones" value={n.observaciones} />}
+                                                            </div>
+                                                        )}
+                                                        <p className="ai-overline" style={{ marginBottom: 8 }}>Soportes documentales</p>
+                                                        <div className="ai-row">
+                                                            <SoporteBadge label="Documento original" ok={!!n.tiene_documento_original} />
+                                                            <SoporteBadge label="Copia del documento" ok={!!n.tiene_copia_documento} />
+                                                            <SoporteBadge label="Historia clínica" ok={!!n.tiene_historia_clinica} />
+                                                            <SoporteBadge label="RUNT" ok={!!n.tiene_runt} />
+                                                            <SoporteBadge label="FURIPS" ok={!!n.tiene_furips} />
+                                                            <SoporteBadge label="SOAT" ok={!!n.tiene_soat} />
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    <Pagination
+                        page={page}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        pageSize={pageSize}
+                        onPageChange={setPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                        etiqueta="novedades"
+                    />
+                </div>
             </div>
 
             {showCreateForm && (

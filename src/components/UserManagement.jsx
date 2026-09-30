@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { userService } from '../services/api';
+import { userService, userCompanyService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { 
     Plus, 
@@ -39,9 +39,18 @@ const UserManagement = () => {
         full_name: '',
         role: '',
         sede: 'bogota',
-        departamento: 'claro'
+        departamento: 'claro',
+        users_company_id: null
     });
     const [showPassword, setShowPassword] = useState(false);
+    const [empleadosDisponibles, setEmpleadosDisponibles] = useState([]);
+    const [loadingEmpleados, setLoadingEmpleados] = useState(false);
+
+    // Roles que necesitan estar vinculados a una ficha de RRHH (users_company): para
+    // director_operaciones/empleado, porque el módulo de asistencia lo exige — ver
+    // users_company_id en CLAUDE.md/asistencia.md. Para recursosHumanos, porque al
+    // registrar un empleado nuevo ese mismo id se guarda como "analista encargado" del alta.
+    const ROLES_VINCULADOS_A_EMPLEADO = ['director_operaciones', 'empleado', 'recursosHumanos'];
 
     const roles = [
         { value: 'coordinador', label: 'Coordinador', color: 'bg-blue-100 text-blue-800' },
@@ -51,7 +60,9 @@ const UserManagement = () => {
         { value: 'gestorActivos', label: 'Gestor de Activos', color: 'bg-indigo-100 text-indigo-800' },
         { value: 'tecnicoInventario', label: 'Técnico Inventario', color: 'bg-teal-100 text-teal-800' },
         { value: 'disenador', label: 'Diseñador', color: 'bg-purple-100 text-purple-800' },
-        { value: 'recursosHumanos', label: 'Recursos Humanos', color: 'bg-pink-100 text-pink-800' }
+        { value: 'recursosHumanos', label: 'Recursos Humanos', color: 'bg-pink-100 text-pink-800' },
+        { value: 'director_operaciones', label: 'Director de Operaciones', color: 'bg-cyan-100 text-cyan-800' },
+        { value: 'empleado', label: 'Empleado', color: 'bg-yellow-100 text-yellow-800' }
     ];
 
     const sedes = [
@@ -82,6 +93,60 @@ const UserManagement = () => {
     };
 
     const departamentos = getDepartamentosBySede(formData.sede);
+
+    // Trae las fichas de RRHH (users_company) sin cuenta de login vinculada, para el
+    // selector de director_operaciones/empleado. `currentUsersCompanyId` (al editar) se
+    // agrega aparte porque el filtro sin_usuario la excluye (ya está vinculada a sí misma).
+    const cargarEmpleadosDisponibles = async (currentUsersCompanyId = null) => {
+        try {
+            setLoadingEmpleados(true);
+            const response = await userCompanyService.getAll({ sin_usuario: true });
+            let empleados = response.data.empleados || [];
+
+            if (currentUsersCompanyId && !empleados.some(e => e.id === currentUsersCompanyId)) {
+                try {
+                    const actual = await userCompanyService.getById(currentUsersCompanyId);
+                    if (actual.data?.empleado) {
+                        empleados = [actual.data.empleado, ...empleados];
+                    }
+                } catch (err) {
+                    console.error('Error cargando el empleado vinculado actual:', err);
+                }
+            }
+
+            setEmpleadosDisponibles(empleados);
+        } catch (error) {
+            console.error('Error cargando empleados disponibles:', error);
+            setEmpleadosDisponibles([]);
+        } finally {
+            setLoadingEmpleados(false);
+        }
+    };
+
+    const handleRoleChange = (newRole) => {
+        setFormData(prev => ({
+            ...prev,
+            role: newRole,
+            users_company_id: ROLES_VINCULADOS_A_EMPLEADO.includes(newRole) ? prev.users_company_id : null
+        }));
+
+        if (ROLES_VINCULADOS_A_EMPLEADO.includes(newRole)) {
+            // Si el usuario editado ya tenía una ficha vinculada (por ejemplo, venía de
+            // director_operaciones y pasa a empleado), se incluye en la lista aunque el
+            // filtro sin_usuario la excluya por estar vinculada a este mismo usuario.
+            cargarEmpleadosDisponibles(showEditModal ? (selectedUser?.users_company_id || null) : null);
+        }
+    };
+
+    const handleEmpleadoSeleccionado = (empleadoIdRaw) => {
+        const empleadoId = empleadoIdRaw ? parseInt(empleadoIdRaw, 10) : null;
+        const empleado = empleadosDisponibles.find(e => e.id === empleadoId);
+        setFormData(prev => ({
+            ...prev,
+            users_company_id: empleadoId,
+            full_name: empleado ? empleado.nombre_completo : prev.full_name
+        }));
+    };
 
     const handleSedeChange = (newSede) => {
         const newDepartamentos = getDepartamentosBySede(newSede);
@@ -160,8 +225,10 @@ const UserManagement = () => {
             full_name: '',
             role: '',
             sede: 'bogota',
-            departamento: 'claro'
+            departamento: 'claro',
+            users_company_id: null
         });
+        setEmpleadosDisponibles([]);
         setShowCreateModal(true);
         setError('');
         setSuccess('');
@@ -175,8 +242,14 @@ const UserManagement = () => {
             full_name: user.full_name,
             role: user.role,
             sede: user.sede || 'bogota',
-            departamento: user.departamento || 'claro'
+            departamento: user.departamento || 'claro',
+            users_company_id: user.users_company_id || null
         });
+        if (ROLES_VINCULADOS_A_EMPLEADO.includes(user.role)) {
+            cargarEmpleadosDisponibles(user.users_company_id || null);
+        } else {
+            setEmpleadosDisponibles([]);
+        }
         setShowEditModal(true);
         setError('');
         setSuccess('');
@@ -200,23 +273,33 @@ const UserManagement = () => {
             return;
         }
 
+        if (ROLES_VINCULADOS_A_EMPLEADO.includes(formData.role) && !formData.users_company_id) {
+            setError('Selecciona el empleado (ficha de RRHH) que corresponde a esta cuenta');
+            return;
+        }
+
         try {
             setLoading(true);
-            
+
             // Preparar datos para envío
             const submitData = { ...formData };
-            
-            // Para técnicos y administrativos, no asignar departamento específico
-            if (submitData.role === 'technician' || submitData.role === 'administrativo') {
+
+            // Para técnicos, administrativos, directores de operaciones y empleados, no asignar departamento específico
+            if (submitData.role === 'technician' || submitData.role === 'administrativo' || submitData.role === 'director_operaciones' || submitData.role === 'empleado') {
                 submitData.departamento = null;
             }
-            
+
             // Para gestores de activos y técnicos de inventario, no asignar sede ni departamento
             if (submitData.role === 'gestorActivos' || submitData.role === 'tecnicoInventario' || submitData.role === 'disenador' || submitData.role === 'recursosHumanos') {
                 submitData.sede = null;
                 submitData.departamento = null;
             }
-            
+
+            // users_company_id solo aplica a director_operaciones/empleado
+            if (!ROLES_VINCULADOS_A_EMPLEADO.includes(submitData.role)) {
+                submitData.users_company_id = null;
+            }
+
             if (showCreateModal) {
                 await userService.create(submitData);
                 setSuccess('Usuario creado exitosamente');
@@ -343,6 +426,8 @@ const UserManagement = () => {
                             <option value="tecnicoInventario">Técnicos Inventario</option>
                             <option value="disenador">Diseñadores</option>
                             <option value="recursosHumanos">Recursos Humanos</option>
+                            <option value="director_operaciones">Directores de Operaciones</option>
+                            <option value="empleado">Empleados</option>
                         </select>
                     </div>
 
@@ -532,7 +617,7 @@ const UserManagement = () => {
                                     <select
                                         required
                                         value={formData.role}
-                                        onChange={(e) => setFormData({...formData, role: e.target.value})}
+                                        onChange={(e) => handleRoleChange(e.target.value)}
                                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
                                         <option value="">Seleccionar rol...</option>
@@ -543,6 +628,41 @@ const UserManagement = () => {
                                         ))}
                                     </select>
                                 </div>
+
+                                {/* Empleado (ficha RRHH) - director_operaciones, empleado y recursosHumanos */}
+                                {ROLES_VINCULADOS_A_EMPLEADO.includes(formData.role) && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Empleado (ficha de RRHH) *
+                                        </label>
+                                        <select
+                                            required
+                                            value={formData.users_company_id || ''}
+                                            onChange={(e) => handleEmpleadoSeleccionado(e.target.value)}
+                                            disabled={loadingEmpleados}
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        >
+                                            <option value="">
+                                                {loadingEmpleados ? 'Cargando empleados...' : 'Seleccionar empleado...'}
+                                            </option>
+                                            {empleadosDisponibles.map(emp => (
+                                                <option key={emp.id} value={emp.id}>
+                                                    {emp.nombre_completo}
+                                                    {emp.numero_identificacion ? ` — ${emp.numero_identificacion}` : ''}
+                                                    {emp.cargo_nombre ? ` · ${emp.cargo_nombre}` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {!loadingEmpleados && empleadosDisponibles.length === 0 && (
+                                            <p className="mt-1 text-xs text-red-600">
+                                                No hay fichas de RRHH sin vincular. Créalas primero en Recursos Humanos.
+                                            </p>
+                                        )}
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            El nombre completo se toma de la ficha seleccionada.
+                                        </p>
+                                    </div>
+                                )}
 
                                 {/* Sede - Solo mostrar si NO es gestorActivos */}
                                 {formData.role !== 'gestorActivos' && formData.role !== 'tecnicoInventario' && formData.role !== 'disenador' && formData.role !== 'recursosHumanos' && (
@@ -631,6 +751,24 @@ const UserManagement = () => {
                                         <p className="text-sm text-teal-700">
                                             <strong>Nota:</strong> Los técnicos de inventario tienen acceso al módulo de inventario.
                                             No requieren sede ni departamento específico.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Mensaje informativo para directores de operaciones */}
+                                {formData.role === 'director_operaciones' && (
+                                    <div className="bg-cyan-50 border border-cyan-200 rounded-md p-3">
+                                        <p className="text-sm text-cyan-700">
+                                            <strong>Nota:</strong> El director de operaciones gestiona horarios, horas extra y la trazabilidad de asistencia de su equipo. No requiere departamento específico.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Mensaje informativo para empleados */}
+                                {formData.role === 'empleado' && (
+                                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                                        <p className="text-sm text-yellow-700">
+                                            <strong>Nota:</strong> El empleado registra su asistencia (entrada, pausas, salida) en el módulo de asistencia. No requiere departamento específico.
                                         </p>
                                     </div>
                                 )}
