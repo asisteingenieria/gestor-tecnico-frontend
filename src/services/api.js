@@ -146,7 +146,7 @@ export const assetHistoryService = {
 
 // === SERVICIOS DE EMPLEADOS (users_company) ===
 export const userCompanyService = {
-    getAll: () => api.get('/users-company'),
+    getAll: (params = {}) => api.get('/users-company', { params }),
     getById: (id) => api.get(`/users-company/${id}`),
     create: (data) => api.post('/users-company', data),
     update: (id, data) => api.put(`/users-company/${id}`, data),
@@ -154,7 +154,13 @@ export const userCompanyService = {
     getGastoTotal: () => api.get('/users-company/gasto-total'),
     getActivos: (id) => api.get(`/users-company/${id}/activos`),
     assignActivo: (id, activoId) => api.put(`/users-company/${id}/activos/${activoId}`),
-    unassignActivo: (id, activoId) => api.delete(`/users-company/${id}/activos/${activoId}`)
+    unassignActivo: (id, activoId) => api.delete(`/users-company/${id}/activos/${activoId}`),
+    getRetiro: (id) => api.get(`/users-company/${id}/retiro`),
+    registrarRetiro: (id, data) => api.post(`/users-company/${id}/retiro`, data),
+    actualizarRetiro: (id, data) => api.put(`/users-company/${id}/retiro`, data),
+    reactivarEmpleado: (id) => api.delete(`/users-company/${id}/retiro`),
+    previewImportExcel: (formData) => api.post('/users-company/import-excel/preview', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 }),
+    commitImportExcel: (formData) => api.post('/users-company/import-excel/commit', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })
 };
 
 // === SERVICIOS DE NOVEDADES RRHH ===
@@ -204,6 +210,44 @@ export const disenoService = {
     replaceEntregas: (id, formData) => api.put(`/disenos/${id}/entregas/replace`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
     deleteEntrega: (id, archivoId) => api.delete(`/disenos/${id}/entregas/${archivoId}`),
     delete: (id) => api.delete(`/disenos/${id}`)
+};
+
+// === SERVICIOS DE ASISTENCIA ===
+export const asistenciaService = {
+    // Empleado (y director sobre sí mismo)
+    getMiHorario: (params = {}) => api.get('/asistencia/mi-horario', { params }),
+    getMiJornadaHoy: () => api.get('/asistencia/mi-jornada/hoy'),
+    marcarEntrada: () => api.post('/asistencia/mi-jornada/entrada'),
+    iniciarPausa: (tipo) => api.post('/asistencia/mi-jornada/pausa', { tipo }),
+    finalizarPausa: () => api.post('/asistencia/mi-jornada/pausa/fin'),
+    marcarSalida: () => api.post('/asistencia/mi-jornada/salida'),
+    getTrazabilidad: (fecha) => api.get(`/asistencia/mi-jornada/${fecha}/trazabilidad`),
+    getMisJornadas: (params = {}) => api.get('/asistencia/mis-jornadas', { params }),
+    getMisEstadisticas: (params = {}) => api.get('/asistencia/mis-estadisticas', { params }),
+    solicitarHoraExtra: (data) => api.post('/asistencia/horas-extra/solicitar', data),
+    getMisHorasExtra: (params = {}) => api.get('/asistencia/mis-horas-extra', { params }),
+
+    // Director de operaciones
+    getEquipo: () => api.get('/asistencia/equipo'),
+    getJornadasDe: (empleadoId, params = {}) => api.get(`/asistencia/equipo/${empleadoId}/jornadas`, { params }),
+    getTrazabilidadDe: (empleadoId, fecha) => api.get(`/asistencia/equipo/${empleadoId}/jornada/${fecha}/trazabilidad`),
+    getEstadisticasEquipo: (params = {}) => api.get('/asistencia/equipo/estadisticas', { params }),
+    registrarEventoManual: (jornadaId, data) => api.post(`/asistencia/equipo/jornada/${jornadaId}/evento`, data),
+
+    getPlantillas: () => api.get('/asistencia/horarios/plantillas'),
+    crearPlantilla: (data) => api.post('/asistencia/horarios/plantillas', data),
+    actualizarPlantilla: (id, data) => api.put(`/asistencia/horarios/plantillas/${id}`, data),
+    eliminarPlantilla: (id) => api.delete(`/asistencia/horarios/plantillas/${id}`),
+
+    getHorarios: (params = {}) => api.get('/asistencia/horarios', { params }),
+    asignarHorarios: (data) => api.post('/asistencia/horarios', data),
+    actualizarHorario: (id, data) => api.put(`/asistencia/horarios/${id}`, data),
+    eliminarHorario: (id) => api.delete(`/asistencia/horarios/${id}`),
+
+    getBandejaHorasExtra: (params = {}) => api.get('/asistencia/horas-extra', { params }),
+    aprobarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/aprobar`, data),
+    rechazarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/rechazar`, data),
+    asignarHoraExtra: (data) => api.post('/asistencia/horas-extra/asignar', data)
 };
 
 export default api;

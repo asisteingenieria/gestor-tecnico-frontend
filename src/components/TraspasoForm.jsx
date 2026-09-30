@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { traspasoService } from '../services/api';
-import { X, Save } from 'lucide-react';
+import { X, Save, ArrowLeftRight } from 'lucide-react';
 
 const fecha = (v) => (v ? String(v).substring(0, 10) : '');
 const val = (v) => (v === undefined || v === null ? '' : v);
-
-const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500";
-const labelClass = "block text-sm font-medium text-gray-700 mb-1";
-const sectionClass = "text-sm font-semibold text-indigo-700 uppercase tracking-wider pt-4 border-t border-gray-100";
 
 const CATALOGOS_VACIOS = { areas: [], campanias: [], centros_costo: [], cargos: [], modalidades: [], empleados: [] };
 
@@ -188,66 +184,66 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
 
     const bloqueEstado = (estado, onChangeEstado, titulo) => (
         <div>
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">{titulo}</h4>
-            <div className="space-y-3">
-                <div>
-                    <label className={labelClass}>Área</label>
-                    <select name="area_id" value={estado.area_id} onChange={onChangeEstado} className={inputClass}>
+            <p className="ai-overline" style={{ marginBottom: 12 }}>{titulo}</p>
+            <div className="ai-stack" style={{ gap: 12 }}>
+                <div className="ai-field">
+                    <label className="ai-label">Área</label>
+                    <select name="area_id" value={estado.area_id} onChange={onChangeEstado} className="ai-input">
                         <option value="">Sin especificar</option>
                         {catalogos.areas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
                     </select>
                 </div>
-                <div>
-                    <label className={labelClass}>Campaña</label>
-                    <select name="campania_id" value={estado.campania_id} onChange={onChangeEstado} className={inputClass}>
+                <div className="ai-field">
+                    <label className="ai-label">Campaña</label>
+                    <select name="campania_id" value={estado.campania_id} onChange={onChangeEstado} className="ai-input">
                         <option value="">Sin especificar</option>
                         {catalogos.campanias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                     </select>
                 </div>
-                <div>
-                    <label className={labelClass}>Centro de costo</label>
-                    <select name="centro_costo_id" value={estado.centro_costo_id} onChange={onChangeEstado} className={inputClass}>
+                <div className="ai-field">
+                    <label className="ai-label">Centro de costo</label>
+                    <select name="centro_costo_id" value={estado.centro_costo_id} onChange={onChangeEstado} className="ai-input">
                         <option value="">Sin especificar</option>
                         {catalogos.centros_costo.map(c => <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>)}
                     </select>
                 </div>
-                <div>
-                    <label className={labelClass}>Cargo</label>
-                    <select name="cargo_id" value={estado.cargo_id} onChange={onChangeEstado} className={inputClass}>
+                <div className="ai-field">
+                    <label className="ai-label">Cargo</label>
+                    <select name="cargo_id" value={estado.cargo_id} onChange={onChangeEstado} className="ai-input">
                         <option value="">Sin especificar</option>
                         {catalogos.cargos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                     </select>
                 </div>
-                <div>
-                    <label className={labelClass}>Cargo SSFF</label>
-                    <input type="text" name="cargo_ssff" value={estado.cargo_ssff} onChange={onChangeEstado} className={inputClass} />
+                <div className="ai-field">
+                    <label className="ai-label">Cargo SSFF</label>
+                    <input type="text" name="cargo_ssff" value={estado.cargo_ssff} onChange={onChangeEstado} className="ai-input" />
                 </div>
-                <div>
-                    <label className={labelClass}>Usuario SSFF</label>
-                    <input type="text" name="usuario_ssff" value={estado.usuario_ssff} onChange={onChangeEstado} className={inputClass} />
+                <div className="ai-field">
+                    <label className="ai-label">Usuario SSFF</label>
+                    <input type="text" name="usuario_ssff" value={estado.usuario_ssff} onChange={onChangeEstado} className="ai-input" />
                 </div>
-                <div>
-                    <label className={labelClass}>Salario</label>
-                    <input type="number" min="0" step="0.01" name="salario" value={estado.salario} onChange={onChangeEstado} className={inputClass} />
+                <div className="ai-field">
+                    <label className="ai-label">Salario</label>
+                    <input type="number" min="0" step="0.01" name="salario" value={estado.salario} onChange={onChangeEstado} className="ai-input" />
                 </div>
-                <div>
-                    <label className={labelClass}>Bono no prestacional</label>
-                    <input type="number" min="0" step="0.01" name="bono_no_prestacional" value={estado.bono_no_prestacional} onChange={onChangeEstado} className={inputClass} />
+                <div className="ai-field">
+                    <label className="ai-label">Bono no prestacional</label>
+                    <input type="number" min="0" step="0.01" name="bono_no_prestacional" value={estado.bono_no_prestacional} onChange={onChangeEstado} className="ai-input" />
                 </div>
-                <div>
-                    <label className={labelClass}>Bono cafetería</label>
-                    <input type="number" min="0" step="0.01" name="bono_cafeteria" value={estado.bono_cafeteria} onChange={onChangeEstado} className={inputClass} />
+                <div className="ai-field">
+                    <label className="ai-label">Bono cafetería</label>
+                    <input type="number" min="0" step="0.01" name="bono_cafeteria" value={estado.bono_cafeteria} onChange={onChangeEstado} className="ai-input" />
                 </div>
-                <div>
-                    <label className={labelClass}>Jefe de área</label>
-                    <select name="jefe_area_id" value={estado.jefe_area_id} onChange={onChangeEstado} className={inputClass}>
+                <div className="ai-field">
+                    <label className="ai-label">Jefe de área</label>
+                    <select name="jefe_area_id" value={estado.jefe_area_id} onChange={onChangeEstado} className="ai-input">
                         <option value="">Sin especificar</option>
                         {catalogos.empleados.map(emp => <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>)}
                     </select>
                 </div>
-                <div>
-                    <label className={labelClass}>Jefe inmediato</label>
-                    <select name="jefe_inmediato_id" value={estado.jefe_inmediato_id} onChange={onChangeEstado} className={inputClass}>
+                <div className="ai-field">
+                    <label className="ai-label">Jefe inmediato</label>
+                    <select name="jefe_inmediato_id" value={estado.jefe_inmediato_id} onChange={onChangeEstado} className="ai-input">
                         <option value="">Sin especificar</option>
                         {catalogos.empleados.map(emp => <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>)}
                     </select>
@@ -257,101 +253,102 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
     );
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[92vh] overflow-y-auto">
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                        {traspaso ? 'Editar Traspaso' : 'Nuevo Traspaso'}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                        <X className="h-6 w-6" />
-                    </button>
+        <div className="ai-overlay ai-scope">
+            <div className="ai-modal" style={{ maxWidth: 960, maxHeight: '92vh', overflowY: 'auto' }}>
+                <div className="ai-modal-head">
+                    <div className="ai-modal-icon"><ArrowLeftRight size={20} /></div>
+                    <div>
+                        <h2 className="ai-modal-title">{traspaso ? 'Editar traspaso' : 'Nuevo traspaso'}</h2>
+                        <p className="ai-modal-sub">Cambios de área, cargo, campaña o salario</p>
+                    </div>
+                    <button onClick={onClose} className="ai-icon-btn" aria-label="Cerrar"><X size={18} /></button>
                 </div>
 
                 {loadingData ? (
-                    <div className="flex items-center justify-center py-16">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                    <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: 'var(--primary)' }} />
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit} className="p-6">
-                        {error && (
-                            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                                {error}
-                            </div>
-                        )}
+                    <form onSubmit={handleSubmit}>
+                        <div className="ai-modal-body">
+                            {error && (
+                                <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', marginBottom: 16, width: 'fit-content' }}>
+                                    <span className="ai-dot" />
+                                    {error}
+                                </div>
+                            )}
 
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-semibold text-indigo-700 uppercase tracking-wider">Empleado</h3>
-                            <div>
-                                <label className={labelClass}>Empleado *</label>
-                                <select value={empleadoId} onChange={onSelectEmpleado} required className={inputClass} disabled={!!traspaso}>
-                                    <option value="">Seleccionar...</option>
-                                    {empleados.map(emp => (
-                                        <option key={emp.id} value={emp.id}>{emp.nombre_completo} — {emp.numero_identificacion}</option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-gray-500 mt-1">Al seleccionar, se precarga el estado "Anterior" con los datos actuales del contrato.</p>
-                            </div>
-
-                            <h3 className={sectionClass}>Datos generales</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div>
-                                    <label className={labelClass}>Estado</label>
-                                    <input type="text" name="estado" value={general.estado} onChange={onChangeGeneral} className={inputClass} placeholder="Ej: aprobado" />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Fecha inicio *</label>
-                                    <input type="date" name="fecha_inicio" value={general.fecha_inicio} onChange={onChangeGeneral} required className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Fecha fin</label>
-                                    <input type="date" name="fecha_fin" value={general.fecha_fin} onChange={onChangeGeneral} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Modalidad</label>
-                                    <select name="modalidad_id" value={general.modalidad_id} onChange={onChangeGeneral} className={inputClass}>
-                                        <option value="">Sin especificar</option>
-                                        {catalogos.modalidades.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                            <div className="ai-stack">
+                                <p className="ai-overline">Empleado</p>
+                                <div className="ai-field">
+                                    <label className="ai-label">Empleado <em>*</em></label>
+                                    <select value={empleadoId} onChange={onSelectEmpleado} required className="ai-input" disabled={!!traspaso}>
+                                        <option value="">Seleccionar...</option>
+                                        {empleados.map(emp => (
+                                            <option key={emp.id} value={emp.id}>{emp.nombre_completo} — {emp.numero_identificacion}</option>
+                                        ))}
                                     </select>
+                                    <p className="ai-help">Al seleccionar, se precarga el estado "Anterior" con los datos actuales del contrato.</p>
                                 </div>
-                                <div>
-                                    <label className={labelClass}>Trabajo en casa - inicio</label>
-                                    <input type="date" name="fecha_inicio_trabajo_casa" value={general.fecha_inicio_trabajo_casa} onChange={onChangeGeneral} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Trabajo en casa - fin</label>
-                                    <input type="date" name="fecha_fin_trabajo_casa" value={general.fecha_fin_trabajo_casa} onChange={onChangeGeneral} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Diadema</label>
-                                    <input type="text" name="diadema" value={general.diadema} onChange={onChangeGeneral} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Equipo de cómputo</label>
-                                    <input type="text" name="equipo_computo" value={general.equipo_computo} onChange={onChangeGeneral} className={inputClass} />
-                                </div>
-                            </div>
-                            <label className="flex items-center gap-2 text-sm text-gray-700">
-                                <input type="checkbox" name="ratificacion" checked={general.ratificacion} onChange={onChangeGeneral} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                                Ratificación
-                            </label>
-                            <div>
-                                <label className={labelClass}>Observaciones</label>
-                                <textarea name="observaciones" value={general.observaciones} onChange={onChangeGeneral} rows={2} className={inputClass} />
-                            </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100">
-                                {bloqueEstado(anterior, onChangeAnterior, 'Estado anterior')}
-                                {bloqueEstado(nuevo, onChangeNuevo, 'Estado nuevo')}
+                                <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Datos generales</p>
+                                <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Estado</label>
+                                        <input type="text" name="estado" value={general.estado} onChange={onChangeGeneral} className="ai-input" placeholder="Ej: aprobado" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Fecha inicio <em>*</em></label>
+                                        <input type="date" name="fecha_inicio" value={general.fecha_inicio} onChange={onChangeGeneral} required className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Fecha fin</label>
+                                        <input type="date" name="fecha_fin" value={general.fecha_fin} onChange={onChangeGeneral} className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Modalidad</label>
+                                        <select name="modalidad_id" value={general.modalidad_id} onChange={onChangeGeneral} className="ai-input">
+                                            <option value="">Sin especificar</option>
+                                            {catalogos.modalidades.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Trabajo en casa - inicio</label>
+                                        <input type="date" name="fecha_inicio_trabajo_casa" value={general.fecha_inicio_trabajo_casa} onChange={onChangeGeneral} className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Trabajo en casa - fin</label>
+                                        <input type="date" name="fecha_fin_trabajo_casa" value={general.fecha_fin_trabajo_casa} onChange={onChangeGeneral} className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Diadema</label>
+                                        <input type="text" name="diadema" value={general.diadema} onChange={onChangeGeneral} className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Equipo de cómputo</label>
+                                        <input type="text" name="equipo_computo" value={general.equipo_computo} onChange={onChangeGeneral} className="ai-input" />
+                                    </div>
+                                </div>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                                    <input type="checkbox" name="ratificacion" checked={general.ratificacion} onChange={onChangeGeneral} />
+                                    Ratificación
+                                </label>
+                                <div className="ai-field">
+                                    <label className="ai-label">Observaciones</label>
+                                    <textarea name="observaciones" value={general.observaciones} onChange={onChangeGeneral} rows={2} className="ai-input" style={{ height: 'auto', padding: '8px 12px' }} />
+                                </div>
+
+                                <div className="ai-form-grid" style={{ paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                                    {bloqueEstado(anterior, onChangeAnterior, 'Estado anterior')}
+                                    {bloqueEstado(nuevo, onChangeNuevo, 'Estado nuevo')}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
-                            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                                Cancelar
-                            </button>
-                            <button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50">
-                                <Save className="h-4 w-4" />
+                        <div className="ai-modal-foot">
+                            <button type="button" onClick={onClose} className="ai-btn ai-btn--secondary">Cancelar</button>
+                            <button type="submit" disabled={loading} className="ai-btn ai-btn--primary">
+                                <Save size={16} />
                                 {loading ? 'Guardando...' : 'Guardar'}
                             </button>
                         </div>

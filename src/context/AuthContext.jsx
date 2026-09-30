@@ -114,6 +114,8 @@ export const AuthProvider = ({ children }) => {
         isDirectivoFinanciero: user?.role === 'directivoFinanciero',
         isDisenador: user?.role === 'disenador',
         isRecursosHumanos: user?.role === 'recursosHumanos',
+        isEmpleado: user?.role === 'empleado',
+        isDirectorOperaciones: user?.role === 'director_operaciones',
         canSupervise: user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'coordinador' || user?.role === 'administrativo' || user?.role === 'jefe_operaciones',
         canCreateIncidents: user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'coordinador' || user?.role === 'jefe_operaciones',
         // Permisos para activos

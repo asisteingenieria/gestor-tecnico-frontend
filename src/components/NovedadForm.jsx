@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { novedadRrhhService } from '../services/api';
-import { X, Save } from 'lucide-react';
+import { X, Save, ClipboardList } from 'lucide-react';
 
 const fecha = (v) => (v ? String(v).substring(0, 10) : '');
-
-const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500";
-const labelClass = "block text-sm font-medium text-gray-700 mb-1";
-const sectionClass = "text-sm font-semibold text-indigo-700 uppercase tracking-wider pt-4 border-t border-gray-100";
 
 const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
     const [empleados, setEmpleados] = useState([]);
@@ -120,131 +116,129 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
     if (!isOpen) return null;
 
     const checkboxField = (label, name) => (
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" name={name} checked={form[name]} onChange={onChange} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <input type="checkbox" name={name} checked={form[name]} onChange={onChange} />
             {label}
         </label>
     );
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[92vh] overflow-y-auto">
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                        {novedad ? 'Editar Novedad' : 'Nueva Novedad'}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                        <X className="h-6 w-6" />
-                    </button>
+        <div className="ai-overlay ai-scope">
+            <div className="ai-modal" style={{ maxWidth: 720, maxHeight: '92vh', overflowY: 'auto' }}>
+                <div className="ai-modal-head">
+                    <div className="ai-modal-icon"><ClipboardList size={20} /></div>
+                    <div>
+                        <h2 className="ai-modal-title">{novedad ? 'Editar novedad' : 'Nueva novedad'}</h2>
+                        <p className="ai-modal-sub">Incapacidades, licencias y demás novedades de RRHH</p>
+                    </div>
+                    <button onClick={onClose} className="ai-icon-btn" aria-label="Cerrar"><X size={18} /></button>
                 </div>
 
                 {loadingData ? (
-                    <div className="flex items-center justify-center py-16">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                    <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: 'var(--primary)' }} />
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit} className="p-6">
-                        {error && (
-                            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                                {error}
-                            </div>
-                        )}
+                    <form onSubmit={handleSubmit}>
+                        <div className="ai-modal-body">
+                            {error && (
+                                <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', marginBottom: 16, width: 'fit-content' }}>
+                                    <span className="ai-dot" />
+                                    {error}
+                                </div>
+                            )}
 
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-semibold text-indigo-700 uppercase tracking-wider">Empleado y tipo</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label className={labelClass}>Empleado *</label>
-                                    <select name="empleado_id" value={form.empleado_id} onChange={onChangeEmpleado} required className={inputClass} disabled={!!novedad}>
-                                        <option value="">Seleccionar...</option>
-                                        {empleados.map(emp => (
-                                            <option key={emp.id} value={emp.id}>{emp.nombre_completo} — {emp.numero_identificacion}</option>
-                                        ))}
-                                    </select>
+                            <div className="ai-stack">
+                                <p className="ai-overline">Empleado y tipo</p>
+                                <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Empleado <em>*</em></label>
+                                        <select name="empleado_id" value={form.empleado_id} onChange={onChangeEmpleado} required className="ai-input" disabled={!!novedad}>
+                                            <option value="">Seleccionar...</option>
+                                            {empleados.map(emp => (
+                                                <option key={emp.id} value={emp.id}>{emp.nombre_completo} — {emp.numero_identificacion}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Tipo de novedad <em>*</em></label>
+                                        <select name="tipo_novedad_id" value={form.tipo_novedad_id} onChange={onChange} required className="ai-input">
+                                            <option value="">Seleccionar...</option>
+                                            {tiposNovedad.map(t => (
+                                                <option key={t.id} value={t.id}>[{t.categoria}] {t.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Responsable</label>
+                                        <select name="responsable_id" value={form.responsable_id} onChange={onChange} className="ai-input">
+                                            <option value="">Sin especificar</option>
+                                            {empleados.map(emp => (
+                                                <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className={labelClass}>Tipo de novedad *</label>
-                                    <select name="tipo_novedad_id" value={form.tipo_novedad_id} onChange={onChange} required className={inputClass}>
-                                        <option value="">Seleccionar...</option>
-                                        {tiposNovedad.map(t => (
-                                            <option key={t.id} value={t.id}>[{t.categoria}] {t.nombre}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Responsable</label>
-                                    <select name="responsable_id" value={form.responsable_id} onChange={onChange} className={inputClass}>
-                                        <option value="">Sin especificar</option>
-                                        {empleados.map(emp => (
-                                            <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <label className="flex items-center gap-2 text-sm text-gray-700">
-                                <input type="checkbox" name="accidente_transito" checked={form.accidente_transito} onChange={onChange} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                                Accidente de tránsito
-                            </label>
+                                {checkboxField('Accidente de tránsito', 'accidente_transito')}
 
-                            <h3 className={sectionClass}>Fechas</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div>
-                                    <label className={labelClass}>Fecha inicial *</label>
-                                    <input type="date" name="fecha_inicial" value={form.fecha_inicial} onChange={onChange} required className={inputClass} />
+                                <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Fechas</p>
+                                <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Fecha inicial <em>*</em></label>
+                                        <input type="date" name="fecha_inicial" value={form.fecha_inicial} onChange={onChange} required className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Fecha final</label>
+                                        <input type="date" name="fecha_final" value={form.fecha_final} onChange={onChange} className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Fecha de retorno</label>
+                                        <input type="date" name="fecha_retorno" value={form.fecha_retorno} onChange={onChange} className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Total días</label>
+                                        <input type="number" min="0" name="total_dias" value={form.total_dias} onChange={onChange} className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Fecha de recibido</label>
+                                        <input type="date" name="fecha_recibido" value={form.fecha_recibido} onChange={onChange} className="ai-input" />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Fecha de reporte</label>
+                                        <input type="date" name="fecha_reporte" value={form.fecha_reporte} onChange={onChange} className="ai-input" />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className={labelClass}>Fecha final</label>
-                                    <input type="date" name="fecha_final" value={form.fecha_final} onChange={onChange} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Fecha de retorno</label>
-                                    <input type="date" name="fecha_retorno" value={form.fecha_retorno} onChange={onChange} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Total días</label>
-                                    <input type="number" min="0" name="total_dias" value={form.total_dias} onChange={onChange} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Fecha de recibido</label>
-                                    <input type="date" name="fecha_recibido" value={form.fecha_recibido} onChange={onChange} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Fecha de reporte</label>
-                                    <input type="date" name="fecha_reporte" value={form.fecha_reporte} onChange={onChange} className={inputClass} />
-                                </div>
-                            </div>
 
-                            <h3 className={sectionClass}>Detalle</h3>
-                            <div>
-                                <label className={labelClass}>Origen de la incapacidad</label>
-                                <input type="text" name="origen_incapacidad" value={form.origen_incapacidad} onChange={onChange} className={inputClass} />
-                            </div>
-                            <div>
-                                <label className={labelClass}>Diagnóstico</label>
-                                <textarea name="resumen_diagnostico" value={form.resumen_diagnostico} onChange={onChange} rows={2} className={inputClass} />
-                            </div>
-                            <div>
-                                <label className={labelClass}>Observaciones</label>
-                                <textarea name="observaciones" value={form.observaciones} onChange={onChange} rows={2} className={inputClass} />
-                            </div>
+                                <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Detalle</p>
+                                <div className="ai-field">
+                                    <label className="ai-label">Origen de la incapacidad</label>
+                                    <input type="text" name="origen_incapacidad" value={form.origen_incapacidad} onChange={onChange} className="ai-input" />
+                                </div>
+                                <div className="ai-field">
+                                    <label className="ai-label">Diagnóstico</label>
+                                    <textarea name="resumen_diagnostico" value={form.resumen_diagnostico} onChange={onChange} rows={2} className="ai-input" style={{ height: 'auto', padding: '8px 12px' }} />
+                                </div>
+                                <div className="ai-field">
+                                    <label className="ai-label">Observaciones</label>
+                                    <textarea name="observaciones" value={form.observaciones} onChange={onChange} rows={2} className="ai-input" style={{ height: 'auto', padding: '8px 12px' }} />
+                                </div>
 
-                            <h3 className={sectionClass}>Soportes documentales</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                {checkboxField('Documento original', 'tiene_documento_original')}
-                                {checkboxField('Copia del documento', 'tiene_copia_documento')}
-                                {checkboxField('Historia clínica', 'tiene_historia_clinica')}
-                                {checkboxField('RUNT', 'tiene_runt')}
-                                {checkboxField('FURIPS', 'tiene_furips')}
-                                {checkboxField('SOAT', 'tiene_soat')}
+                                <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Soportes documentales</p>
+                                <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                                    {checkboxField('Documento original', 'tiene_documento_original')}
+                                    {checkboxField('Copia del documento', 'tiene_copia_documento')}
+                                    {checkboxField('Historia clínica', 'tiene_historia_clinica')}
+                                    {checkboxField('RUNT', 'tiene_runt')}
+                                    {checkboxField('FURIPS', 'tiene_furips')}
+                                    {checkboxField('SOAT', 'tiene_soat')}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
-                            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                                Cancelar
-                            </button>
-                            <button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50">
-                                <Save className="h-4 w-4" />
+                        <div className="ai-modal-foot">
+                            <button type="button" onClick={onClose} className="ai-btn ai-btn--secondary">Cancelar</button>
+                            <button type="submit" disabled={loading} className="ai-btn ai-btn--primary">
+                                <Save size={16} />
                                 {loading ? 'Guardando...' : 'Guardar'}
                             </button>
                         </div>
