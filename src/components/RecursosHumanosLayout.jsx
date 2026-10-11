@@ -1,16 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { novedadRrhhService } from '../services/api';
+import { novedadRrhhService, contratacionHydraService } from '../services/api';
 import { iniciales } from '../utils/formatoRRHH';
 import {
-    Users, ClipboardList, ArrowLeftRight, CalendarDays,
+    Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus,
     Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../assets/asiste-ui/asiste-mark-white.png';
 
 const NAV_ITEMS = [
     { to: '/recursos-humanos', label: 'Empleados', icon: Users, end: true },
+    { to: '/recursos-humanos/contratacion-hydra', label: 'Contratación Hydra', icon: UserPlus, countKey: 'contratacion' },
     { to: '/recursos-humanos/novedades', label: 'Novedades', icon: ClipboardList, countKey: 'novedades' },
     { to: '/recursos-humanos/traspasos', label: 'Traspasos', icon: ArrowLeftRight },
     { to: '/recursos-humanos/vacaciones', label: 'Pasivo vacacional', icon: CalendarDays }
@@ -22,6 +23,8 @@ const RecursosHumanosLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [totalNovedades, setTotalNovedades] = useState(null);
+    // Lotes de Hydra que todavía requieren trabajo de RRHH (en completitud o listos).
+    const [lotesAbiertos, setLotesAbiertos] = useState(null);
     const [tema, setTema] = useState(() => (typeof document !== 'undefined' && document.documentElement.dataset.theme) || 'light');
     const menuRef = useRef(null);
 
@@ -29,7 +32,12 @@ const RecursosHumanosLayout = () => {
         novedadRrhhService.getAll()
             .then(({ data }) => setTotalNovedades(data.novedades?.length ?? null))
             .catch(() => setTotalNovedades(null));
+        contratacionHydraService.getLotes()
+            .then(({ data }) => setLotesAbiertos(data.lotes.filter(l => l.estado === 'abierto' || l.estado === 'listo').length))
+            .catch(() => setLotesAbiertos(null));
     }, []);
+
+    const contadores = { novedades: totalNovedades, contratacion: lotesAbiertos || null };
 
     useEffect(() => {
         const cerrarFuera = (e) => {
@@ -74,8 +82,8 @@ const RecursosHumanosLayout = () => {
                         >
                             <Icon className="ai-ic" size={16} strokeWidth={1.75} />
                             <span className="ai-topnav-link-text">{label}</span>
-                            {countKey === 'novedades' && totalNovedades !== null && (
-                                <span className="ai-count">{totalNovedades}</span>
+                            {countKey && contadores[countKey] != null && (
+                                <span className="ai-count">{contadores[countKey]}</span>
                             )}
                         </NavLink>
                     ))}
@@ -163,8 +171,8 @@ const RecursosHumanosLayout = () => {
                         >
                             <Icon className="ai-ic" size={16} strokeWidth={1.75} />
                             {label}
-                            {countKey === 'novedades' && totalNovedades !== null && (
-                                <span className="ai-count">{totalNovedades}</span>
+                            {countKey && contadores[countKey] != null && (
+                                <span className="ai-count">{contadores[countKey]}</span>
                             )}
                         </NavLink>
                     ))}

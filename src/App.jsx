@@ -35,6 +35,8 @@ import RecursosHumanosLayout from './components/RecursosHumanosLayout';
 import NovedadesRRHH from './components/NovedadesRRHH';
 import Traspasos from './components/Traspasos';
 import PasivoVacacional from './components/PasivoVacacional';
+import ContratacionHydra from './components/contratacionHydra/ContratacionHydra';
+import LoteHydra from './components/contratacionHydra/LoteHydra';
 import AsistenciaLayout from './components/asistencia/AsistenciaLayout';
 import MiJornada from './components/asistencia/MiJornada';
 import MiHorario from './components/asistencia/MiHorario';
@@ -452,6 +454,8 @@ function App() {
               <Route path="recursos-humanos/novedades" element={<RecursosHumanosRoute><NovedadesRRHH /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/traspasos" element={<RecursosHumanosRoute><Traspasos /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/vacaciones" element={<RecursosHumanosRoute><PasivoVacacional /></RecursosHumanosRoute>} />
+              <Route path="recursos-humanos/contratacion-hydra" element={<RecursosHumanosRoute><ContratacionHydra /></RecursosHumanosRoute>} />
+              <Route path="recursos-humanos/contratacion-hydra/:id" element={<RecursosHumanosRoute><LoteHydra /></RecursosHumanosRoute>} />
 
               {/* Rutas de técnico de inventario */}
               <Route path="inventario-tecnico" element={<TecnicoInventarioRoute><TecnicoInventarioEdicion /></TecnicoInventarioRoute>} />
