@@ -190,6 +190,24 @@ export const vacacionesService = {
     delete: (id) => api.delete(`/users-company/vacaciones/${id}`)
 };
 
+// === CONTRATACIÓN DESDE HYDRA (RRHH) ===
+// Lotes de candidatos que envía Hydra (reclutamiento). Ver conexionhydra.md §8 en el backend.
+export const contratacionHydraService = {
+    getLotes: (params = {}) => api.get('/contratacion-hydra/lotes', { params }),
+    getLote: (id) => api.get(`/contratacion-hydra/lotes/${id}`),
+    getCandidato: (id) => api.get(`/contratacion-hydra/candidatos/${id}`),
+    guardarSeccion: (id, seccion, cambios) => api.put(`/contratacion-hydra/candidatos/${id}/secciones/${seccion}`, cambios),
+    marcarVerificacion: (id, seccion, verificado) => api.put(`/contratacion-hydra/candidatos/${id}/secciones/${seccion}/verificacion`, { verificado }),
+    descartar: (id, motivo) => api.post(`/contratacion-hydra/candidatos/${id}/descartar`, { motivo }),
+    // simular=true hace todo el registro y lo revierte: devuelve errores o "se registrarían N".
+    registrarLote: (id, { simular = false } = {}) => api.post(`/contratacion-hydra/lotes/${id}/registrar`, null, { params: simular ? { simular: 'true' } : {} }),
+    getCatalogosMapeo: () => api.get('/contratacion-hydra/catalogos'),
+    getMapeos: () => api.get('/contratacion-hydra/mapeos'),
+    guardarMapeo: (data) => api.post('/contratacion-hydra/mapeos', data),
+    getEnvios: (params = {}) => api.get('/contratacion-hydra/envios', { params }),
+    reintentarEnvio: (id) => api.post(`/contratacion-hydra/envios/${id}/reintentar`)
+};
+
 // === SERVICIOS DE DISEÑOS ===
 export const disenoService = {
     getAll: (params = {}) => api.get('/disenos', { params }),
