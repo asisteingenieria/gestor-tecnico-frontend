@@ -11,7 +11,7 @@ function formatearCuentaRegresiva(segundos) {
 const BotonesPausa = ({ jornada, segundosParaHabilitarSalida, onIniciarPausa, onMarcarSalida }) => {
     const [cargando, setCargando] = useState(null);
 
-    if (!jornada || jornada.estado === 'pendiente' || jornada.estado === 'finalizada' || jornada.pausa_activa) return null;
+    if (!jornada || jornada.estado === 'pendiente' || jornada.estado === 'finalizada' || jornada.pausa_activa || jornada.desconexion_activa) return null;
 
     const ejecutar = async (nombre, fn) => {
         setCargando(nombre);

@@ -19,7 +19,8 @@ function sumarDias(fechaIso, dias) {
 
 const ETIQUETAS_EVENTO = {
     entrada: 'Entrada', salida: 'Salida', inicio_bano: 'Inicio baño', fin_bano: 'Fin baño',
-    inicio_almuerzo: 'Inicio almuerzo', fin_almuerzo: 'Fin almuerzo', inicio_extra: 'Inicio hora extra', fin_extra: 'Fin hora extra'
+    inicio_almuerzo: 'Inicio almuerzo', fin_almuerzo: 'Fin almuerzo', inicio_extra: 'Inicio hora extra', fin_extra: 'Fin hora extra',
+    inicio_desconexion: 'Desconexión (logout AsisLock)', fin_desconexion: 'Reconexión (login AsisLock)'
 };
 
 const MiTrazabilidad = () => {
