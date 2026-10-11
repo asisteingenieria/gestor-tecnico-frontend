@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useJornada } from '../../hooks/useJornada';
 import { asistenciaService } from '../../services/api';
 import { formatearFecha } from '../../utils/fecha';
-import { formatearHoraTime12 } from '../../utils/tiempoAsistencia';
+import { formatearHoraTime12, formatearHora12 } from '../../utils/tiempoAsistencia';
 import ContadorJornada from './ContadorJornada';
 import TarjetaPausa from './TarjetaPausa';
 import BotonesPausa from './BotonesPausa';
@@ -80,6 +80,16 @@ const MiJornada = () => {
                 <div className="ai-row" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
                     <AlertCircle size={16} strokeWidth={1.75} />
                     <span style={{ fontSize: 13 }}>{error}</span>
+                </div>
+            )}
+
+            {jornada?.desconexion_activa && (
+                <div className="ai-row" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
+                    <AlertCircle size={16} strokeWidth={1.75} />
+                    <span style={{ fontSize: 13 }}>
+                        Cerraste sesión en AsisLock a las {formatearHora12(jornada.desconexion_activa.desde)}: el tiempo laborado
+                        no corre hasta que vuelvas a iniciar sesión allí.
+                    </span>
                 </div>
             )}
 

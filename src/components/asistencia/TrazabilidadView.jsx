@@ -10,10 +10,12 @@ const ETIQUETAS_EVENTO = {
     inicio_almuerzo: 'Inicio almuerzo',
     fin_almuerzo: 'Fin almuerzo',
     inicio_extra: 'Inicio hora extra',
-    fin_extra: 'Fin hora extra'
+    fin_extra: 'Fin hora extra',
+    inicio_desconexion: 'Desconexión (logout AsisLock)',
+    fin_desconexion: 'Reconexión (login AsisLock)'
 };
 
-const ORIGEN_LABEL = { empleado: 'El empleado', director: 'El director', sistema: 'Cierre automático' };
+const ORIGEN_LABEL = { empleado: 'El empleado', director: 'El director', sistema: 'Cierre automático', asislock: 'AsisLock' };
 
 const ESTADO_BADGE = {
     pendiente: { label: 'Sin iniciar', clase: 'ai-badge--neutral' },
@@ -34,9 +36,13 @@ function construirSegmentos(eventos, finAbierto) {
         } else if (TIPOS_PAUSA_INICIO[ev.tipo]) {
             if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
             actual = { tipo: TIPOS_PAUSA_INICIO[ev.tipo], desde: ev.ocurrido_en };
-        } else if (ev.tipo === 'fin_bano' || ev.tipo === 'fin_almuerzo') {
+        } else if (ev.tipo === 'fin_bano' || ev.tipo === 'fin_almuerzo' || ev.tipo === 'fin_desconexion') {
             if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
             actual = { tipo: 'work', desde: ev.ocurrido_en };
+        } else if (ev.tipo === 'inicio_desconexion') {
+            // Desconectado de AsisLock: no es tiempo laborado, queda como hueco en la barra.
+            if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
+            actual = null;
         } else if (ev.tipo === 'salida') {
             if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
             actual = null;
@@ -52,8 +58,11 @@ function detalleEvento(ev, jornada) {
             ? <span className="ai-badge ai-badge--warning">+{jornada.minutosTarde} min tarde</span>
             : <span className="ai-badge ai-badge--success">Puntual</span>;
     }
-    if (ev.tipo === 'fin_bano' || ev.tipo === 'fin_almuerzo') {
+    if (ev.tipo === 'fin_bano' || ev.tipo === 'fin_almuerzo' || ev.tipo === 'fin_desconexion') {
         return <span className="ai-muted">Regresó {formatearHora12(ev.ocurrido_en)}</span>;
+    }
+    if (ev.tipo === 'inicio_desconexion') {
+        return <span className="ai-badge ai-badge--warning">No cuenta como tiempo laborado</span>;
     }
     if (ev.tipo === 'salida' && jornada.minutosSalidaAnticipada > 0) {
         return <span className="ai-badge ai-badge--warning">Salida anticipada</span>;

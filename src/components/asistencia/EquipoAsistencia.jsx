@@ -222,6 +222,10 @@ const EquipoAsistencia = () => {
                                                     {emp.pausa_activa.tipo === 'bano' ? <Coffee size={12} strokeWidth={1.75} /> : <Utensils size={12} strokeWidth={1.75} />}
                                                     {emp.pausa_activa.tipo === 'bano' ? 'Baño' : 'Almuerzo'} · {emp.pausa_activa.minutosTranscurridos} min
                                                 </span>
+                                            ) : emp.desconexion_activa ? (
+                                                <span className="ai-badge ai-badge--warning">
+                                                    Desconectado de AsisLock · {emp.desconexion_activa.minutosTranscurridos} min
+                                                </span>
                                             ) : <span className="ai-muted">—</span>}
                                         </td>
                                         <td>
