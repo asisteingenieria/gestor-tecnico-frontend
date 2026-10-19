@@ -81,10 +81,18 @@ export const AuthProvider = ({ children }) => {
 
     const changePassword = async (currentPassword, newPassword) => {
         try {
-            await axios.put(`${API_BASE_URL}/auth/change-password`, {
+            const response = await axios.put(`${API_BASE_URL}/auth/change-password`, {
                 currentPassword,
                 newPassword
             });
+            // El backend devuelve una sesión nueva (la anterior podía traer la marca de cambio
+            // obligatorio). Se reemplaza para que el resto de la API vuelva a responder.
+            if (response.data?.token) {
+                localStorage.setItem('token', response.data.token);
+                axios.defaults.headers.common['x-auth-token'] = response.data.token;
+                setToken(response.data.token);
+                setUser(response.data.user);
+            }
             return { success: true };
         } catch (error) {
             return {
@@ -102,6 +110,9 @@ export const AuthProvider = ({ children }) => {
         logout,
         changePassword,
         isAuthenticated: !!user,
+        // Cuenta con la contraseña inicial (cédula): debe cambiarla antes de usar Gestor.
+        // Viene como debeCambiarPassword del login o debe_cambiar_password de /auth/me.
+        debeCambiarPassword: Boolean(user?.debeCambiarPassword || user?.debe_cambiar_password),
         isAdmin: user?.role === 'admin',
         isCoordinador: user?.role === 'coordinador',
         isJefeOperaciones: user?.role === 'jefe_operaciones',

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { novedadRrhhService, contratacionHydraService } from '../services/api';
 import { iniciales } from '../utils/formatoRRHH';
 import {
-    Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus,
+    Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus, Clock,
     Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../assets/asiste-ui/asiste-mark-white.png';
@@ -14,7 +14,9 @@ const NAV_ITEMS = [
     { to: '/recursos-humanos/contratacion-hydra', label: 'Contratación Hydra', icon: UserPlus, countKey: 'contratacion' },
     { to: '/recursos-humanos/novedades', label: 'Novedades', icon: ClipboardList, countKey: 'novedades' },
     { to: '/recursos-humanos/traspasos', label: 'Traspasos', icon: ArrowLeftRight },
-    { to: '/recursos-humanos/vacaciones', label: 'Pasivo vacacional', icon: CalendarDays }
+    { to: '/recursos-humanos/vacaciones', label: 'Pasivo vacacional', icon: CalendarDays },
+    // Su propia asistencia (asistencia.md §19): RRHH no tiene cuenta de empleado aparte.
+    { to: '/asistencia', label: 'Mi asistencia', icon: Clock }
 ];
 
 const RecursosHumanosLayout = () => {

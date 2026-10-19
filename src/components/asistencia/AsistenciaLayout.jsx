@@ -21,7 +21,7 @@ const ROL_LABEL = {
 };
 
 const AsistenciaLayout = () => {
-    const { user, logout, isDirectorOperaciones } = useAuth();
+    const { user, logout, isDirectorOperaciones, isRecursosHumanos } = useAuth();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -43,7 +43,8 @@ const AsistenciaLayout = () => {
         { to: `${base}/horario`, label: 'Mi horario', icon: Calendar },
         { to: `${base}/trazabilidad`, label: 'Trazabilidad', icon: History },
         { to: `${base}/estadisticas`, label: 'Estadísticas', icon: BarChart3 },
-        ...(!isDirectorOperaciones ? [{ to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3 }] : [])
+        ...(!isDirectorOperaciones ? [{ to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3 }] : []),
+        ...(isRecursosHumanos ? [{ to: '/recursos-humanos', label: 'Recursos Humanos', icon: Users, end: true }] : [])
     ];
 
     const navEquipo = isDirectorOperaciones ? [

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 import Login from './components/Login';
@@ -32,6 +32,7 @@ import DirectivoDashboard from './components/DirectivoDashboard';
 import AgentManagement from './components/AgentManagement';
 import Disenos from './components/Disenos';
 import RecursosHumanosLayout from './components/RecursosHumanosLayout';
+import CambiarPasswordObligatorio from './components/CambiarPasswordObligatorio';
 import NovedadesRRHH from './components/NovedadesRRHH';
 import Traspasos from './components/Traspasos';
 import PasivoVacacional from './components/PasivoVacacional';
@@ -50,6 +51,7 @@ import GestionHorarios from './components/asistencia/GestionHorarios';
 // Componente para determinar el layout según el rol
 const LayoutWrapper = ({ children }) => {
   const { user } = useAuth();
+  const location = useLocation();
 
   if (user?.role === 'anonimo') {
     return <AnonymousLayout>{children}</AnonymousLayout>;
@@ -65,6 +67,12 @@ const LayoutWrapper = ({ children }) => {
 
   if (user?.role === 'directivoFinanciero') {
     return <DirectivoFinancieroLayout>{children}</DirectivoFinancieroLayout>;
+  }
+
+  // RRHH ve su propia asistencia con su cuenta (asistencia.md §19): esas pantallas usan el
+  // layout de asistencia, con un enlace de vuelta a Recursos Humanos.
+  if (user?.role === 'recursosHumanos' && location.pathname.startsWith('/asistencia')) {
+    return <AsistenciaLayout>{children}</AsistenciaLayout>;
   }
 
   if (user?.role === 'recursosHumanos') {
@@ -208,7 +216,8 @@ const NonAnonymousRoute = ({ children }) => {
 
 // Componente para rutas protegidas
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, debeCambiarPassword } = useAuth();
+  const location = useLocation();
   
   if (loading) {
     return (
@@ -218,7 +227,12 @@ const ProtectedRoute = ({ children }) => {
     );
   }
   
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  // Con la contraseña inicial (cédula) no se entra a ninguna pantalla hasta cambiarla.
+  if (debeCambiarPassword && location.pathname !== '/cambiar-password') {
+    return <Navigate to="/cambiar-password" replace />;
+  }
+  return children;
 };
 
 // Componente para rutas que requieren rol de admin
@@ -343,7 +357,7 @@ const RecursosHumanosRoute = ({ children }) => {
 
 // Componente para rutas que requieren rol de empleado
 const EmpleadoRoute = ({ children }) => {
-  const { isEmpleado, loading } = useAuth();
+  const { isEmpleado, isRecursosHumanos, loading } = useAuth();
 
   if (loading) {
     return (
@@ -353,7 +367,7 @@ const EmpleadoRoute = ({ children }) => {
     );
   }
 
-  if (!isEmpleado) {
+  if (!isEmpleado && !isRecursosHumanos) {
     return (
       <div className="text-center py-12">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Acceso Denegado</h1>
@@ -404,6 +418,7 @@ function App() {
         <div className="min-h-screen bg-gray-50">
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/cambiar-password" element={<ProtectedRoute><CambiarPasswordObligatorio /></ProtectedRoute>} />
             
             {/* Ruta pública para crear activos desde script */}
             <Route path="/activos/script-parser" element={<ScriptParser />} />
