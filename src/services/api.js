@@ -29,6 +29,10 @@ api.interceptors.response.use(
             localStorage.removeItem('token');
             window.location.href = '/login';
         }
+        if (error.response?.status === 403 && error.response?.data?.codigo === 'CAMBIO_PASSWORD_REQUERIDO'
+            && window.location.pathname !== '/cambiar-password') {
+            window.location.href = '/cambiar-password';
+        }
         return Promise.reject(error);
     }
 );
