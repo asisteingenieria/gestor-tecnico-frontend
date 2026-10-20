@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { asistenciaService } from '../../services/api';
+import { alCambiarContadores } from '../../utils/eventosAsistencia';
 import {
     Clock, Calendar, History, BarChart3, Users, CalendarClock, Clock3,
     Bell, ChevronDown, Moon, Sun, LogOut, Menu, X
@@ -23,6 +24,7 @@ const ROL_LABEL = {
 const AsistenciaLayout = () => {
     const { user, logout, isDirectorOperaciones, isRecursosHumanos } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [menuOpen, setMenuOpen] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [alertasEquipo, setAlertasEquipo] = useState(null);
@@ -53,18 +55,24 @@ const AsistenciaLayout = () => {
         { to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3, count: pendientesHorasExtra }
     ] : [];
 
+    // Los contadores del menú se recargan al cambiar de pantalla y cuando una pantalla avisa
+    // que los cambió sin cambiar de ruta (p. ej. al aprobar una hora extra).
     useEffect(() => {
-        if (!isDirectorOperaciones) return;
-        asistenciaService.getEquipo()
-            .then(({ data }) => {
-                const conAlerta = data.filter((e) => e.estado === 'ausente' || e.alertas?.includes('llegada_tarde')).length;
-                setAlertasEquipo(conAlerta);
-            })
-            .catch(() => setAlertasEquipo(null));
-        asistenciaService.getBandejaHorasExtra({ estado: 'pendiente' })
-            .then(({ data }) => setPendientesHorasExtra(data.length))
-            .catch(() => setPendientesHorasExtra(null));
-    }, [isDirectorOperaciones]);
+        if (!isDirectorOperaciones) return undefined;
+        const cargarContadores = () => {
+            asistenciaService.getEquipo()
+                .then(({ data }) => {
+                    const conAlerta = data.filter((e) => e.estado === 'ausente' || e.alertas?.includes('llegada_tarde')).length;
+                    setAlertasEquipo(conAlerta);
+                })
+                .catch(() => setAlertasEquipo(null));
+            asistenciaService.getBandejaHorasExtra({ estado: 'pendiente' })
+                .then(({ data }) => setPendientesHorasExtra(data.length))
+                .catch(() => setPendientesHorasExtra(null));
+        };
+        cargarContadores();
+        return alCambiarContadores(cargarContadores);
+    }, [isDirectorOperaciones, location.pathname]);
 
     useEffect(() => {
         const id = setInterval(() => setHoraActual(formatearHoraBogota(new Date())), 30000);
@@ -92,7 +100,7 @@ const AsistenciaLayout = () => {
     };
 
     const nombreUsuario = user?.full_name || user?.fullName || '';
-    const rolLabel = ROL_LABEL[user?.role] || '';
+    const rolLabel = user?.role === 'empleado' && isDirectorOperaciones ? 'Jefe de equipo' : (ROL_LABEL[user?.role] || '');
 
     const renderLink = ({ to, label, icon: Icon, end, count, alert }) => (
         <NavLink

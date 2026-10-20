@@ -61,7 +61,9 @@ const UserManagement = () => {
         { value: 'tecnicoInventario', label: 'Técnico Inventario', color: 'bg-teal-100 text-teal-800' },
         { value: 'disenador', label: 'Diseñador', color: 'bg-purple-100 text-purple-800' },
         { value: 'recursosHumanos', label: 'Recursos Humanos', color: 'bg-pink-100 text-pink-800' },
-        { value: 'director_operaciones', label: 'Director de Operaciones', color: 'bg-cyan-100 text-cyan-800' },
+        // Ya no se crean (asistencia.md §26): los jefes gestionan su equipo con su cuenta por
+        // cédula. Se deja para mostrar y editar las cuentas que ya existen.
+        { value: 'director_operaciones', label: 'Director de Operaciones', color: 'bg-cyan-100 text-cyan-800', obsoleto: true },
         { value: 'empleado', label: 'Empleado', color: 'bg-yellow-100 text-yellow-800' }
     ];
 
@@ -621,7 +623,7 @@ const UserManagement = () => {
                                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
                                         <option value="">Seleccionar rol...</option>
-                                        {roles.map(role => (
+                                        {roles.filter(role => !role.obsoleto || role.value === formData.role).map(role => (
                                             <option key={role.value} value={role.value}>
                                                 {role.label}
                                             </option>

@@ -103,7 +103,7 @@ const AnonymousRoute = ({ children }) => {
 
 // Componente para redirigir según el rol
 const RedirectByRole = () => {
-  const { user, loading } = useAuth();
+  const { user, isDirectorOperaciones, loading } = useAuth();
   
   if (loading) {
     return (
@@ -137,12 +137,13 @@ const RedirectByRole = () => {
     return <Navigate to="/recursos-humanos" replace />;
   }
 
-  if (user?.role === 'empleado') {
-    return <Navigate to="/asistencia" replace />;
+  // Empleado con gente a cargo entra por la vista de equipo (asistencia.md §23).
+  if (isDirectorOperaciones) {
+    return <Navigate to="/operaciones" replace />;
   }
 
-  if (user?.role === 'director_operaciones') {
-    return <Navigate to="/operaciones" replace />;
+  if (user?.role === 'empleado') {
+    return <Navigate to="/asistencia" replace />;
   }
 
   return <Navigate to="/dashboard" replace />;
@@ -150,7 +151,7 @@ const RedirectByRole = () => {
 
 // Componente que bloquea dashboard para anónimos
 const DashboardRoute = () => {
-  const { user, loading } = useAuth();
+  const { user, isDirectorOperaciones, loading } = useAuth();
   
   if (loading) {
     return (
@@ -184,12 +185,13 @@ const DashboardRoute = () => {
     return <Navigate to="/recursos-humanos" replace />;
   }
 
-  if (user?.role === 'empleado') {
-    return <Navigate to="/asistencia" replace />;
+  // Empleado con gente a cargo entra por la vista de equipo (asistencia.md §23).
+  if (isDirectorOperaciones) {
+    return <Navigate to="/operaciones" replace />;
   }
 
-  if (user?.role === 'director_operaciones') {
-    return <Navigate to="/operaciones" replace />;
+  if (user?.role === 'empleado') {
+    return <Navigate to="/asistencia" replace />;
   }
 
   return <Dashboard />;
