@@ -168,12 +168,28 @@ const GestionHorarios = () => {
             empleados: prev.empleados.includes(id) ? prev.empleados.filter((e) => e !== id) : [...prev.empleados, id]
         }));
     };
+    // "Seleccionar todos" actúa sobre lo que muestra el buscador: sin búsqueda, todo el equipo.
+    const toggleTodos = (visibles) => {
+        const ids = visibles.map((emp) => emp.users_company_id);
+        setFormAsignacion((prev) => {
+            const todosMarcados = ids.length > 0 && ids.every((id) => prev.empleados.includes(id));
+            return {
+                ...prev,
+                empleados: todosMarcados
+                    ? prev.empleados.filter((id) => !ids.includes(id))
+                    : [...new Set([...prev.empleados, ...ids])]
+            };
+        });
+    };
     const toggleDia = (dia) => {
         setFormAsignacion((prev) => ({
             ...prev,
             dias_semana: prev.dias_semana.includes(dia) ? prev.dias_semana.filter((d) => d !== dia) : [...prev.dias_semana, dia]
         }));
     };
+
+    const textoBusqueda = buscarEmpleado.trim().toLowerCase();
+    const empleadosVisibles = equipo.filter((e) => !textoBusqueda || (e.nombre || '').toLowerCase().includes(textoBusqueda));
 
     const asignar = async (e) => {
         e.preventDefault();
@@ -484,8 +500,24 @@ const GestionHorarios = () => {
                                 <div className="ai-field">
                                     <label className="ai-label">Empleados <em>*</em> ({formAsignacion.empleados.length} seleccionados)</label>
                                     <input className="ai-input" placeholder="Buscar..." value={buscarEmpleado} onChange={(e) => setBuscarEmpleado(e.target.value)} style={{ marginBottom: 6 }} />
+                                    {(() => {
+                                        const visibles = empleadosVisibles;
+                                        const marcados = visibles.filter((emp) => formAsignacion.empleados.includes(emp.users_company_id)).length;
+                                        if (visibles.length === 0) return null;
+                                        return (
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, marginBottom: 6, cursor: 'pointer' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={marcados === visibles.length}
+                                                    ref={(el) => { if (el) el.indeterminate = marcados > 0 && marcados < visibles.length; }}
+                                                    onChange={() => toggleTodos(visibles)}
+                                                />
+                                                {buscarEmpleado.trim() ? `Seleccionar los ${visibles.length} de la búsqueda` : `Seleccionar todos (${visibles.length})`}
+                                            </label>
+                                        );
+                                    })()}
                                     <div className="ai-checklist">
-                                        {equipo.filter((e) => !buscarEmpleado.trim() || e.nombre.toLowerCase().includes(buscarEmpleado.trim().toLowerCase())).map((emp) => (
+                                        {empleadosVisibles.map((emp) => (
                                             <label key={emp.users_company_id}>
                                                 <input type="checkbox" checked={formAsignacion.empleados.includes(emp.users_company_id)} onChange={() => toggleEmpleado(emp.users_company_id)} />
                                                 {nombrePropio(emp.nombre)}
