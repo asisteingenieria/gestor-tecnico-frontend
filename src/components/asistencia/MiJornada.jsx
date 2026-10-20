@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { AlertCircle, Loader2, Clock3, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, Loader2, Clock3, X, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useJornada } from '../../hooks/useJornada';
 import { asistenciaService } from '../../services/api';
@@ -21,6 +21,14 @@ const MiJornada = () => {
     const [formExtra, setFormExtra] = useState({ minutos_estimados: '', motivo: '' });
     const [enviandoExtra, setEnviandoExtra] = useState(false);
     const [mensajeExtra, setMensajeExtra] = useState(null);
+    // Confirmación en la página, no dentro del modal: el modal se cierra al enviar.
+    const [avisoExtra, setAvisoExtra] = useState(null);
+
+    useEffect(() => {
+        if (!avisoExtra) return undefined;
+        const id = setTimeout(() => setAvisoExtra(null), 6000);
+        return () => clearTimeout(id);
+    }, [avisoExtra]);
 
     const solicitarExtra = async (e) => {
         e.preventDefault();
@@ -32,9 +40,9 @@ const MiJornada = () => {
                 minutos_estimados: Number(formExtra.minutos_estimados),
                 motivo: formExtra.motivo || undefined
             });
-            setMensajeExtra({ tipo: 'ok', texto: 'Solicitud enviada al director.' });
             setFormExtra({ minutos_estimados: '', motivo: '' });
-            setTimeout(() => { setMostrarModalExtra(false); setMensajeExtra(null); }, 1200);
+            setMostrarModalExtra(false);
+            setAvisoExtra('Solicitud de hora extra enviada. Queda pendiente hasta que tu jefe la apruebe.');
         } catch (err) {
             setMensajeExtra({ tipo: 'error', texto: err.response?.data?.message || 'No se pudo enviar la solicitud' });
         } finally {
@@ -83,6 +91,13 @@ const MiJornada = () => {
                 </div>
             )}
 
+            {avisoExtra && (
+                <div className="ai-row" role="status" style={{ background: 'var(--success-soft)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
+                    <Check size={16} strokeWidth={1.75} />
+                    <span style={{ fontSize: 13 }}>{avisoExtra}</span>
+                </div>
+            )}
+
             {jornada?.desconexion_activa && (
                 <div className="ai-row" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
                     <AlertCircle size={16} strokeWidth={1.75} />
@@ -114,7 +129,7 @@ const MiJornada = () => {
                             <span className="ai-modal-icon"><Clock3 size={20} strokeWidth={1.75} /></span>
                             <div>
                                 <h3 className="ai-modal-title">Solicitar hora extra</h3>
-                                <p className="ai-modal-sub">Para hoy · queda pendiente de aprobación del director</p>
+                                <p className="ai-modal-sub">Para hoy · queda pendiente de aprobación de tu jefe</p>
                             </div>
                             <button type="button" className="ai-icon-btn" onClick={() => setMostrarModalExtra(false)} aria-label="Cerrar">
                                 <X size={18} strokeWidth={1.75} />

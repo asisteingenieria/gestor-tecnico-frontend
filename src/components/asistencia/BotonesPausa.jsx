@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Coffee, Utensils, LogOut, Loader2 } from 'lucide-react';
+import { formatearDuracion } from '../../utils/tiempoAsistencia';
 
+// Desde una hora: "6 h 14 min" (antes salía "374:02"). En la última hora, minutos:segundos.
 function formatearCuentaRegresiva(segundos) {
     const total = Math.max(0, segundos || 0);
+    if (total >= 3600) return formatearDuracion(Math.ceil(total / 60));
     const minutos = Math.floor(total / 60);
     const restoSegundos = total % 60;
     return `${minutos}:${String(restoSegundos).padStart(2, '0')}`;

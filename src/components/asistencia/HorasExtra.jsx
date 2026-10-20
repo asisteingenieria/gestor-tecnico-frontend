@@ -5,6 +5,7 @@ import { asistenciaService } from '../../services/api';
 import { formatearFecha } from '../../utils/fecha';
 import { formatearDuracion } from '../../utils/tiempoAsistencia';
 import { nombrePropio, iniciales } from '../../utils/formatoRRHH';
+import { avisarCambioContadores } from '../../utils/eventosAsistencia';
 
 const ESTADO_BADGE = {
     pendiente: { label: 'Pendiente', clase: 'ai-badge--info' },
@@ -41,6 +42,7 @@ const HorasExtra = () => {
     const [equipo, setEquipo] = useState([]);
     const [loading, setLoading] = useState(true);
     const [mensaje, setMensaje] = useState(null);
+    const [aviso, setAviso] = useState(null);
     const [procesando, setProcesando] = useState(null);
     const [tab, setTab] = useState('pendiente');
 
@@ -96,6 +98,7 @@ const HorasExtra = () => {
             setAprobandoId(null);
             setMinutosAprobar('');
             await cargar();
+            avisarCambioContadores();
         } catch (err) {
             setMensaje(err.response?.data?.message || 'No se pudo aprobar');
         } finally {
@@ -110,6 +113,7 @@ const HorasExtra = () => {
             setRechazandoId(null);
             setComentarioRechazo('');
             await cargar();
+            avisarCambioContadores();
         } catch (err) {
             setMensaje(err.response?.data?.message || 'No se pudo rechazar');
         } finally {
@@ -125,6 +129,7 @@ const HorasExtra = () => {
         e.preventDefault();
         setEnviando(true);
         setMensaje(null);
+        setAviso(null);
         try {
             await asistenciaService.solicitarHoraExtra({
                 fecha: formSolicitud.fecha,
@@ -134,6 +139,7 @@ const HorasExtra = () => {
             setModalSolicitud(false);
             setFormSolicitud({ fecha: new Date().toISOString().slice(0, 10), inicio: '', fin: '', motivo: '' });
             await cargar();
+            setAviso('Solicitud enviada. Queda pendiente hasta que tu jefe la apruebe.');
         } catch (err) {
             setMensaje(err.response?.data?.message || 'No se pudo enviar la solicitud');
         } finally {
@@ -164,6 +170,12 @@ const HorasExtra = () => {
             </div>
 
             {mensaje && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{mensaje}</p>}
+            {aviso && (
+                <div className="ai-row" role="status" style={{ background: 'var(--success-soft)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
+                    <Check size={16} strokeWidth={1.75} />
+                    <span style={{ fontSize: 13 }}>{aviso}</span>
+                </div>
+            )}
 
             <div className="ai-kpi-strip">
                 <div>

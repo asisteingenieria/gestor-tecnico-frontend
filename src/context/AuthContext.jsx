@@ -126,7 +126,10 @@ export const AuthProvider = ({ children }) => {
         isDisenador: user?.role === 'disenador',
         isRecursosHumanos: user?.role === 'recursosHumanos',
         isEmpleado: user?.role === 'empleado',
-        isDirectorOperaciones: user?.role === 'director_operaciones',
+        // Gestión de equipo: el rol director_operaciones, o un empleado cuya ficha es jefe de
+        // área de alguien (esJefeEquipo del login / es_jefe_equipo de /auth/me). Ver asistencia.md §23.
+        isDirectorOperaciones: user?.role === 'director_operaciones'
+            || (user?.role === 'empleado' && Boolean(user?.esJefeEquipo || user?.es_jefe_equipo)),
         canSupervise: user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'coordinador' || user?.role === 'administrativo' || user?.role === 'jefe_operaciones',
         canCreateIncidents: user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'coordinador' || user?.role === 'jefe_operaciones',
         // Permisos para activos
