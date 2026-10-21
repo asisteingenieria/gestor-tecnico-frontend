@@ -124,7 +124,9 @@ export const AuthProvider = ({ children }) => {
         isTecnicoInventario: user?.role === 'tecnicoInventario',
         isDirectivoFinanciero: user?.role === 'directivoFinanciero',
         isDisenador: user?.role === 'disenador',
-        isRecursosHumanos: user?.role === 'recursosHumanos',
+        // Financiera tiene todo lo de RRHH, como un admin del módulo (asistencia.md §32).
+        isRecursosHumanos: user?.role === 'recursosHumanos' || user?.role === 'financiera',
+        isFinanciera: user?.role === 'financiera',
         isEmpleado: user?.role === 'empleado',
         // Gestión de equipo: el rol director_operaciones, o un empleado cuya ficha es jefe de
         // área de alguien (esJefeEquipo del login / es_jefe_equipo de /auth/me). Ver asistencia.md §23.

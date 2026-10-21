@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { novedadRrhhService, contratacionHydraService } from '../services/api';
+import { novedadRrhhService, contratacionHydraService, financieraService } from '../services/api';
+import { periodoAnterior } from '../utils/reporteHorasExtra';
 import { iniciales } from '../utils/formatoRRHH';
 import {
-    Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus, Clock,
+    Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus, Clock, FileSpreadsheet, History,
     Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../assets/asiste-ui/asiste-mark-white.png';
@@ -19,14 +20,22 @@ const NAV_ITEMS = [
     { to: '/asistencia', label: 'Mi asistencia', icon: Clock }
 ];
 
+// Financiera ve todo lo de RRHH y además los reportes de horas extras de los jefes y la
+// trazabilidad de asistencia por campaña (asistencia.md §32).
+const NAV_FINANCIERA = [
+    { to: '/recursos-humanos/reportes-horas-extra', label: 'Reportes horas extra', icon: FileSpreadsheet, countKey: 'reportes' },
+    { to: '/recursos-humanos/trazabilidad', label: 'Trazabilidad', icon: History }
+];
+
 const RecursosHumanosLayout = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, isFinanciera } = useAuth();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [totalNovedades, setTotalNovedades] = useState(null);
     // Lotes de Hydra que todavía requieren trabajo de RRHH (en completitud o listos).
     const [lotesAbiertos, setLotesAbiertos] = useState(null);
+    const [reportesPorRevisar, setReportesPorRevisar] = useState(null);
     const [tema, setTema] = useState(() => (typeof document !== 'undefined' && document.documentElement.dataset.theme) || 'light');
     const menuRef = useRef(null);
 
@@ -39,7 +48,17 @@ const RecursosHumanosLayout = () => {
             .catch(() => setLotesAbiertos(null));
     }, []);
 
-    const contadores = { novedades: totalNovedades, contratacion: lotesAbiertos || null };
+    useEffect(() => {
+        if (!isFinanciera) return;
+        financieraService.getReportesDelPeriodo(periodoAnterior())
+            .then(({ data }) => setReportesPorRevisar(data.resumen?.por_revisar || null))
+            .catch(() => setReportesPorRevisar(null));
+    }, [isFinanciera]);
+
+    const contadores = { novedades: totalNovedades, contratacion: lotesAbiertos || null, reportes: reportesPorRevisar };
+    const navItems = isFinanciera
+        ? [...NAV_ITEMS.slice(0, -1), ...NAV_FINANCIERA, NAV_ITEMS[NAV_ITEMS.length - 1]]
+        : NAV_ITEMS;
 
     useEffect(() => {
         const cerrarFuera = (e) => {
@@ -75,7 +94,7 @@ const RecursosHumanosLayout = () => {
                 </NavLink>
 
                 <div className="ai-topnav-links" style={{ display: 'none' }} data-desktop-nav>
-                    {NAV_ITEMS.map(({ to, label, icon: Icon, end, countKey }) => (
+                    {navItems.map(({ to, label, icon: Icon, end, countKey }) => (
                         <NavLink
                             key={to}
                             to={to}
@@ -122,7 +141,7 @@ const RecursosHumanosLayout = () => {
                             <span className="ai-avatar ai-avatar--brand ai-avatar--sm">{iniciales(nombreUsuario)}</span>
                             <span style={{ textAlign: 'left', lineHeight: 1.2 }}>
                                 <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#fff' }}>{nombreUsuario}</span>
-                                <span style={{ display: 'block', fontSize: 11, color: '#8fa9cc' }}>Recursos Humanos</span>
+                                <span style={{ display: 'block', fontSize: 11, color: '#8fa9cc' }}>{isFinanciera ? 'Financiera' : 'Recursos Humanos'}</span>
                             </span>
                             <ChevronDown size={16} strokeWidth={1.75} style={{ color: '#8fa9cc' }} />
                         </button>
@@ -162,7 +181,7 @@ const RecursosHumanosLayout = () => {
 
             {mobileNavOpen && (
                 <div style={{ background: 'var(--sidebar-bg)', padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: 4 }} data-mobile-nav>
-                    {NAV_ITEMS.map(({ to, label, icon: Icon, end, countKey }) => (
+                    {navItems.map(({ to, label, icon: Icon, end, countKey }) => (
                         <NavLink
                             key={to}
                             to={to}

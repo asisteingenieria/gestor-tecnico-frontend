@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Download } from 'lucide-react';
-import { asistenciaService } from '../../services/api';
+import { asistenciaService, financieraService } from '../../services/api';
+import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import { formatearFecha } from '../../utils/fecha';
 import { descargarCsv } from '../../utils/csv';
 import TrazabilidadView from './TrazabilidadView';
@@ -23,11 +24,14 @@ const ETIQUETAS_EVENTO = {
     inicio_desconexion: 'Desconexión (logout AsisLock)', fin_desconexion: 'Reconexión (login AsisLock)'
 };
 
-const TrazabilidadEmpleado = () => {
+// `financiera`: la ve el rol financiera desde la trazabilidad por campaña (asistencia.md §32), con
+// su propio endpoint, que trae también el empleado y su horario y no exige que sea de su equipo.
+const TrazabilidadEmpleado = ({ financiera = false }) => {
     const { empleadoId } = useParams();
     const [fecha, setFecha] = useState(hoyIso());
     const [datos, setDatos] = useState(null);
     const [horario, setHorario] = useState(null);
+    const [empleado, setEmpleado] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const inputFechaRef = useRef(null);
@@ -37,6 +41,18 @@ const TrazabilidadEmpleado = () => {
             setLoading(true);
             setError(null);
             try {
+                if (financiera) {
+                    const { data } = await financieraService.getTrazabilidad(empleadoId, fecha);
+                    setEmpleado(data.empleado);
+                    setHorario(data.horario);
+                    if (data.jornada) {
+                        setDatos(data);
+                    } else {
+                        setDatos(null);
+                        setError('No hay jornada registrada para esa fecha');
+                    }
+                    return;
+                }
                 const [{ data: trazabilidad }, { data: horarios }] = await Promise.all([
                     asistenciaService.getTrazabilidadDe(empleadoId, fecha),
                     asistenciaService.getHorarios({ empleadoId, desde: fecha, hasta: fecha })
@@ -51,7 +67,7 @@ const TrazabilidadEmpleado = () => {
                 setLoading(false);
             }
         })();
-    }, [empleadoId, fecha]);
+    }, [empleadoId, fecha, financiera]);
 
     const exportar = () => {
         if (!datos) return;
@@ -66,14 +82,20 @@ const TrazabilidadEmpleado = () => {
 
     return (
         <div className="ai-content">
-            <Link to="/operaciones/equipo" className="ai-link">
-                <ArrowLeft size={14} strokeWidth={1.75} /> Volver al equipo
+            <Link
+                to={financiera ? `/recursos-humanos/trazabilidad${empleado?.idcampania ? `?campania=${empleado.idcampania}` : ''}` : '/operaciones/equipo'}
+                className="ai-link"
+            >
+                <ArrowLeft size={14} strokeWidth={1.75} /> {financiera ? 'Volver a la campaña' : 'Volver al equipo'}
             </Link>
 
             <div className="ai-page-head">
                 <div>
-                    <h1 className="ai-page-title">Trazabilidad del empleado</h1>
-                    <p className="ai-page-sub">{formatearFecha(fecha, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    <h1 className="ai-page-title">{empleado ? nombrePropio(empleado.nombre) : 'Trazabilidad del empleado'}</h1>
+                    <p className="ai-page-sub">
+                        {empleado && `CC ${empleado.cedula}${empleado.campania ? ` · ${primeraMayuscula(empleado.campania)}` : ''} · `}
+                        {formatearFecha(fecha, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
                 </div>
                 <div className="ai-row">
                     <div className="ai-datenav">

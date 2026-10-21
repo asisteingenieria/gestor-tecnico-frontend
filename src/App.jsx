@@ -47,6 +47,13 @@ import HorasExtra from './components/asistencia/HorasExtra';
 import EquipoAsistencia from './components/asistencia/EquipoAsistencia';
 import TrazabilidadEmpleado from './components/asistencia/TrazabilidadEmpleado';
 import GestionHorarios from './components/asistencia/GestionHorarios';
+import ReporteHorasExtra from './components/asistencia/ReporteHorasExtra';
+import ReportesHorasExtra from './components/financiera/ReportesHorasExtra';
+import DetalleReporteHorasExtra from './components/financiera/DetalleReporteHorasExtra';
+import TrazabilidadPorCampania from './components/financiera/TrazabilidadPorCampania';
+
+// Financiera entra por las mismas pantallas y layout que RRHH (asistencia.md §32).
+const esRRHH = (role) => role === 'recursosHumanos' || role === 'financiera';
 
 // Componente para determinar el layout según el rol
 const LayoutWrapper = ({ children }) => {
@@ -71,11 +78,11 @@ const LayoutWrapper = ({ children }) => {
 
   // RRHH ve su propia asistencia con su cuenta (asistencia.md §19): esas pantallas usan el
   // layout de asistencia, con un enlace de vuelta a Recursos Humanos.
-  if (user?.role === 'recursosHumanos' && location.pathname.startsWith('/asistencia')) {
+  if (esRRHH(user?.role) && location.pathname.startsWith('/asistencia')) {
     return <AsistenciaLayout>{children}</AsistenciaLayout>;
   }
 
-  if (user?.role === 'recursosHumanos') {
+  if (esRRHH(user?.role)) {
     return <RecursosHumanosLayout>{children}</RecursosHumanosLayout>;
   }
 
@@ -133,7 +140,7 @@ const RedirectByRole = () => {
     return <Navigate to="/disenos" replace />;
   }
 
-  if (user?.role === 'recursosHumanos') {
+  if (esRRHH(user?.role)) {
     return <Navigate to="/recursos-humanos" replace />;
   }
 
@@ -181,7 +188,7 @@ const DashboardRoute = () => {
     return <Navigate to="/disenos" replace />;
   }
 
-  if (user?.role === 'recursosHumanos') {
+  if (esRRHH(user?.role)) {
     return <Navigate to="/recursos-humanos" replace />;
   }
 
@@ -357,6 +364,30 @@ const RecursosHumanosRoute = ({ children }) => {
   return children;
 };
 
+// Componente para rutas que requieren rol de financiera
+const FinancieraRoute = ({ children }) => {
+  const { isFinanciera, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!isFinanciera) {
+    return (
+      <div className="text-center py-12">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Acceso Denegado</h1>
+        <p className="text-gray-600">Solo Financiera puede acceder a esta sección.</p>
+      </div>
+    );
+  }
+
+  return children;
+};
+
 // Componente para rutas que requieren rol de empleado
 const EmpleadoRoute = ({ children }) => {
   const { isEmpleado, isRecursosHumanos, loading } = useAuth();
@@ -473,6 +504,10 @@ function App() {
               <Route path="recursos-humanos/vacaciones" element={<RecursosHumanosRoute><PasivoVacacional /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/contratacion-hydra" element={<RecursosHumanosRoute><ContratacionHydra /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/contratacion-hydra/:id" element={<RecursosHumanosRoute><LoteHydra /></RecursosHumanosRoute>} />
+              <Route path="recursos-humanos/reportes-horas-extra" element={<FinancieraRoute><ReportesHorasExtra /></FinancieraRoute>} />
+              <Route path="recursos-humanos/reportes-horas-extra/:id" element={<FinancieraRoute><DetalleReporteHorasExtra /></FinancieraRoute>} />
+              <Route path="recursos-humanos/trazabilidad" element={<FinancieraRoute><TrazabilidadPorCampania /></FinancieraRoute>} />
+              <Route path="recursos-humanos/trazabilidad/:empleadoId" element={<FinancieraRoute><TrazabilidadEmpleado financiera /></FinancieraRoute>} />
 
               {/* Rutas de técnico de inventario */}
               <Route path="inventario-tecnico" element={<TecnicoInventarioRoute><TecnicoInventarioEdicion /></TecnicoInventarioRoute>} />
@@ -501,6 +536,7 @@ function App() {
               <Route path="operaciones/equipo/:empleadoId/trazabilidad" element={<DirectorOperacionesRoute><TrazabilidadEmpleado /></DirectorOperacionesRoute>} />
               <Route path="operaciones/horarios" element={<DirectorOperacionesRoute><GestionHorarios /></DirectorOperacionesRoute>} />
               <Route path="operaciones/horas-extra" element={<DirectorOperacionesRoute><HorasExtra /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/reporte-horas-extra" element={<DirectorOperacionesRoute><ReporteHorasExtra /></DirectorOperacionesRoute>} />
             </Route>
 
             {/* Ruta catch-all */}

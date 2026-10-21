@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { asistenciaService } from '../../services/api';
 import { Bell, BellRing } from 'lucide-react';
 
@@ -8,8 +8,11 @@ const fmtFecha = (v) => (v ? new Date(v).toLocaleDateString('es-CO', { timeZone:
 // Campana del portal: alertas de traspasos dirigidas a mi ficha (migración 070) — al director
 // de área, la evaluación de desempeño de un encargo; al jefe inmediato, el retorno de alguien
 // del trabajo en casa. Se recargan al cambiar de pantalla; abrir una la marca como leída.
+// Además, los recordatorios del reporte mensual de horas extras (asistencia.md §32): no se
+// marcan como leídos, salen solos al enviar el reporte, y al abrirlos llevan a él (`enlace`).
 const CampanaAlertas = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const [alertas, setAlertas] = useState([]);
     const [abierta, setAbierta] = useState(false);
     const ref = useRef(null);
@@ -30,7 +33,12 @@ const CampanaAlertas = () => {
 
     const sinLeer = alertas.filter(a => !a.leida_en).length;
 
-    const marcarLeida = (alerta) => {
+    const abrir = (alerta) => {
+        if (alerta.enlace) {
+            setAbierta(false);
+            navigate(alerta.enlace);
+            return;
+        }
         if (alerta.leida_en) return;
         asistenciaService.marcarAlertaLeida(alerta.idalerta_traspaso)
             .then(() => setAlertas(prev => prev.map(a => (a.idalerta_traspaso === alerta.idalerta_traspaso ? { ...a, leida_en: new Date().toISOString() } : a))))
@@ -65,12 +73,12 @@ const CampanaAlertas = () => {
                         <button
                             key={a.idalerta_traspaso}
                             type="button"
-                            onClick={() => marcarLeida(a)}
+                            onClick={() => abrir(a)}
                             style={{
-                                display: 'flex', gap: 10, width: '100%', textAlign: 'left', padding: '8px', border: 0, cursor: a.leida_en ? 'default' : 'pointer',
+                                display: 'flex', gap: 10, width: '100%', textAlign: 'left', padding: '8px', border: 0, cursor: a.leida_en && !a.enlace ? 'default' : 'pointer',
                                 borderRadius: 'var(--radius-md)', background: a.leida_en ? 'transparent' : 'var(--primary-soft)', color: 'inherit', font: 'inherit', marginBottom: 4
                             }}
-                            title={a.leida_en ? '' : 'Marcar como leída'}
+                            title={a.enlace ? 'Abrir' : (a.leida_en ? '' : 'Marcar como leída')}
                         >
                             <BellRing size={16} style={{ flex: 'none', marginTop: 2, color: a.leida_en ? 'var(--ink-subtle)' : 'var(--primary)' }} />
                             <span style={{ fontSize: 13 }}>
