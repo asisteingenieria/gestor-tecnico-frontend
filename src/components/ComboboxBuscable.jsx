@@ -14,7 +14,7 @@ const LIMITE_RESULTADOS = 50;
  * a un portal en <body> por el mismo motivo que FiltroChip en AgentManagement.jsx: el
  * modal del formulario tiene overflow con scroll propio y recortaría el desplegable.
  */
-const ComboboxBuscable = ({ label, opciones, value, onChange, placeholder = 'Escribe para buscar…', required = false }) => {
+const ComboboxBuscable = ({ label, opciones, value, onChange, placeholder = 'Escribe para buscar…', required = false, disabled = false, unidad = 'ciudades' }) => {
     const [query, setQuery] = useState('');
     const [abierto, setAbierto] = useState(false);
     const [resaltado, setResaltado] = useState(0);
@@ -85,8 +85,9 @@ const ComboboxBuscable = ({ label, opciones, value, onChange, placeholder = 'Esc
                     onKeyDown={onKeyDown}
                     autoComplete="off"
                     required={required}
+                    disabled={disabled}
                 />
-                {seleccionado && !abierto && (
+                {seleccionado && !abierto && !disabled && (
                     <button
                         type="button"
                         onClick={() => onChange('')}
@@ -130,7 +131,7 @@ const ComboboxBuscable = ({ label, opciones, value, onChange, placeholder = 'Esc
                     )}
                     {!query && opciones.length > LIMITE_RESULTADOS && (
                         <p className="ai-muted" style={{ fontSize: 12, padding: '6px 10px 2px', margin: 0 }}>
-                            Mostrando {LIMITE_RESULTADOS} de {opciones.length} ciudades — escribe para filtrar
+                            Mostrando {LIMITE_RESULTADOS} de {opciones.length} {unidad} — escribe para filtrar
                         </p>
                     )}
                 </div>,

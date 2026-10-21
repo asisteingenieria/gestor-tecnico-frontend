@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2, Clock } from 'lucide-react';
 import { formatearHora12, formatearDuracion, minutosDesdeMedianoche, minutosBogotaDe } from '../../utils/tiempoAsistencia';
+import { BadgeIngreso, RegistrosAsislock } from './IngresoAsislock';
 
 const ETIQUETAS_EVENTO = {
     entrada: 'Entrada',
@@ -91,6 +92,7 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
     if (!datos) return null;
 
     const { jornada, eventos } = datos;
+    const asislock = datos.asislock;
     const badge = ESTADO_BADGE[jornada.estado] || ESTADO_BADGE.pendiente;
     const minutosPausas = (jornada.minutosPausaBano || 0) + (jornada.minutosPausaAlmuerzo || 0);
 
@@ -152,6 +154,19 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                         <div style={{ marginTop: 4 }}><span className={`ai-badge ${badge.clase}`}>{badge.label}</span></div>
                     </span>
                 </div>
+                {asislock?.resumen && (
+                    <div>
+                        <span>
+                            <span className="ai-kpi-label">Ingreso (AsisLock)</span>
+                            <div style={{ marginTop: 4 }}>
+                                <BadgeIngreso modalidad={asislock.resumen.modalidad} vacio="Sin dato" />
+                                {asislock.resumen.modalidades.length > 1 && (
+                                    <span className="ai-muted" style={{ fontSize: 12, marginLeft: 6 }}>(cambió en el día)</span>
+                                )}
+                            </div>
+                        </span>
+                    </div>
+                )}
             </div>
 
             {jornada.alertas?.length > 0 && (
@@ -243,6 +258,8 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                     </tbody>
                 </table>
             </div>
+
+            <RegistrosAsislock registros={asislock?.registros} />
         </>
     );
 };

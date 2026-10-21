@@ -173,7 +173,16 @@ export const novedadRrhhService = {
     getById: (id) => api.get(`/users-company/novedades/${id}`),
     create: (data) => api.post('/users-company/novedades', data),
     update: (id, data) => api.put(`/users-company/novedades/${id}`, data),
-    delete: (id) => api.delete(`/users-company/novedades/${id}`)
+    delete: (id) => api.delete(`/users-company/novedades/${id}`),
+    // Soportes documentales (PDF o imagen), uno por tipo de soporte que aplica a la novedad
+    getSoportes: (id) => api.get(`/users-company/novedades/${id}/soportes`),
+    subirSoporte: (id, tipoSoporteId, archivo) => {
+        const formData = new FormData();
+        formData.append('archivo', archivo);
+        return api.post(`/users-company/novedades/${id}/soportes/${tipoSoporteId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 });
+    },
+    descargarSoporte: (id, tipoSoporteId) => api.get(`/users-company/novedades/${id}/soportes/${tipoSoporteId}/archivo`, { responseType: 'blob' }),
+    eliminarSoporte: (id, tipoSoporteId) => api.delete(`/users-company/novedades/${id}/soportes/${tipoSoporteId}`)
 };
 
 // === SERVICIOS DE TRASPASOS ===
@@ -182,7 +191,18 @@ export const traspasoService = {
     getById: (id) => api.get(`/users-company/traspasos/${id}`),
     create: (data) => api.post('/users-company/traspasos', data),
     update: (id, data) => api.put(`/users-company/traspasos/${id}`, data),
-    delete: (id) => api.delete(`/users-company/traspasos/${id}`)
+    delete: (id) => api.delete(`/users-company/traspasos/${id}`),
+    // Alertas (evaluación del encargo, retorno del trabajo en casa) y documentos por tipo (migración 070)
+    getAlertas: () => api.get('/users-company/traspasos/alertas'),
+    reenviarAlertaEvaluacion: (id) => api.post(`/users-company/traspasos/${id}/alertas/evaluacion`),
+    getSoportes: (id) => api.get(`/users-company/traspasos/${id}/soportes`),
+    subirSoporte: (id, tipoSoporteId, archivo) => {
+        const formData = new FormData();
+        formData.append('archivo', archivo);
+        return api.post(`/users-company/traspasos/${id}/soportes/${tipoSoporteId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 });
+    },
+    descargarSoporte: (id, tipoSoporteId) => api.get(`/users-company/traspasos/${id}/soportes/${tipoSoporteId}/archivo`, { responseType: 'blob' }),
+    eliminarSoporte: (id, tipoSoporteId) => api.delete(`/users-company/traspasos/${id}/soportes/${tipoSoporteId}`)
 };
 
 // === SERVICIOS DE PASIVO VACACIONAL ===
@@ -248,6 +268,9 @@ export const asistenciaService = {
     getMisEstadisticas: (params = {}) => api.get('/asistencia/mis-estadisticas', { params }),
     solicitarHoraExtra: (data) => api.post('/asistencia/horas-extra/solicitar', data),
     getMisHorasExtra: (params = {}) => api.get('/asistencia/mis-horas-extra', { params }),
+    // Campana: alertas de traspasos dirigidas a mí
+    getMisAlertas: () => api.get('/asistencia/mis-alertas'),
+    marcarAlertaLeida: (id) => api.post(`/asistencia/mis-alertas/${id}/leida`),
 
     // Director de operaciones
     getEquipo: () => api.get('/asistencia/equipo'),

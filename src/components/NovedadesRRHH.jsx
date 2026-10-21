@@ -4,7 +4,8 @@ import { novedadRrhhService } from '../services/api';
 import NovedadForm from './NovedadForm';
 import Pagination from './Pagination';
 import { nombrePropio, iniciales, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
-import { ClipboardList, Plus, Search, Edit3, Trash2, AlertCircle, FileCheck, ChevronDown, ChevronUp, Check, X as XIcon } from 'lucide-react';
+import { SoportesResumen } from './SoportesDocumentales';
+import { ClipboardList, Plus, Search, Edit3, Trash2, AlertCircle, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -13,16 +14,6 @@ const DetailField = ({ label, value }) => (
         <p className="ai-overline" style={{ marginBottom: 4 }}>{label}</p>
         <p style={{ fontSize: 13, color: 'var(--ink)' }}>{value ?? '—'}</p>
     </div>
-);
-
-const SoporteBadge = ({ label, ok }) => (
-    <span
-        className={`ai-badge${ok ? ' ai-badge--success' : ''}`}
-        style={!ok ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
-    >
-        {ok ? <Check size={12} /> : <XIcon size={12} />}
-        {label}
-    </span>
 );
 
 const NovedadesRRHH = () => {
@@ -184,7 +175,8 @@ const NovedadesRRHH = () => {
                             </thead>
                             <tbody>
                                 {paginated.map((n) => {
-                                    const soportes = [n.tiene_documento_original, n.tiene_copia_documento, n.tiene_historia_clinica, n.tiene_runt, n.tiene_furips, n.tiene_soat].filter(Boolean).length;
+                                    const soportes = Number(n.soportes_cargados) || 0;
+                                    const requeridos = Number(n.soportes_requeridos) || 0;
                                     const chip = claseCampania(n.campania_nombre);
                                     const isExpanded = expandedIds.has(n.idnovedad_rrhh);
                                     return (
@@ -230,10 +222,10 @@ const NovedadesRRHH = () => {
                                                 <td className="ai-num">{n.total_dias ?? '—'}</td>
                                                 <td>
                                                     <span
-                                                        className={`ai-badge${soportes > 0 ? ' ai-badge--success' : ''}`}
-                                                        style={soportes === 0 ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
+                                                        className={`ai-badge${requeridos > 0 && soportes === requeridos ? ' ai-badge--success' : soportes > 0 ? ' ai-badge--warning' : ''}`}
+                                                        style={soportes === 0 || requeridos === 0 ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
                                                     >
-                                                        <FileCheck size={12} /> {soportes}/6
+                                                        <FileCheck size={12} /> {requeridos > 0 ? `${soportes}/${requeridos}` : '—'}
                                                     </span>
                                                 </td>
                                                 <td className="ai-muted">{n.responsable_nombre ? nombrePropio(n.responsable_nombre) : '—'}</td>
@@ -266,14 +258,11 @@ const NovedadesRRHH = () => {
                                                             </div>
                                                         )}
                                                         <p className="ai-overline" style={{ marginBottom: 8 }}>Soportes documentales</p>
-                                                        <div className="ai-row">
-                                                            <SoporteBadge label="Documento original" ok={!!n.tiene_documento_original} />
-                                                            <SoporteBadge label="Copia del documento" ok={!!n.tiene_copia_documento} />
-                                                            <SoporteBadge label="Historia clínica" ok={!!n.tiene_historia_clinica} />
-                                                            <SoporteBadge label="RUNT" ok={!!n.tiene_runt} />
-                                                            <SoporteBadge label="FURIPS" ok={!!n.tiene_furips} />
-                                                            <SoporteBadge label="SOAT" ok={!!n.tiene_soat} />
-                                                        </div>
+                                                        <SoportesResumen
+                                                            cargar={() => novedadRrhhService.getSoportes(n.idnovedad_rrhh)}
+                                                            descargar={(tipoSoporteId) => novedadRrhhService.descargarSoporte(n.idnovedad_rrhh, tipoSoporteId)}
+                                                            textoSinSoportes="Este tipo de novedad no requiere soportes."
+                                                        />
                                                     </td>
                                                 </tr>
                                             )}

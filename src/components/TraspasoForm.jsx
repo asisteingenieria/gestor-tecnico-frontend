@@ -1,78 +1,121 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { traspasoService } from '../services/api';
-import { X, Save, ArrowLeftRight } from 'lucide-react';
+import ComboboxBuscable from './ComboboxBuscable';
+import SoportesDocumentales from './SoportesDocumentales';
+import { errorArchivoSoporte, abrirSoporte, subirSoportesPendientes } from '../utils/soportesRrhh';
+import { jefesCandidatos, conValorActual } from '../utils/catalogosRRHH';
+import {
+    CAMPOS_NUEVOS_POR_TIPO, OBLIGATORIOS_POR_TIPO, CAMPOS_ACTUALES, etiquetaCampo,
+    TIPOS_CON_EVALUACION, DIAS_AVISO_RETORNO, restarDias
+} from '../utils/traspasos';
+import { X, Save, ArrowLeftRight, BellRing } from 'lucide-react';
 
 const fecha = (v) => (v ? String(v).substring(0, 10) : '');
 const val = (v) => (v === undefined || v === null ? '' : v);
+const fechaCorta = (f) => (f ? f.split('-').reverse().join('/') : '');
 
-const CATALOGOS_VACIOS = { areas: [], campanias: [], centros_costo: [], cargos: [], modalidades: [], empleados: [] };
-
-const ESTADO_VACIO = {
-    area_id: '', campania_id: '', centro_costo_id: '', cargo_id: '',
-    cargo_ssff: '', usuario_ssff: '', salario: '', bono_no_prestacional: '', bono_cafeteria: '',
-    jefe_area_id: '', jefe_inmediato_id: ''
+const CATALOGOS_VACIOS = {
+    areas: [], campanias: [], centros_costo: [], cargos: [], modalidades: [], empleados: [], tipos_contrato: [],
+    ciudades: [], jefes_area: [], jefes_inmediatos: [], tipos_traspaso: [], tipos_soporte_traspaso: []
 };
+
+const NUEVOS = [...new Set(Object.values(CAMPOS_NUEVOS_POR_TIPO).flat())];
+const vacio = (campos) => Object.fromEntries(campos.map(c => [c, '']));
+
+// Campos que la hoja no pide pero que existen en la tabla (039): se conservan al editar.
+const OCULTOS = ['estado', 'bono_cafeteria_anterior', 'bono_cafeteria_nuevo'];
+
+// Datos actuales del empleado (GET /users-company/:id) → "Información actual".
+function actualDesdeEmpleado(emp) {
+    const c = emp.contrato || {};
+    return {
+        tipo_contrato_anterior_id: val(c.tipo_contrato_idtipo_contrato),
+        ciudad_anterior_id: val(c.ciudad_idciudad),
+        fecha_ingreso_anterior: fecha(c.fecha_ingreso),
+        area_anterior_id: val(c.area_idarea),
+        campania_anterior_id: val(c.campania_idcampania),
+        centro_costo_anterior_id: val(c.centro_costo_idcentro_costo),
+        cargo_ssff_anterior: c.cargo_ssff || '',
+        usuario_ssff_anterior: emp.usuario_ssff || '',
+        cargo_anterior_id: val(c.cargo_idcargo),
+        salario_anterior: val(emp.salario_actual?.salario),
+        bono_no_prestacional_anterior: val(emp.salario_actual?.bono_no_prestacional),
+        jefe_area_anterior_id: val(c.jefe_area_id),
+        jefe_inmediato_anterior_id: val(c.jefe_inmediato_id),
+        modalidad_anterior_id: val(c.modalidad_idmodalidad)
+    };
+}
+
+// "Información nueva" arranca igual a la actual (se edita lo que cambia).
+function nuevoDesdeActual(a) {
+    return {
+        ...vacio(NUEVOS),
+        cargo_nuevo_id: a.cargo_anterior_id,
+        area_nueva_id: a.area_anterior_id,
+        campania_nueva_id: a.campania_anterior_id,
+        centro_costo_nuevo_id: a.centro_costo_anterior_id,
+        cargo_ssff_nuevo: a.cargo_ssff_anterior,
+        usuario_ssff_nuevo: a.usuario_ssff_anterior,
+        jefe_area_nuevo_id: a.jefe_area_anterior_id,
+        jefe_inmediato_nuevo_id: a.jefe_inmediato_anterior_id,
+        modalidad_idmodalidad: a.modalidad_anterior_id
+    };
+}
 
 const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
     const [empleados, setEmpleados] = useState([]);
     const [catalogos, setCatalogos] = useState(CATALOGOS_VACIOS);
     const [empleadoId, setEmpleadoId] = useState('');
     const [contratoId, setContratoId] = useState('');
+    const [jefatura, setJefatura] = useState({}); // contrato vigente: director/jefes, para el aviso de alertas
+    const [tipoId, setTipoId] = useState('');
+    const [observaciones, setObservaciones] = useState('');
+    const [ocultos, setOcultos] = useState(vacio(OCULTOS));
+    const [actual, setActual] = useState(vacio(CAMPOS_ACTUALES));
+    const [nuevo, setNuevo] = useState(vacio(NUEVOS));
 
-    const [general, setGeneral] = useState({
-        estado: '', fecha_inicio: '', fecha_fin: '', ratificacion: false, observaciones: '',
-        modalidad_id: '', fecha_inicio_trabajo_casa: '', fecha_fin_trabajo_casa: '', diadema: '', equipo_computo: ''
-    });
-    const [anterior, setAnterior] = useState(ESTADO_VACIO);
-    const [nuevo, setNuevo] = useState(ESTADO_VACIO);
+    // Id del traspaso ya guardado: el que se edita, o el recién creado si falló la carga de algún
+    // documento (así un segundo "Guardar" lo actualiza en vez de crear otro).
+    const [traspasoId, setTraspasoId] = useState(traspaso?.idtraspaso || null);
+    const [soportesGuardados, setSoportesGuardados] = useState([]);
+    const [archivos, setArchivos] = useState({});
+    const [huboCambios, setHuboCambios] = useState(false);
+    const [aviso, setAviso] = useState('');
 
     const [loadingData, setLoadingData] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    const cargarJefatura = async (id) => {
+        const { data } = await api.get(`/users-company/${id}`);
+        const c = data.empleado.contrato || {};
+        setJefatura({ director_area_id: c.director_area_id, jefe_area_id: c.jefe_area_id, jefe_inmediato_id: c.jefe_inmediato_id });
+        return data.empleado;
+    };
+
     useEffect(() => {
         const cargar = async () => {
             setLoadingData(true);
             try {
-                const [empRes, catRes] = await Promise.all([
+                const [empRes, catRes, sopRes] = await Promise.all([
                     api.get('/users-company'),
-                    api.get('/users-company/catalogos')
+                    api.get('/users-company/catalogos'),
+                    traspaso ? traspasoService.getSoportes(traspaso.idtraspaso) : Promise.resolve(null)
                 ]);
                 setEmpleados(empRes.data.empleados);
-                setCatalogos(catRes.data.catalogos);
+                setCatalogos({ ...CATALOGOS_VACIOS, ...catRes.data.catalogos });
+                setSoportesGuardados(sopRes?.data.soportes || []);
 
                 if (traspaso) {
                     setEmpleadoId(traspaso.empleado_id || '');
                     setContratoId(traspaso.contrato_idcontrato || '');
-                    setGeneral({
-                        estado: traspaso.estado || '',
-                        fecha_inicio: fecha(traspaso.fecha_inicio),
-                        fecha_fin: fecha(traspaso.fecha_fin),
-                        ratificacion: !!traspaso.ratificacion,
-                        observaciones: traspaso.observaciones || '',
-                        modalidad_id: traspaso.modalidad_idmodalidad || '',
-                        fecha_inicio_trabajo_casa: fecha(traspaso.fecha_inicio_trabajo_casa),
-                        fecha_fin_trabajo_casa: fecha(traspaso.fecha_fin_trabajo_casa),
-                        diadema: traspaso.diadema || '',
-                        equipo_computo: traspaso.equipo_computo || ''
-                    });
-                    setAnterior({
-                        area_id: val(traspaso.area_anterior_id), campania_id: val(traspaso.campania_anterior_id),
-                        centro_costo_id: val(traspaso.centro_costo_anterior_id), cargo_id: val(traspaso.cargo_anterior_id),
-                        cargo_ssff: traspaso.cargo_ssff_anterior || '', usuario_ssff: traspaso.usuario_ssff_anterior || '',
-                        salario: val(traspaso.salario_anterior), bono_no_prestacional: val(traspaso.bono_no_prestacional_anterior),
-                        bono_cafeteria: val(traspaso.bono_cafeteria_anterior),
-                        jefe_area_id: val(traspaso.jefe_area_anterior_id), jefe_inmediato_id: val(traspaso.jefe_inmediato_anterior_id)
-                    });
-                    setNuevo({
-                        area_id: val(traspaso.area_nueva_id), campania_id: val(traspaso.campania_nueva_id),
-                        centro_costo_id: val(traspaso.centro_costo_nuevo_id), cargo_id: val(traspaso.cargo_nuevo_id),
-                        cargo_ssff: traspaso.cargo_ssff_nuevo || '', usuario_ssff: traspaso.usuario_ssff_nuevo || '',
-                        salario: val(traspaso.salario_nuevo), bono_no_prestacional: val(traspaso.bono_no_prestacional_nuevo),
-                        bono_cafeteria: val(traspaso.bono_cafeteria_nuevo),
-                        jefe_area_id: val(traspaso.jefe_area_nuevo_id), jefe_inmediato_id: val(traspaso.jefe_inmediato_nuevo_id)
-                    });
+                    setTipoId(val(traspaso.tipo_traspaso_id));
+                    setObservaciones(traspaso.observaciones || '');
+                    setOcultos(Object.fromEntries(OCULTOS.map(c => [c, val(traspaso[c])])));
+                    setActual(Object.fromEntries(CAMPOS_ACTUALES.map(c => [c, c.startsWith('fecha') ? fecha(traspaso[c]) : val(traspaso[c])])));
+                    setNuevo(Object.fromEntries(NUEVOS.map(c => [c, c.startsWith('fecha') ? fecha(traspaso[c]) : val(traspaso[c])])));
+                    if (traspaso.empleado_id) await cargarJefatura(traspaso.empleado_id);
                 }
                 setError('');
             } catch (err) {
@@ -85,172 +128,235 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
         cargar();
     }, [traspaso]);
 
-    const onSelectEmpleado = async (e) => {
-        const id = e.target.value;
+    const onSelectEmpleado = async (id) => {
         setEmpleadoId(id);
         if (!id) {
             setContratoId('');
-            setAnterior(ESTADO_VACIO);
-            setNuevo(ESTADO_VACIO);
+            setJefatura({});
+            setActual(vacio(CAMPOS_ACTUALES));
+            setNuevo(vacio(NUEVOS));
             return;
         }
         try {
-            const res = await api.get(`/users-company/${id}`);
-            const emp = res.data.empleado;
+            const emp = await cargarJefatura(id);
             setContratoId(emp.contrato?.idcontrato || '');
-
-            const snapshot = {
-                area_id: val(emp.contrato?.area_idarea), campania_id: val(emp.contrato?.campania_idcampania),
-                centro_costo_id: val(emp.contrato?.centro_costo_idcentro_costo), cargo_id: val(emp.contrato?.cargo_idcargo),
-                cargo_ssff: '', usuario_ssff: emp.usuario_ssff || '',
-                salario: val(emp.salario_actual?.salario), bono_no_prestacional: val(emp.salario_actual?.bono_no_prestacional),
-                bono_cafeteria: val(emp.salario_actual?.bono_cafeteria),
-                jefe_area_id: val(emp.contrato?.jefe_area_id), jefe_inmediato_id: val(emp.contrato?.jefe_inmediato_id)
-            };
-            setAnterior(snapshot);
-            setNuevo(snapshot); // el usuario edita desde aca lo que cambio
+            const snapshot = actualDesdeEmpleado(emp);
+            setActual(snapshot);
+            setNuevo(nuevoDesdeActual(snapshot));
+            setOcultos(prev => ({ ...prev, bono_cafeteria_anterior: val(emp.salario_actual?.bono_cafeteria) }));
         } catch (err) {
             console.error('Error al cargar empleado:', err);
             setError('Error al cargar los datos actuales del empleado');
         }
     };
 
-    const onChangeGeneral = (e) => {
-        const { name, value, type, checked } = e.target;
-        setGeneral(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    const tiposOpciones = catalogos.tipos_traspaso.filter(t => Number(t.vigente) === 1 || String(t.id) === String(tipoId));
+    const tipoElegido = catalogos.tipos_traspaso.find(t => String(t.id) === String(tipoId));
+    const codigo = tipoElegido?.codigo;
+    const camposNuevos = codigo ? CAMPOS_NUEVOS_POR_TIPO[codigo] : [];
+    const obligatorios = codigo ? OBLIGATORIOS_POR_TIPO[codigo] : [];
+    const soportesQueAplican = tipoElegido
+        ? catalogos.tipos_soporte_traspaso.filter(s => tipoElegido.soportes.includes(Number(s.id)))
+        : [];
+
+    const nombreEmpleado = (id) => catalogos.empleados.find(e => String(e.id) === String(id))?.nombre_completo;
+
+    // ---- Documentos ----
+    const elegirArchivo = (tipoSoporteId, archivo) => {
+        if (!archivo) return;
+        const problema = errorArchivoSoporte(archivo);
+        if (problema) {
+            setError(`${archivo.name}: ${problema}`);
+            return;
+        }
+        setError('');
+        setArchivos(prev => ({ ...prev, [tipoSoporteId]: archivo }));
     };
-    const onChangeAnterior = (e) => setAnterior(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const onChangeNuevo = (e) => setNuevo(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const quitarPendiente = (tipoSoporteId) => setArchivos(prev => {
+        const siguiente = { ...prev };
+        delete siguiente[tipoSoporteId];
+        return siguiente;
+    });
+    const verSoporte = async (tipoSoporteId) => {
+        try {
+            await abrirSoporte(() => traspasoService.descargarSoporte(traspasoId, tipoSoporteId));
+        } catch (err) {
+            console.error('Error al abrir documento:', err);
+            setError('No se pudo abrir el documento');
+        }
+    };
+    const eliminarSoporte = async (soporte) => {
+        if (!window.confirm(`¿Eliminar el archivo de "${soporte.nombre}"?`)) return;
+        try {
+            const { data } = await traspasoService.eliminarSoporte(traspasoId, soporte.tipo_soporte_id);
+            setSoportesGuardados(data.soportes);
+            setHuboCambios(true);
+        } catch (err) {
+            console.error('Error al eliminar documento:', err);
+            setError(err.response?.data?.message || 'No se pudo eliminar el documento');
+        }
+    };
+
+    const reenviarRecordatorio = async () => {
+        try {
+            await traspasoService.reenviarAlertaEvaluacion(traspasoId);
+            setAviso('Recordatorio enviado al director.');
+            setHuboCambios(true);
+        } catch (err) {
+            setError(err.response?.data?.message || 'No se pudo enviar el recordatorio');
+        }
+    };
+
+    const cerrar = () => (huboCambios ? onSuccess() : onClose());
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
-
+        setAviso('');
         if (!contratoId) {
             setError('Selecciona un empleado válido (con contrato activo)');
+            return;
+        }
+        setLoading(true);
+
+        const nulos = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v === '' ? null : v]));
+        const payload = {
+            contrato_id: contratoId,
+            tipo_traspaso_id: tipoId,
+            observaciones: observaciones || null,
+            ...nulos(ocultos),
+            ...nulos(actual),
+            ...nulos(nuevo)
+        };
+
+        let id = traspasoId;
+        try {
+            if (id) {
+                await traspasoService.update(id, payload);
+            } else {
+                const { data } = await traspasoService.create(payload);
+                id = data.traspaso.id;
+                setTraspasoId(id);
+            }
+            setHuboCambios(true);
+        } catch (err) {
+            console.error('Error al guardar traspaso:', err);
+            setError(err.response?.data?.message || err.message || 'Error al guardar el traspaso');
             setLoading(false);
             return;
         }
 
-        const payload = {
-            contrato_id: contratoId,
-            estado: general.estado || null,
-            fecha_inicio: general.fecha_inicio,
-            fecha_fin: general.fecha_fin || null,
-            ratificacion: general.ratificacion,
-            observaciones: general.observaciones || null,
-            modalidad_idmodalidad: general.modalidad_id || null,
-            fecha_inicio_trabajo_casa: general.fecha_inicio_trabajo_casa || null,
-            fecha_fin_trabajo_casa: general.fecha_fin_trabajo_casa || null,
-            diadema: general.diadema || null,
-            equipo_computo: general.equipo_computo || null,
-
-            area_anterior_id: anterior.area_id || null, campania_anterior_id: anterior.campania_id || null,
-            centro_costo_anterior_id: anterior.centro_costo_id || null, cargo_anterior_id: anterior.cargo_id || null,
-            cargo_ssff_anterior: anterior.cargo_ssff || null, usuario_ssff_anterior: anterior.usuario_ssff || null,
-            salario_anterior: anterior.salario || null, bono_no_prestacional_anterior: anterior.bono_no_prestacional || null,
-            bono_cafeteria_anterior: anterior.bono_cafeteria || null,
-            jefe_area_anterior_id: anterior.jefe_area_id || null, jefe_inmediato_anterior_id: anterior.jefe_inmediato_id || null,
-
-            area_nueva_id: nuevo.area_id || null, campania_nueva_id: nuevo.campania_id || null,
-            centro_costo_nuevo_id: nuevo.centro_costo_id || null, cargo_nuevo_id: nuevo.cargo_id || null,
-            cargo_ssff_nuevo: nuevo.cargo_ssff || null, usuario_ssff_nuevo: nuevo.usuario_ssff || null,
-            salario_nuevo: nuevo.salario || null, bono_no_prestacional_nuevo: nuevo.bono_no_prestacional || null,
-            bono_cafeteria_nuevo: nuevo.bono_cafeteria || null,
-            jefe_area_nuevo_id: nuevo.jefe_area_id || null, jefe_inmediato_nuevo_id: nuevo.jefe_inmediato_id || null
-        };
-
-        try {
-            let response;
-            if (traspaso) {
-                response = await traspasoService.update(traspaso.idtraspaso, payload);
-            } else {
-                response = await traspasoService.create(payload);
-            }
-            if (response.data.success) {
-                onSuccess();
-                onClose();
-            }
-        } catch (err) {
-            console.error('Error al guardar traspaso:', err);
-            setError(err.response?.data?.message || err.message || 'Error al guardar el traspaso');
-        } finally {
-            setLoading(false);
+        // Los documentos se suben después de guardar (necesitan el id del traspaso).
+        const { fallidos, subidos, ultimos } = await subirSoportesPendientes(
+            soportesQueAplican, archivos, (tipoSoporteId, archivo) => traspasoService.subirSoporte(id, tipoSoporteId, archivo)
+        );
+        subidos.forEach(quitarPendiente);
+        setLoading(false);
+        if (fallidos.length > 0) {
+            if (ultimos) setSoportesGuardados(ultimos);
+            setError(`El traspaso se guardó, pero estos documentos no se cargaron: ${fallidos.join(' · ')}`);
+            return;
         }
+        onSuccess();
     };
 
     if (!isOpen) return null;
 
-    const bloqueEstado = (estado, onChangeEstado, titulo) => (
-        <div>
-            <p className="ai-overline" style={{ marginBottom: 12 }}>{titulo}</p>
-            <div className="ai-stack" style={{ gap: 12 }}>
-                <div className="ai-field">
-                    <label className="ai-label">Área</label>
-                    <select name="area_id" value={estado.area_id} onChange={onChangeEstado} className="ai-input">
-                        <option value="">Sin especificar</option>
-                        {catalogos.areas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                    </select>
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Campaña</label>
-                    <select name="campania_id" value={estado.campania_id} onChange={onChangeEstado} className="ai-input">
-                        <option value="">Sin especificar</option>
-                        {catalogos.campanias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                    </select>
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Centro de costo</label>
-                    <select name="centro_costo_id" value={estado.centro_costo_id} onChange={onChangeEstado} className="ai-input">
-                        <option value="">Sin especificar</option>
-                        {catalogos.centros_costo.map(c => <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>)}
-                    </select>
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Cargo</label>
-                    <select name="cargo_id" value={estado.cargo_id} onChange={onChangeEstado} className="ai-input">
-                        <option value="">Sin especificar</option>
-                        {catalogos.cargos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                    </select>
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Cargo SSFF</label>
-                    <input type="text" name="cargo_ssff" value={estado.cargo_ssff} onChange={onChangeEstado} className="ai-input" />
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Usuario SSFF</label>
-                    <input type="text" name="usuario_ssff" value={estado.usuario_ssff} onChange={onChangeEstado} className="ai-input" />
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Salario</label>
-                    <input type="number" min="0" step="0.01" name="salario" value={estado.salario} onChange={onChangeEstado} className="ai-input" />
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Bono no prestacional</label>
-                    <input type="number" min="0" step="0.01" name="bono_no_prestacional" value={estado.bono_no_prestacional} onChange={onChangeEstado} className="ai-input" />
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Bono cafetería</label>
-                    <input type="number" min="0" step="0.01" name="bono_cafeteria" value={estado.bono_cafeteria} onChange={onChangeEstado} className="ai-input" />
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Jefe de área</label>
-                    <select name="jefe_area_id" value={estado.jefe_area_id} onChange={onChangeEstado} className="ai-input">
-                        <option value="">Sin especificar</option>
-                        {catalogos.empleados.map(emp => <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>)}
-                    </select>
-                </div>
-                <div className="ai-field">
-                    <label className="ai-label">Jefe inmediato</label>
-                    <select name="jefe_inmediato_id" value={estado.jefe_inmediato_id} onChange={onChangeEstado} className="ai-input">
-                        <option value="">Sin especificar</option>
-                        {catalogos.empleados.map(emp => <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>)}
-                    </select>
-                </div>
+    // ---- Campos ----
+    const empleadosConNombre = catalogos.empleados.map(e => ({ ...e, nombre: e.nombre_completo }));
+    const opcionesDe = (nombre, estado, esNuevo) => {
+        let lista = null;
+        if (/^area/.test(nombre)) lista = catalogos.areas;
+        else if (/^campania/.test(nombre)) lista = catalogos.campanias;
+        else if (/^centro_costo/.test(nombre)) lista = catalogos.centros_costo.map(c => ({ ...c, nombre: c.codigo ? `${c.codigo} — ${c.nombre}` : c.nombre }));
+        else if (/^cargo_(nuevo|anterior)_id$/.test(nombre)) lista = catalogos.cargos;
+        else if (/^modalidad/.test(nombre)) lista = catalogos.modalidades;
+        else if (nombre === 'tipo_contrato_anterior_id') lista = catalogos.tipos_contrato;
+        // Jefes nuevos: los que ya lo son en la campaña/cargo nuevos (como en el alta de empleados).
+        else if (/^jefe_area/.test(nombre)) lista = esNuevo ? jefesCandidatos(catalogos.jefes_area, estado.campania_nueva_id, estado.cargo_nuevo_id) : empleadosConNombre;
+        else if (/^jefe_inmediato/.test(nombre)) lista = esNuevo ? jefesCandidatos(catalogos.jefes_inmediatos, estado.campania_nueva_id, estado.cargo_nuevo_id) : empleadosConNombre;
+        if (!lista) return null;
+        const conNombre = lista.map(o => ({ ...o, nombre: o.nombre ?? o.nombre_completo }));
+        return /^jefe/.test(nombre) ? conValorActual(conNombre, empleadosConNombre, estado[nombre]) : conNombre;
+    };
+
+    const campo = (nombre, estado, setEstado, esNuevo) => {
+        const etiqueta = etiquetaCampo(nombre, codigo);
+        const requerido = esNuevo && obligatorios.includes(nombre);
+        const onChange = (e) => setEstado(prev => ({ ...prev, [nombre]: e.target.value }));
+
+        if (nombre === 'ciudad_anterior_id') {
+            return (
+                <ComboboxBuscable
+                    key={nombre}
+                    label={etiqueta}
+                    opciones={catalogos.ciudades}
+                    value={estado[nombre]}
+                    onChange={(id) => setEstado(prev => ({ ...prev, [nombre]: id }))}
+                />
+            );
+        }
+        const opciones = opcionesDe(nombre, estado, esNuevo);
+        let control;
+        if (opciones) {
+            control = (
+                <select name={nombre} value={estado[nombre]} onChange={onChange} required={requerido} className="ai-input">
+                    <option value="">Sin especificar</option>
+                    {opciones.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+                </select>
+            );
+        } else if (nombre.startsWith('fecha')) {
+            control = <input type="date" name={nombre} value={estado[nombre]} onChange={onChange} required={requerido} className="ai-input" />;
+        } else if (/salario|bono/.test(nombre)) {
+            control = <input type="number" min="0" step="0.01" name={nombre} value={estado[nombre]} onChange={onChange} required={requerido} className="ai-input" />;
+        } else {
+            control = <input type="text" name={nombre} value={estado[nombre]} onChange={onChange} required={requerido} className="ai-input" />;
+        }
+        return (
+            <div key={nombre} className="ai-field">
+                <label className="ai-label">{etiqueta}{requerido && <em> *</em>}</label>
+                {control}
             </div>
-        </div>
-    );
+        );
+    };
+
+    // ---- Aviso de alertas ----
+    const alertaEvaluacion = TIPOS_CON_EVALUACION.includes(codigo);
+    const directorId = jefatura.director_area_id || jefatura.jefe_area_id;
+    const formatoEvaluacionCargado = soportesGuardados.some(s => s.codigo === 'FORMATO_EVALUACION' && s.id);
+    const jefeRetornoId = nuevo.jefe_inmediato_nuevo_id || jefatura.jefe_inmediato_id;
+    const fechaAvisoRetorno = restarDias(nuevo.fecha_fin_trabajo_casa, DIAS_AVISO_RETORNO);
+    const estiloAviso = { height: 'auto', padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', whiteSpace: 'normal' };
+
+    let avisoAlerta = null;
+    if (alertaEvaluacion) {
+        avisoAlerta = (
+            <div className="ai-badge ai-badge--info" style={estiloAviso}>
+                <BellRing size={14} />
+                <span style={{ flex: 1 }}>
+                    {formatoEvaluacionCargado
+                        ? 'El formato de evaluación ya está cargado: no hay recordatorio pendiente.'
+                        : directorId
+                            ? <>{traspasoId ? 'Se avisó' : 'Al guardar se avisará'} a <strong>{nombreEmpleado(directorId)}</strong> (director de área) en el portal de asistencia para que haga la evaluación de desempeño del encargo. El aviso sigue activo hasta que se cargue el formato de evaluación.</>
+                            : 'El empleado no tiene director ni jefe de área en su contrato: no hay a quién enviarle el recordatorio.'}
+                </span>
+                {traspasoId && !formatoEvaluacionCargado && directorId && (
+                    <button type="button" onClick={reenviarRecordatorio} className="ai-btn ai-btn--secondary">Reenviar recordatorio</button>
+                )}
+            </div>
+        );
+    } else if (codigo === 'TRABAJO_CASA' && nuevo.fecha_fin_trabajo_casa) {
+        avisoAlerta = (
+            <div className="ai-badge ai-badge--info" style={estiloAviso}>
+                <BellRing size={14} />
+                <span style={{ flex: 1 }}>
+                    {jefeRetornoId
+                        ? <>El <strong>{fechaCorta(fechaAvisoRetorno)}</strong> (una semana antes del retorno, el {fechaCorta(nuevo.fecha_fin_trabajo_casa)}) se avisará a <strong>{nombreEmpleado(jefeRetornoId)}</strong> (jefe inmediato) en el portal de asistencia. También aparece en "Alertas" de Traspasos.</>
+                        : <>El {fechaCorta(fechaAvisoRetorno)} aparecerá la alerta de retorno en "Alertas" de Traspasos (el empleado no tiene jefe inmediato a quien avisarle).</>}
+                </span>
+            </div>
+        );
+    }
 
     return (
         <div className="ai-overlay ai-scope">
@@ -259,9 +365,9 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
                     <div className="ai-modal-icon"><ArrowLeftRight size={20} /></div>
                     <div>
                         <h2 className="ai-modal-title">{traspaso ? 'Editar traspaso' : 'Nuevo traspaso'}</h2>
-                        <p className="ai-modal-sub">Cambios de área, cargo, campaña o salario</p>
+                        <p className="ai-modal-sub">Encargos, ratificaciones, trabajo en casa y cambios de cargo o salario</p>
                     </div>
-                    <button onClick={onClose} className="ai-icon-btn" aria-label="Cerrar"><X size={18} /></button>
+                    <button onClick={cerrar} className="ai-icon-btn" aria-label="Cerrar"><X size={18} /></button>
                 </div>
 
                 {loadingData ? (
@@ -272,81 +378,84 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
                     <form onSubmit={handleSubmit}>
                         <div className="ai-modal-body">
                             {error && (
-                                <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', marginBottom: 16, width: 'fit-content' }}>
+                                <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', marginBottom: 16, width: 'fit-content', whiteSpace: 'normal' }}>
                                     <span className="ai-dot" />
                                     {error}
                                 </div>
                             )}
+                            {aviso && (
+                                <div className="ai-badge ai-badge--success" style={{ height: 'auto', padding: '10px 14px', marginBottom: 16, width: 'fit-content' }}>
+                                    <span className="ai-dot" />
+                                    {aviso}
+                                </div>
+                            )}
 
                             <div className="ai-stack">
-                                <p className="ai-overline">Empleado</p>
-                                <div className="ai-field">
-                                    <label className="ai-label">Empleado <em>*</em></label>
-                                    <select value={empleadoId} onChange={onSelectEmpleado} required className="ai-input" disabled={!!traspaso}>
-                                        <option value="">Seleccionar...</option>
-                                        {empleados.map(emp => (
-                                            <option key={emp.id} value={emp.id}>{emp.nombre_completo} — {emp.numero_identificacion}</option>
-                                        ))}
-                                    </select>
-                                    <p className="ai-help">Al seleccionar, se precarga el estado "Anterior" con los datos actuales del contrato.</p>
-                                </div>
-
-                                <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Datos generales</p>
-                                <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                                <p className="ai-overline">Empleado y tipo de traspaso</p>
+                                <div className="ai-form-grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
+                                    <ComboboxBuscable
+                                        label="Empleado"
+                                        opciones={empleados.map(emp => ({ id: emp.id, nombre: `${emp.nombre_completo} — ${emp.numero_identificacion}` }))}
+                                        value={empleadoId}
+                                        onChange={onSelectEmpleado}
+                                        placeholder="Nombre o cédula…"
+                                        required
+                                        disabled={!!traspaso}
+                                        unidad="empleados"
+                                    />
                                     <div className="ai-field">
-                                        <label className="ai-label">Estado</label>
-                                        <input type="text" name="estado" value={general.estado} onChange={onChangeGeneral} className="ai-input" placeholder="Ej: aprobado" />
-                                    </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Fecha inicio <em>*</em></label>
-                                        <input type="date" name="fecha_inicio" value={general.fecha_inicio} onChange={onChangeGeneral} required className="ai-input" />
-                                    </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Fecha fin</label>
-                                        <input type="date" name="fecha_fin" value={general.fecha_fin} onChange={onChangeGeneral} className="ai-input" />
-                                    </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Modalidad</label>
-                                        <select name="modalidad_id" value={general.modalidad_id} onChange={onChangeGeneral} className="ai-input">
-                                            <option value="">Sin especificar</option>
-                                            {catalogos.modalidades.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                                        <label className="ai-label">Tipo de traspaso <em>*</em></label>
+                                        <select value={tipoId} onChange={(e) => setTipoId(e.target.value)} required className="ai-input">
+                                            <option value="">Seleccionar...</option>
+                                            {tiposOpciones.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                                         </select>
                                     </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Trabajo en casa - inicio</label>
-                                        <input type="date" name="fecha_inicio_trabajo_casa" value={general.fecha_inicio_trabajo_casa} onChange={onChangeGeneral} className="ai-input" />
-                                    </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Trabajo en casa - fin</label>
-                                        <input type="date" name="fecha_fin_trabajo_casa" value={general.fecha_fin_trabajo_casa} onChange={onChangeGeneral} className="ai-input" />
-                                    </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Diadema</label>
-                                        <input type="text" name="diadema" value={general.diadema} onChange={onChangeGeneral} className="ai-input" />
-                                    </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Equipo de cómputo</label>
-                                        <input type="text" name="equipo_computo" value={general.equipo_computo} onChange={onChangeGeneral} className="ai-input" />
-                                    </div>
-                                </div>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                                    <input type="checkbox" name="ratificacion" checked={general.ratificacion} onChange={onChangeGeneral} />
-                                    Ratificación
-                                </label>
-                                <div className="ai-field">
-                                    <label className="ai-label">Observaciones</label>
-                                    <textarea name="observaciones" value={general.observaciones} onChange={onChangeGeneral} rows={2} className="ai-input" style={{ height: 'auto', padding: '8px 12px' }} />
                                 </div>
 
-                                <div className="ai-form-grid" style={{ paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-                                    {bloqueEstado(anterior, onChangeAnterior, 'Estado anterior')}
-                                    {bloqueEstado(nuevo, onChangeNuevo, 'Estado nuevo')}
+                                <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Información actual</p>
+                                {!empleadoId ? (
+                                    <p className="ai-muted" style={{ fontSize: 13, margin: 0 }}>Elige el empleado: se carga con los datos actuales de su contrato.</p>
+                                ) : (
+                                    <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                                        {CAMPOS_ACTUALES.map(c => campo(c, actual, setActual, false))}
+                                    </div>
+                                )}
+
+                                <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                                    Información nueva{tipoElegido ? ` · ${tipoElegido.nombre}` : ''}
+                                </p>
+                                {!tipoElegido ? (
+                                    <p className="ai-muted" style={{ fontSize: 13, margin: 0 }}>Elige el tipo de traspaso para ver qué hay que llenar.</p>
+                                ) : (
+                                    <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                                        {camposNuevos.map(c => campo(c, nuevo, setNuevo, true))}
+                                    </div>
+                                )}
+                                {avisoAlerta}
+
+                                <div className="ai-field">
+                                    <label className="ai-label">Observaciones</label>
+                                    <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={2} className="ai-input" style={{ height: 'auto', padding: '8px 12px' }} />
                                 </div>
+
+                                <SoportesDocumentales
+                                    titulo="Documentos"
+                                    tipoElegido={!!tipoElegido}
+                                    aplican={soportesQueAplican}
+                                    guardados={soportesGuardados}
+                                    archivos={archivos}
+                                    onElegir={elegirArchivo}
+                                    onQuitar={quitarPendiente}
+                                    onVer={verSoporte}
+                                    onEliminar={eliminarSoporte}
+                                    textoSinTipo="Elige el tipo de traspaso para ver qué documentos aplican."
+                                    textoSinSoportes="Este tipo de traspaso no requiere documentos."
+                                />
                             </div>
                         </div>
 
                         <div className="ai-modal-foot">
-                            <button type="button" onClick={onClose} className="ai-btn ai-btn--secondary">Cancelar</button>
+                            <button type="button" onClick={cerrar} className="ai-btn ai-btn--secondary">Cancelar</button>
                             <button type="submit" disabled={loading} className="ai-btn ai-btn--primary">
                                 <Save size={16} />
                                 {loading ? 'Guardando...' : 'Guardar'}

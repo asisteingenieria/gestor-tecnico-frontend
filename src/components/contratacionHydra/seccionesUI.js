@@ -13,11 +13,31 @@
 
 import {
     TARIFAS_ARL, clientesUnicos, campaniasDeCliente, clienteDeCampania, cargosDeCliente,
-    jefesInmediatos, jefesPorCampania, conValorActual, aplicaFinContrato, esAprendizaje, sumarMeses
+    jefesCandidatos, conValorActual, aplicaFinContrato, esAprendizaje, sumarMeses, entidadesVigentes,
+    sugerirJefatura, aplicarSugerenciaJefatura, jefeInmediatoElegido, ROLES_JEFATURA
 } from '../../utils/catalogosRRHH';
 
 const conCodigo = (o) => (o.codigo ? `${o.nombre} (${o.codigo})` : o.nombre);
 const nombreDe = (lista, id) => lista.find(o => String(o.id) === String(id))?.nombre || '';
+
+// Jefatura sugerida por Campaña + Cargo, igual que en el alta manual (AgentForm). Se recalcula
+// al cambiar Cliente, Campaña, Cargo o Jefe inmediato; `_jefatura_sugerida` recuerda lo que
+// puso la sugerencia para reemplazarlo después sin pisar nunca lo elegido a mano.
+const conJefaturaSugerida = (d, cat) => {
+    const antes = d._jefatura_sugerida || {};
+    const actual = Object.fromEntries(ROLES_JEFATURA.map(rol => [rol, d[`contrato.${rol}`]]));
+    const ahora = sugerirJefatura(
+        cat.cadenas_jefatura, d['contrato.campania_id'], d['contrato.cargo_id'],
+        jefeInmediatoElegido(actual.jefe_inmediato_id, antes)
+    );
+    const aplicado = aplicarSugerenciaJefatura(actual, antes, ahora);
+    const siguiente = { ...d, _jefatura_sugerida: {} };
+    for (const rol of ROLES_JEFATURA) {
+        siguiente[`contrato.${rol}`] = aplicado[rol];
+        if (aplicado[rol] && aplicado[rol] === (ahora[rol] || '')) siguiente._jefatura_sugerida[rol] = aplicado[rol];
+    }
+    return siguiente;
+};
 const codigoDe = (lista, id) => lista.find(o => String(o.id) === String(id))?.codigo || '';
 const nombreCompleto = (o) => o.nombre_completo;
 
@@ -65,23 +85,24 @@ export const SECCIONES_UI = [
             {
                 ruta: '_cliente_id', label: 'Cliente', tipo: 'select', requerido: true, etiquetaSalario: true,
                 opciones: (d, cat) => clientesUnicos(cat.campanias, d._cliente_id),
-                alCambiar: (d, valor, cat) => ({
+                alCambiar: (d, valor, cat) => conJefaturaSugerida({
                     ...d,
                     _cliente_id: valor,
                     'contrato.campania_id': String(clienteDeCampania(cat.campanias, d['contrato.campania_id'])) === String(valor) ? d['contrato.campania_id'] : '',
                     'contrato.cargo_id': cargosDeCliente(cat.cargos, cat.salarios_referencia, valor, '').some(c => String(c.id) === String(d['contrato.cargo_id'])) ? d['contrato.cargo_id'] : ''
-                })
+                }, cat)
             },
             {
                 ruta: 'contrato.campania_id', label: 'Campaña', tipo: 'select', requerido: true,
                 opciones: (d, cat) => campaniasDeCliente(cat.campanias, d._cliente_id),
-                alCambiar: (d, valor, cat) => ({ ...d, 'contrato.campania_id': valor, _cliente_id: clienteDeCampania(cat.campanias, valor) || d._cliente_id })
+                alCambiar: (d, valor, cat) => conJefaturaSugerida({ ...d, 'contrato.campania_id': valor, _cliente_id: clienteDeCampania(cat.campanias, valor) || d._cliente_id }, cat)
             },
             { ruta: 'contrato.area_id', label: 'Área', tipo: 'select', catalogo: 'areas', requerido: true },
             { ruta: 'contrato.centro_costo_id', label: 'Centro de costo', tipo: 'select', catalogo: 'centros_costo', requerido: true, render: (o) => `${o.codigo} — ${o.nombre}` },
             {
                 ruta: 'contrato.cargo_id', label: 'Cargo', tipo: 'select', requerido: true, etiquetaSalario: true,
-                opciones: (d, cat) => cargosDeCliente(cat.cargos, cat.salarios_referencia, d._cliente_id, d['contrato.cargo_id'])
+                opciones: (d, cat) => cargosDeCliente(cat.cargos, cat.salarios_referencia, d._cliente_id, d['contrato.cargo_id']),
+                alCambiar: (d, valor, cat) => conJefaturaSugerida({ ...d, 'contrato.cargo_id': valor }, cat)
             },
             { ruta: 'contrato.cargo_ssff', label: 'Cargo en SSFF', tipo: 'texto' },
             {
@@ -115,15 +136,16 @@ export const SECCIONES_UI = [
             },
             {
                 ruta: 'contrato.jefe_inmediato_id', label: 'Jefe inmediato', tipo: 'select', render: nombreCompleto,
-                opciones: (d, cat) => conValorActual(jefesInmediatos(cat.jefes_inmediatos, d['contrato.campania_id'], d['contrato.cargo_id']), cat.empleados, d['contrato.jefe_inmediato_id'])
+                opciones: (d, cat) => conValorActual(jefesCandidatos(cat.jefes_inmediatos, d['contrato.campania_id'], d['contrato.cargo_id']), cat.empleados, d['contrato.jefe_inmediato_id']),
+                alCambiar: (d, valor, cat) => conJefaturaSugerida({ ...d, 'contrato.jefe_inmediato_id': valor }, cat)
             },
             {
                 ruta: 'contrato.jefe_area_id', label: 'Jefe de área', tipo: 'select', render: nombreCompleto,
-                opciones: (d, cat) => conValorActual(jefesPorCampania(cat.jefes_area, d['contrato.campania_id']), cat.empleados, d['contrato.jefe_area_id'])
+                opciones: (d, cat) => conValorActual(jefesCandidatos(cat.jefes_area, d['contrato.campania_id'], d['contrato.cargo_id']), cat.empleados, d['contrato.jefe_area_id'])
             },
             {
                 ruta: 'contrato.director_area_id', label: 'Director de área', tipo: 'select', render: nombreCompleto,
-                opciones: (d, cat) => conValorActual(jefesPorCampania(cat.directores_area, d['contrato.campania_id']), cat.empleados, d['contrato.director_area_id'])
+                opciones: (d, cat) => conValorActual(jefesCandidatos(cat.directores_area, d['contrato.campania_id'], d['contrato.cargo_id']), cat.empleados, d['contrato.director_area_id'])
             },
             { ruta: 'contrato.empresa_id', label: 'Empresa', tipo: 'select', catalogo: 'empresas', unicoPorDefecto: true },
             { ruta: 'contrato.periodo_pago_id', label: 'Periodo de pago', tipo: 'select', catalogo: 'periodos_pago', unicoPorDefecto: true },
@@ -143,15 +165,16 @@ export const SECCIONES_UI = [
         clave: 'seguridad_social',
         titulo: 'Seguridad social',
         campos: [
-            { ruta: 'seguridad_social.eps_id', label: 'EPS', tipo: 'select', catalogo: 'entidades_eps' },
+            // Solo las entidades vigentes (hoja "EPS AFP CESANTIAS", migración 068), más la ya elegida.
+            { ruta: 'seguridad_social.eps_id', label: 'EPS', tipo: 'select', opciones: (d, cat) => entidadesVigentes(cat.entidades_eps, d['seguridad_social.eps_id']) },
             { ruta: 'seguridad_social.eps_fecha_afiliacion', label: 'Fecha afiliación EPS', tipo: 'fecha' },
-            { ruta: 'seguridad_social.arl_id', label: 'ARL', tipo: 'select', catalogo: 'entidades_arl' },
+            { ruta: 'seguridad_social.arl_id', label: 'ARL', tipo: 'select', opciones: (d, cat) => entidadesVigentes(cat.entidades_arl, d['seguridad_social.arl_id']) },
             { ruta: 'seguridad_social.arl_fecha_afiliacion', label: 'Fecha afiliación ARL', tipo: 'fecha' },
             { ruta: 'seguridad_social.tarifa_arl', label: 'Tarifa ARL (%)', tipo: 'select', opciones: () => TARIFAS_ARL, span2: true },
-            { ruta: 'seguridad_social.afp_id', label: 'Fondo de pensiones (AFP)', tipo: 'select', catalogo: 'entidades_afp' },
+            { ruta: 'seguridad_social.afp_id', label: 'Fondo de pensiones (AFP)', tipo: 'select', opciones: (d, cat) => entidadesVigentes(cat.entidades_afp, d['seguridad_social.afp_id']) },
             { ruta: 'seguridad_social.afp_fecha_afiliacion', label: 'Fecha afiliación AFP', tipo: 'fecha' },
-            { ruta: 'seguridad_social.cesantias_id', label: 'Fondo de cesantías', tipo: 'select', catalogo: 'entidades_cesantias' },
-            { ruta: 'seguridad_social.caja_id', label: 'Caja de compensación', tipo: 'select', catalogo: 'entidades_caja' },
+            { ruta: 'seguridad_social.cesantias_id', label: 'Fondo de cesantías', tipo: 'select', opciones: (d, cat) => entidadesVigentes(cat.entidades_cesantias, d['seguridad_social.cesantias_id']) },
+            { ruta: 'seguridad_social.caja_id', label: 'Caja de compensación', tipo: 'select', opciones: (d, cat) => entidadesVigentes(cat.entidades_caja, d['seguridad_social.caja_id']) },
             { ruta: 'seguridad_social.caja_fecha_afiliacion', label: 'Fecha afiliación caja', tipo: 'fecha' }
         ]
     },
@@ -226,9 +249,11 @@ export function borradorDeSeccion(seccion, datosEmpleado, catalogos) {
 }
 
 // Sugerencias que el alta manual también pone solas, aplicadas al borrador (sin guardar):
-// catálogos de un único valor y el tipo de dirección "Residencia".
+// catálogos de un único valor, el tipo de dirección "Residencia" y la jefatura por Campaña +
+// Cargo (solo llena los jefes vacíos: los ya guardados cuentan como elegidos a mano).
 export function aplicarValoresPorDefecto(seccion, borrador, catalogos) {
-    const siguiente = { ...borrador };
+    let siguiente = { ...borrador };
+    if (seccion.clave === 'contrato') siguiente = conJefaturaSugerida(siguiente, catalogos);
     for (const campo of seccion.campos) {
         if (siguiente[campo.ruta] !== '') continue;
         if (campo.unicoPorDefecto && catalogos[campo.catalogo]?.length === 1) {

@@ -4,7 +4,8 @@ import { traspasoService } from '../services/api';
 import TraspasoForm from './TraspasoForm';
 import Pagination from './Pagination';
 import { nombrePropio, iniciales } from '../utils/formatoRRHH';
-import { ArrowLeftRight, Plus, Search, Edit3, Trash2, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { SoportesResumen } from './SoportesDocumentales';
+import { ArrowLeftRight, Plus, Search, Edit3, Trash2, AlertCircle, ChevronDown, ChevronUp, FileCheck, BellRing } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -23,6 +24,12 @@ const CompareRow = ({ label, before, after }) => (
     </tr>
 );
 
+const ESTADO_ALERTA = {
+    programada: { label: 'Programada', clase: '' },
+    enviada: { label: 'Enviada, sin leer', clase: ' ai-badge--warning' },
+    leida: { label: 'Leída', clase: ' ai-badge--success' }
+};
+
 const Traspasos = () => {
     const { isRecursosHumanos } = useAuth();
     const [traspasos, setTraspasos] = useState([]);
@@ -35,6 +42,7 @@ const Traspasos = () => {
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(PAGE_SIZE);
+    const [alertas, setAlertas] = useState([]);
 
     useEffect(() => {
         fetchTraspasos();
@@ -47,8 +55,12 @@ const Traspasos = () => {
     const fetchTraspasos = async () => {
         try {
             setLoading(true);
-            const response = await traspasoService.getAll();
+            const [response, alertasRes] = await Promise.all([
+                traspasoService.getAll(),
+                traspasoService.getAlertas().catch(() => ({ data: { alertas: [] } }))
+            ]);
             setTraspasos(response.data.traspasos);
+            setAlertas(alertasRes.data.alertas);
             setError('');
         } catch (err) {
             console.error('Error al cargar traspasos:', err);
@@ -88,6 +100,7 @@ const Traspasos = () => {
     const filtered = traspasos.filter(t =>
         (t.empleado_nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (t.empleado_identificacion || '').includes(searchTerm) ||
+        (t.tipo_nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (t.area_nueva_nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (t.campania_nueva_nombre || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -126,7 +139,7 @@ const Traspasos = () => {
                 <div className="ai-page-head">
                     <div>
                         <h1 className="ai-page-title">Traspasos</h1>
-                        <p className="ai-page-sub">Cambios de área, cargo, campaña o salario de un empleado</p>
+                        <p className="ai-page-sub">Encargos, ratificaciones, trabajo en casa y cambios de cargo o salario</p>
                     </div>
                     <button onClick={handleCreate} className="ai-btn ai-btn--primary">
                         <Plus size={16} />
@@ -141,13 +154,37 @@ const Traspasos = () => {
                     </div>
                 )}
 
+                {alertas.length > 0 && (
+                    <div className="ai-card" style={{ padding: 16 }}>
+                        <p className="ai-overline" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <BellRing size={14} /> Alertas · {alertas.length}
+                        </p>
+                        <div style={{ display: 'grid', gap: 8 }}>
+                            {alertas.map(a => {
+                                const estado = ESTADO_ALERTA[a.estado] || ESTADO_ALERTA.programada;
+                                return (
+                                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
+                                        <span className={`ai-badge${estado.clase}`} style={!estado.clase ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}>
+                                            {estado.label}{a.estado === 'programada' ? ` · ${fmtFecha(a.fecha_alerta)}` : ''}
+                                        </span>
+                                        <span style={{ flex: 1, minWidth: 240 }}>{a.mensaje}</span>
+                                        <span className="ai-muted">
+                                            {a.destinatario_nombre ? `Para ${nombrePropio(a.destinatario_nombre)}` : 'Sin destinatario en el contrato'}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 <div className="ai-card">
                     <div className="ai-toolbar">
                         <div className="ai-search">
                             <Search size={16} />
                             <input
                                 type="text"
-                                placeholder="Buscar por empleado, identificación, área o campaña nueva..."
+                                placeholder="Buscar por empleado, identificación, tipo, área o campaña nueva..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 style={{ border: 0, outline: 'none', background: 'transparent', flex: 1, font: 'inherit', color: 'inherit' }}
@@ -171,17 +208,20 @@ const Traspasos = () => {
                                 <tr>
                                     <th style={{ width: 36 }}></th>
                                     <th>Empleado</th>
+                                    <th>Tipo</th>
                                     <th>Fecha inicio</th>
                                     <th>Área → Nueva</th>
                                     <th>Cargo → Nuevo</th>
                                     <th>Salario → Nuevo</th>
-                                    <th>Ratificación</th>
+                                    <th>Documentos</th>
                                     <th></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginated.map((t) => {
                                     const isExpanded = expandedIds.has(t.idtraspaso);
+                                    const documentos = Number(t.soportes_cargados) || 0;
+                                    const requeridos = Number(t.soportes_requeridos) || 0;
                                     return (
                                         <React.Fragment key={t.idtraspaso}>
                                             <tr>
@@ -203,6 +243,11 @@ const Traspasos = () => {
                                                         </div>
                                                     </div>
                                                 </td>
+                                                <td>
+                                                    {t.tipo_nombre
+                                                        ? <span className="ai-badge ai-badge--info"><span className="ai-dot" />{t.tipo_nombre}</span>
+                                                        : <span className="ai-muted">Sin tipo</span>}
+                                                </td>
                                                 <td className="ai-muted">{fmtFecha(t.fecha_inicio)}</td>
                                                 <td className="ai-muted">
                                                     {t.area_anterior_nombre || '—'} → <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{t.area_nueva_nombre || '—'}</span>
@@ -214,13 +259,12 @@ const Traspasos = () => {
                                                     {fmtMoneda(t.salario_anterior)} → <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{fmtMoneda(t.salario_nuevo)}</span>
                                                 </td>
                                                 <td>
-                                                    {t.ratificacion ? (
-                                                        <span className="ai-badge ai-badge--success">
-                                                            <CheckCircle2 size={12} /> Sí
-                                                        </span>
-                                                    ) : (
-                                                        <span className="ai-badge" style={{ background: 'var(--surface-200)', color: 'var(--ink-muted)' }}>No</span>
-                                                    )}
+                                                    <span
+                                                        className={`ai-badge${requeridos > 0 && documentos === requeridos ? ' ai-badge--success' : documentos > 0 ? ' ai-badge--warning' : ''}`}
+                                                        style={documentos === 0 || requeridos === 0 ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
+                                                    >
+                                                        <FileCheck size={12} /> {requeridos > 0 ? `${documentos}/${requeridos}` : '—'}
+                                                    </span>
                                                 </td>
                                                 <td className="ai-td-actions">
                                                     <div className="ai-row-actions">
@@ -235,11 +279,12 @@ const Traspasos = () => {
                                             </tr>
                                             {isExpanded && (
                                                 <tr>
-                                                    <td colSpan={8} style={{ background: 'var(--surface-0)' }}>
+                                                    <td colSpan={9} style={{ background: 'var(--surface-0)' }}>
                                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16, marginBottom: 20 }}>
-                                                            <DetailField label="Estado" value={t.estado} />
+                                                            <DetailField label="Tipo de contrato" value={t.tipo_contrato_anterior_nombre} />
+                                                            <DetailField label="Ciudad donde labora" value={t.ciudad_anterior_nombre} />
+                                                            <DetailField label="Fecha de ingreso" value={fmtFecha(t.fecha_ingreso_anterior)} />
                                                             <DetailField label="Fecha fin" value={fmtFecha(t.fecha_fin)} />
-                                                            <DetailField label="Modalidad" value={t.modalidad_nombre} />
                                                             <DetailField label="Centro de costo → Nuevo" value={<>{t.centro_costo_anterior_nombre || '—'} → {t.centro_costo_nuevo_nombre || '—'}</>} />
                                                             <DetailField label="Trabajo en casa - inicio" value={fmtFecha(t.fecha_inicio_trabajo_casa)} />
                                                             <DetailField label="Trabajo en casa - fin" value={fmtFecha(t.fecha_fin_trabajo_casa)} />
@@ -259,15 +304,22 @@ const Traspasos = () => {
                                                                 </thead>
                                                                 <tbody>
                                                                     <CompareRow label="Campaña" before={t.campania_anterior_nombre} after={t.campania_nueva_nombre} />
+                                                                    <CompareRow label="Modalidad" before={t.modalidad_anterior_nombre} after={t.modalidad_nombre} />
                                                                     <CompareRow label="Cargo SSFF" before={t.cargo_ssff_anterior} after={t.cargo_ssff_nuevo} />
                                                                     <CompareRow label="Usuario SSFF" before={t.usuario_ssff_anterior} after={t.usuario_ssff_nuevo} />
-                                                                    <CompareRow label="Bono no prestacional" before={fmtMoneda(t.bono_no_prestacional_anterior)} after={fmtMoneda(t.bono_no_prestacional_nuevo)} />
-                                                                    <CompareRow label="Bono cafetería" before={fmtMoneda(t.bono_cafeteria_anterior)} after={fmtMoneda(t.bono_cafeteria_nuevo)} />
+                                                                    <CompareRow label="BNP (bono no prestacional)" before={fmtMoneda(t.bono_no_prestacional_anterior)} after={fmtMoneda(t.bono_no_prestacional_nuevo)} />
                                                                     <CompareRow label="Jefe de área" before={t.jefe_area_anterior_nombre} after={t.jefe_area_nuevo_nombre} />
                                                                     <CompareRow label="Jefe inmediato" before={t.jefe_inmediato_anterior_nombre} after={t.jefe_inmediato_nuevo_nombre} />
                                                                 </tbody>
                                                             </table>
                                                         </div>
+
+                                                        <p className="ai-overline" style={{ margin: '16px 0 8px' }}>Documentos</p>
+                                                        <SoportesResumen
+                                                            cargar={() => traspasoService.getSoportes(t.idtraspaso)}
+                                                            descargar={(tipoSoporteId) => traspasoService.descargarSoporte(t.idtraspaso, tipoSoporteId)}
+                                                            textoSinSoportes={t.tipo_nombre ? 'Este tipo de traspaso no requiere documentos.' : 'Traspaso sin tipo (registrado antes de la hoja TRASPASOS).'}
+                                                        />
 
                                                         {t.observaciones && (
                                                             <div style={{ marginTop: 16 }}>
