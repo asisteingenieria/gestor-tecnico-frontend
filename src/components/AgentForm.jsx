@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import ComboboxBuscable from './ComboboxBuscable';
 import { X, Save, UserPlus, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
+import { jefesCandidatos, sugerirJefatura, aplicarSugerenciaJefatura, jefeInmediatoElegido, ROLES_JEFATURA, entidadesVigentes } from '../utils/catalogosRRHH';
 
 const CATALOGOS_VACIOS = {
     tipos_identificacion: [],
@@ -41,7 +42,8 @@ const CATALOGOS_VACIOS = {
     empleados: [],
     jefes_inmediatos: [],
     jefes_area: [],
-    directores_area: []
+    directores_area: [],
+    cadenas_jefatura: []
 };
 
 const fecha = (v) => (v ? String(v).substring(0, 10) : '');
@@ -166,9 +168,17 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // Jefatura que puso la sugerencia automática (ver el efecto de más abajo). Se guarda para
+    // distinguir lo sugerido de lo elegido a mano: lo sugerido se puede reemplazar al cambiar
+    // Campaña/Cargo/Jefe inmediato, lo elegido a mano nunca.
+    const jefaturaSugeridaRef = useRef({});
+    const [jefaturaSugerida, setJefaturaSugerida] = useState({});
+
     useEffect(() => {
         if (!isOpen) return;
         setPaso(1);
+        jefaturaSugeridaRef.current = {};
+        setJefaturaSugerida({});
         const cargar = async () => {
             setLoadingData(true);
             try {
@@ -343,6 +353,33 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
         };
         cargar();
     }, [agente, isOpen]);
+
+    // Jefatura sugerida al registrar un empleado nuevo: con la Campaña + Cargo elegidos se
+    // proponen el jefe inmediato (si esa combinación tiene uno solo), el jefe de área y el
+    // director de la cadena de mando real más común; al elegir el jefe inmediato, el jefe de área
+    // y director de su equipo. Al editar no se sugiere nada: se respeta lo guardado.
+    useEffect(() => {
+        if (agente || !isOpen) return;
+        const antes = jefaturaSugeridaRef.current;
+        const ahora = sugerirJefatura(
+            catalogos.cadenas_jefatura,
+            contrato.campania_id,
+            contrato.cargo_id,
+            jefeInmediatoElegido(contrato.jefe_inmediato_id, antes)
+        );
+        const aplicado = aplicarSugerenciaJefatura(contrato, antes, ahora);
+        // Solo quedan marcados como "sugeridos" los campos que de verdad tomaron la sugerencia.
+        const marcados = {};
+        for (const rol of ROLES_JEFATURA) {
+            if (aplicado[rol] && aplicado[rol] === (ahora[rol] || '')) marcados[rol] = aplicado[rol];
+        }
+        jefaturaSugeridaRef.current = marcados;
+        setJefaturaSugerida(marcados);
+        setContrato(prev => (ROLES_JEFATURA.every(rol => String(prev[rol] || '') === aplicado[rol])
+            ? prev
+            : { ...prev, ...aplicado }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- solo reacciona a lo que define la jefatura
+    }, [agente, isOpen, catalogos.cadenas_jefatura, contrato.campania_id, contrato.cargo_id, contrato.jefe_inmediato_id]);
 
     const onChange = (setter) => (e) => {
         const { name, value } = e.target;
@@ -612,11 +649,12 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
 
     if (!isOpen) return null;
 
-    const selectField = (label, name, value, handler, options, { required = false, render = (o) => o.nombre, tagSalario = false } = {}) => (
+    const selectField = (label, name, value, handler, options, { required = false, render = (o) => o.nombre, tagSalario = false, sugerido = false } = {}) => (
         <div className={`ai-field${tagSalario ? ' ai-field--salario-source' : ''}`}>
             <label className="ai-label">
                 {label}{required && <em>*</em>}
                 {tagSalario && <span className="ai-label-tag" title="Junto con este campo, sugiere el salario">$ Salario</span>}
+                {sugerido && <span className="ai-label-tag" title="Sugerido según la cadena de mando real de esta campaña y cargo. Puedes cambiarlo.">Sugerido</span>}
             </label>
             <select name={name} value={value} onChange={handler} required={required} className="ai-input">
                 <option value="">{required ? 'Seleccionar…' : 'Sin especificar'}</option>
@@ -657,55 +695,23 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
         return base;
     };
 
-    // Los 3 catálogos anteriores traen ahora una fila por cada Campaña (y, para jefe inmediato,
-    // Cargo) real en la que esa persona figura como jefe -- una misma persona puede repetirse en
-    // varias filas. `dedupePorId` colapsa eso a una opción por persona para cuando no hay
-    // suficiente contexto para filtrar todavía.
-    const dedupePorId = (lista) => {
-        const mapa = new Map();
-        for (const item of lista) if (!mapa.has(item.id)) mapa.set(item.id, item);
-        return [...mapa.values()];
-    };
-
-    // Filtra "Jefe de área"/"Director de área" según la Campaña ya elegida del empleado que se
-    // está registrando -- verificado contra datos reales (ver UserCompany.js::getCatalogos): esos
-    // dos roles casi siempre cubren toda la campaña sin importar el cargo del subordinado. Sin
-    // Campaña elegida, o si la campaña no tiene ningún candidato real todavía (ej. campaña nueva
-    // sin historial), se muestra la lista completa -- mismo criterio que el filtro de Cargo por
-    // Cliente: mejor no bloquear el alta que dejar el selector vacío.
-    const filtrarPorCampania = (lista, campaniaId) => {
-        if (!campaniaId) return dedupePorId(lista);
-        const filtrados = lista.filter(j => String(j.campania_id) === String(campaniaId));
-        return filtrados.length > 0 ? dedupePorId(filtrados) : dedupePorId(lista);
-    };
-
-    // "Jefe inmediato" sí varía por Cargo dentro de una misma Campaña (ej. T&T + Agente call
-    // center trae 7 candidatos reales distintos, T&T + Coordinador Call trae solo 1) -- se filtra
-    // primero por Campaña+Cargo; si esa combinación exacta no tiene candidatos (cargo recién
-    // elegido, o combinación nueva), cae a filtrar solo por Campaña.
-    const filtrarJefesInmediatos = (lista, campaniaId, cargoId) => {
-        if (!campaniaId) return dedupePorId(lista);
-        if (cargoId) {
-            const porCampaniaYCargo = lista.filter(
-                j => String(j.campania_id) === String(campaniaId) && String(j.cargo_id) === String(cargoId)
-            );
-            if (porCampaniaYCargo.length > 0) return dedupePorId(porCampaniaYCargo);
-        }
-        return filtrarPorCampania(lista, campaniaId);
-    };
-
+    // Los 3 selectores se filtran por la Campaña + Cargo ya elegidos (los 3 roles cambian por
+    // cargo dentro de una campaña; ver `jefesCandidatos` en utils/catalogosRRHH.js, compartido
+    // con Contratación Hydra). Sin candidatos para la combinación, cae a la Campaña y luego a la
+    // lista completa: mejor no bloquear el alta que dejar el selector vacío.
     const jefesInmediatosOpciones = filtrarJefes(
-        filtrarJefesInmediatos(catalogos.jefes_inmediatos, contrato.campania_id, contrato.cargo_id),
+        jefesCandidatos(catalogos.jefes_inmediatos, contrato.campania_id, contrato.cargo_id),
         contrato.jefe_inmediato_id
     );
     const jefesAreaOpciones = filtrarJefes(
-        filtrarPorCampania(catalogos.jefes_area, contrato.campania_id),
+        jefesCandidatos(catalogos.jefes_area, contrato.campania_id, contrato.cargo_id),
         contrato.jefe_area_id
     );
     const directoresAreaOpciones = filtrarJefes(
-        filtrarPorCampania(catalogos.directores_area, contrato.campania_id),
+        jefesCandidatos(catalogos.directores_area, contrato.campania_id, contrato.cargo_id),
         contrato.director_area_id
     );
+    const esSugerido = (rol) => Boolean(contrato[rol]) && String(contrato[rol]) === jefaturaSugerida[rol];
 
     return (
         <div className="ai-overlay ai-scope" onClick={onClose}>
@@ -806,9 +812,9 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                         `estadoContratoActivo()` en UserCompany.js) si no se manda este campo --
                                         por eso solo se expone al editar un empleado ya existente. */}
                                     {agente && selectField('Estado del contrato', 'estado_contrato_id', contrato.estado_contrato_id, onChange(setContrato), catalogos.estados_contrato)}
-                                    {selectField('Jefe inmediato', 'jefe_inmediato_id', contrato.jefe_inmediato_id, onChange(setContrato), jefesInmediatosOpciones, { render: o => o.nombre_completo })}
-                                    {selectField('Jefe de área', 'jefe_area_id', contrato.jefe_area_id, onChange(setContrato), jefesAreaOpciones, { render: o => o.nombre_completo })}
-                                    {selectField('Director de área', 'director_area_id', contrato.director_area_id, onChange(setContrato), directoresAreaOpciones, { render: o => o.nombre_completo })}
+                                    {selectField('Jefe inmediato', 'jefe_inmediato_id', contrato.jefe_inmediato_id, onChange(setContrato), jefesInmediatosOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('jefe_inmediato_id') })}
+                                    {selectField('Jefe de área', 'jefe_area_id', contrato.jefe_area_id, onChange(setContrato), jefesAreaOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('jefe_area_id') })}
+                                    {selectField('Director de área', 'director_area_id', contrato.director_area_id, onChange(setContrato), directoresAreaOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('director_area_id') })}
                                     {selectField('Empresa', 'empresa_id', contrato.empresa_id, onChange(setContrato), catalogos.empresas)}
                                     {selectField('Periodo de pago', 'periodo_pago_id', contrato.periodo_pago_id, onChange(setContrato), catalogos.periodos_pago)}
                                     {selectField('Tipo cotizante', 'tipo_cotizante_id', contrato.tipo_cotizante_id, onChange(setContrato), catalogos.tipos_cotizante)}
@@ -864,15 +870,17 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
 
                                 <p className="ai-overline" style={{ margin: '18px 0 10px' }}>Seguridad social</p>
                                 <div className="ai-form-grid">
-                                    {selectField('EPS', 'eps_id', segSocial.eps_id, onChange(setSegSocial), catalogos.entidades_eps)}
+                                    {/* Solo entidades vigentes (hoja "EPS AFP CESANTIAS", migración 068),
+                                        más la ya guardada del empleado aunque no lo sea. */}
+                                    {selectField('EPS', 'eps_id', segSocial.eps_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_eps, segSocial.eps_id))}
                                     {textField('Fecha afiliación EPS', 'eps_fecha_afiliacion', segSocial.eps_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
-                                    {selectField('ARL', 'arl_id', segSocial.arl_id, onChange(setSegSocial), catalogos.entidades_arl)}
+                                    {selectField('ARL', 'arl_id', segSocial.arl_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_arl, segSocial.arl_id))}
                                     {textField('Fecha afiliación ARL', 'arl_fecha_afiliacion', segSocial.arl_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
                                     {selectField('Tarifa ARL (%)', 'tarifa_arl', segSocial.tarifa_arl, onChange(setSegSocial), TARIFAS_ARL)}
-                                    {selectField('Fondo de pensiones (AFP)', 'afp_id', segSocial.afp_id, onChange(setSegSocial), catalogos.entidades_afp)}
+                                    {selectField('Fondo de pensiones (AFP)', 'afp_id', segSocial.afp_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_afp, segSocial.afp_id))}
                                     {textField('Fecha afiliación AFP', 'afp_fecha_afiliacion', segSocial.afp_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
-                                    {selectField('Fondo de cesantías', 'cesantias_id', segSocial.cesantias_id, onChange(setSegSocial), catalogos.entidades_cesantias)}
-                                    {selectField('Caja de compensación', 'caja_id', segSocial.caja_id, onChange(setSegSocial), catalogos.entidades_caja)}
+                                    {selectField('Fondo de cesantías', 'cesantias_id', segSocial.cesantias_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_cesantias, segSocial.cesantias_id))}
+                                    {selectField('Caja de compensación', 'caja_id', segSocial.caja_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_caja, segSocial.caja_id))}
                                     {textField('Fecha afiliación caja', 'caja_fecha_afiliacion', segSocial.caja_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
                                 </div>
 

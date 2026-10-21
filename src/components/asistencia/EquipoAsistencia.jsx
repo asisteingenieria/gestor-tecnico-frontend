@@ -5,6 +5,9 @@ import { asistenciaService } from '../../services/api';
 import { nombrePropio, iniciales, primeraMayuscula } from '../../utils/formatoRRHH';
 import { formatearDuracion } from '../../utils/tiempoAsistencia';
 import { descargarCsv } from '../../utils/csv';
+import { formatearHora12 } from '../../utils/tiempoAsistencia';
+import { BadgeIngreso } from './IngresoAsislock';
+import { MODALIDAD_INGRESO, textoConexion } from '../../utils/asislock';
 
 const POLL_MS = 30000;
 
@@ -77,7 +80,9 @@ const EquipoAsistencia = () => {
         enPausaAlmuerzo: equipo.filter((e) => e.pausa_activa?.tipo === 'almuerzo').length,
         sinIniciar: equipo.filter((e) => e.estado === 'pendiente').length,
         tarde: equipo.filter(esTarde).length,
-        ausentes: equipo.filter((e) => e.estado === 'ausente').length
+        ausentes: equipo.filter((e) => e.estado === 'ausente').length,
+        presencial: equipo.filter((e) => e.asislock?.modalidad === 'presencial').length,
+        teletrabajo: equipo.filter((e) => e.asislock?.modalidad === 'teletrabajo').length
     }), [equipo]);
 
     const filtrado = useMemo(() => {
@@ -98,9 +103,12 @@ const EquipoAsistencia = () => {
     const exportar = () => {
         const filas = filtrado.map((e) => [
             nombrePropio(e.nombre), e.cedula || '', primeraMayuscula(e.cargo || ''),
+            MODALIDAD_INGRESO[e.asislock?.modalidad]?.label || '',
+            e.asislock?.primer_login ? formatearHora12(e.asislock.primer_login) : '',
+            textoConexion(e.asislock) || '',
             formatearDuracion(e.minutos_trabajados), ESTADO_BADGE[e.estado]?.label || e.estado, e.alertas?.length || 0
         ]);
-        descargarCsv('equipo_hoy.csv', ['Empleado', 'Cédula', 'Cargo', 'Tiempo hoy', 'Estado', 'Alertas'], filas);
+        descargarCsv('equipo_hoy.csv', ['Empleado', 'Cédula', 'Cargo', 'Ingreso', 'Primer login AsisLock', 'AsisLock', 'Tiempo hoy', 'Estado', 'Alertas'], filas);
     };
 
     if (loading) {
@@ -137,6 +145,7 @@ const EquipoAsistencia = () => {
                 <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', border: tab === 'en_curso' ? '1px solid var(--primary)' : undefined }} onClick={() => setTab('en_curso')}>
                     <div className="ai-kpi-head"><span className="ai-kpi-label">En turno</span><span className="ai-kpi-icon"><UserCheck size={16} strokeWidth={1.75} /></span></div>
                     <div className="ai-kpi-value" style={{ color: 'var(--success)' }}>{kpis.enTurno}</div>
+                    <div className="ai-kpi-foot">{kpis.presencial} presencial · {kpis.teletrabajo} teletrabajo</div>
                 </button>
                 <div className="ai-kpi">
                     <div className="ai-kpi-head"><span className="ai-kpi-label">En pausa</span><span className="ai-kpi-icon"><Coffee size={16} strokeWidth={1.75} /></span></div>
@@ -195,6 +204,7 @@ const EquipoAsistencia = () => {
                         <thead>
                             <tr>
                                 <th>Empleado</th>
+                                <th>Ingreso</th>
                                 <th>Tiempo hoy</th>
                                 <th>Pausa</th>
                                 <th>Estado</th>
@@ -214,6 +224,12 @@ const EquipoAsistencia = () => {
                                                     <div className="ai-muted" style={{ fontSize: 12 }}>{primeraMayuscula(emp.cargo || '')} · CC {emp.cedula}</div>
                                                 </span>
                                             </span>
+                                        </td>
+                                        <td title={emp.asislock ? textoConexion(emp.asislock) : 'Sin registros de AsisLock hoy'}>
+                                            <BadgeIngreso modalidad={emp.asislock?.modalidad} />
+                                            {emp.asislock?.primer_login && (
+                                                <div className="ai-muted" style={{ fontSize: 12, marginTop: 2 }}>Login {formatearHora12(emp.asislock.primer_login)}</div>
+                                            )}
                                         </td>
                                         <td className="ai-num">{formatearDuracion(emp.minutos_trabajados)}</td>
                                         <td>

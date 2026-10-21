@@ -3,9 +3,10 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { asistenciaService } from '../../services/api';
 import { alCambiarContadores } from '../../utils/eventosAsistencia';
+import CampanaAlertas from './CampanaAlertas';
 import {
     Clock, Calendar, History, BarChart3, Users, CalendarClock, Clock3,
-    Bell, ChevronDown, Moon, Sun, LogOut, Menu, X
+    ChevronDown, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../../assets/asiste-ui/asiste-mark-white.png';
 
@@ -152,9 +153,7 @@ const AsistenciaLayout = () => {
 
                 <div className="ai-row" style={{ marginLeft: 'auto', gap: 8 }} data-topnav-actions>
                     <span className="ai-clock-chip">{horaActual}</span>
-                    <button type="button" className="ai-icon-btn ai-bell" aria-label="Notificaciones">
-                        <Bell size={18} strokeWidth={1.75} />
-                    </button>
+                    <CampanaAlertas />
 
                     <div style={{ position: 'relative' }} ref={menuRef}>
                         <button

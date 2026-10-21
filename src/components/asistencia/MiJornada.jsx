@@ -8,6 +8,7 @@ import { formatearHoraTime12, formatearHora12 } from '../../utils/tiempoAsistenc
 import ContadorJornada from './ContadorJornada';
 import TarjetaPausa from './TarjetaPausa';
 import BotonesPausa from './BotonesPausa';
+import { ResumenAsislock } from './IngresoAsislock';
 
 const MiJornada = () => {
     const { user } = useAuth();
@@ -97,6 +98,8 @@ const MiJornada = () => {
                     <span style={{ fontSize: 13 }}>{avisoExtra}</span>
                 </div>
             )}
+
+            <ResumenAsislock resumen={jornada?.asislock} />
 
             {jornada?.desconexion_activa && (
                 <div className="ai-row" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
