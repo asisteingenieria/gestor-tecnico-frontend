@@ -292,7 +292,25 @@ export const asistenciaService = {
     getBandejaHorasExtra: (params = {}) => api.get('/asistencia/horas-extra', { params }),
     aprobarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/aprobar`, data),
     rechazarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/rechazar`, data),
-    asignarHoraExtra: (data) => api.post('/asistencia/horas-extra/asignar', data)
+    asignarHoraExtra: (data) => api.post('/asistencia/horas-extra/asignar', data),
+
+    // Reporte mensual de horas extras del jefe a financiera (asistencia.md §32)
+    getReporteHorasExtra: (periodo) => api.get('/asistencia/reporte-horas-extra', { params: { periodo } }),
+    guardarReporteHorasExtra: (periodo, filas) => api.put('/asistencia/reporte-horas-extra', { periodo, filas }),
+    enviarReporteHorasExtra: (periodo, filas) => api.post('/asistencia/reporte-horas-extra/enviar', { periodo, filas })
+};
+
+// Rol financiera (asistencia.md §32): reportes de horas extras de los jefes y trazabilidad de
+// todos los empleados por campaña.
+export const financieraService = {
+    getReportesDelPeriodo: (periodo) => api.get('/asistencia/financiera/reportes-horas-extra', { params: { periodo } }),
+    getReporte: (id) => api.get(`/asistencia/financiera/reportes-horas-extra/${id}`),
+    aprobarReporte: (id) => api.put(`/asistencia/financiera/reportes-horas-extra/${id}/aprobar`),
+    devolverReporte: (id, observacion) => api.put(`/asistencia/financiera/reportes-horas-extra/${id}/devolver`, { observacion }),
+    fijarFechaLimite: (periodo, fechaLimite) => api.put(`/asistencia/financiera/periodos/${periodo}`, { fecha_limite: fechaLimite }),
+    getCampanias: () => api.get('/asistencia/financiera/campanias'),
+    getEmpleados: (campaniaId) => api.get('/asistencia/financiera/empleados', { params: campaniaId ? { campania_id: campaniaId } : {} }),
+    getTrazabilidad: (empleadoId, fecha) => api.get(`/asistencia/financiera/empleados/${empleadoId}/jornada/${fecha}/trazabilidad`)
 };
 
 export default api;
