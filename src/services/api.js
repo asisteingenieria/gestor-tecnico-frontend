@@ -278,6 +278,7 @@ export const asistenciaService = {
     getJornadasDe: (empleadoId, params = {}) => api.get(`/asistencia/equipo/${empleadoId}/jornadas`, { params }),
     getTrazabilidadDe: (empleadoId, fecha) => api.get(`/asistencia/equipo/${empleadoId}/jornada/${fecha}/trazabilidad`),
     getEstadisticasEquipo: (params = {}) => api.get('/asistencia/equipo/estadisticas', { params }),
+    getResumenMensualEquipo: (periodo) => api.get('/asistencia/equipo/resumen-mensual', { params: { periodo } }),
     registrarEventoManual: (jornadaId, data) => api.post(`/asistencia/equipo/jornada/${jornadaId}/evento`, data),
 
     getPlantillas: () => api.get('/asistencia/horarios/plantillas'),

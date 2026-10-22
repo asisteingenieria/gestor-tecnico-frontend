@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { asistenciaService, financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
@@ -28,7 +28,12 @@ const ETIQUETAS_EVENTO = {
 // su propio endpoint, que trae también el empleado y su horario y no exige que sea de su equipo.
 const TrazabilidadEmpleado = ({ financiera = false }) => {
     const { empleadoId } = useParams();
-    const [fecha, setFecha] = useState(hoyIso());
+    const [searchParams] = useSearchParams();
+    // Permite abrir una fecha concreta (p. ej. desde el calendario mensual del equipo).
+    const [fecha, setFecha] = useState(() => {
+        const f = searchParams.get('fecha');
+        return /^\d{4}-\d{2}-\d{2}$/.test(f || '') && f <= hoyIso() ? f : hoyIso();
+    });
     const [datos, setDatos] = useState(null);
     const [horario, setHorario] = useState(null);
     const [empleado, setEmpleado] = useState(null);
