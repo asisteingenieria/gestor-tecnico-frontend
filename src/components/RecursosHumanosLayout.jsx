@@ -199,6 +199,7 @@ const RecursosHumanosLayout = () => {
             <style>{`
                 [data-desktop-nav] { display: none; }
                 [data-mobile-toggle] { display: none; }
+                [data-topnav-actions] { flex: none; }
                 @media (min-width: 768px) {
                     [data-desktop-nav] { display: flex !important; }
                     [data-mobile-nav] { display: none !important; }
