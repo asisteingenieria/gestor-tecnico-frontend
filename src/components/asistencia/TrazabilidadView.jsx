@@ -8,8 +8,12 @@ const ETIQUETAS_EVENTO = {
     salida: 'Salida',
     inicio_bano: 'Inicio baño',
     fin_bano: 'Fin baño',
+    inicio_break: 'Inicio break',
+    fin_break: 'Fin break',
     inicio_almuerzo: 'Inicio almuerzo',
     fin_almuerzo: 'Fin almuerzo',
+    inicio_capacitacion: 'Inicio capacitación',
+    fin_capacitacion: 'Fin capacitación',
     inicio_extra: 'Inicio hora extra',
     fin_extra: 'Fin hora extra',
     inicio_desconexion: 'Desconexión (logout AsisLock)',
@@ -26,20 +30,28 @@ const ESTADO_BADGE = {
     ausente: { label: 'Ausente', clase: 'ai-badge--danger' }
 };
 
-const TIPOS_PAUSA_INICIO = { inicio_bano: 'pause', inicio_almuerzo: 'lunch' };
+// Break usa el color de pausa (tiempo libre); capacitación el de trabajo (cuenta como laborada).
+const TIPOS_PAUSA_INICIO = {
+    inicio_bano: { clase: 'pause', label: 'Baño' },
+    inicio_break: { clase: 'pause', label: 'Break' },
+    inicio_almuerzo: { clase: 'lunch', label: 'Almuerzo' },
+    inicio_capacitacion: { clase: 'work', label: 'Capacitación' }
+};
+const FIN_PAUSA = new Set(['fin_bano', 'fin_break', 'fin_almuerzo', 'fin_capacitacion', 'fin_desconexion']);
+const TRABAJO = { clase: 'work', label: 'Trabajo' };
 
 function construirSegmentos(eventos, finAbierto) {
     const segmentos = [];
     let actual = null;
     for (const ev of eventos) {
         if (ev.tipo === 'entrada') {
-            actual = { tipo: 'work', desde: ev.ocurrido_en };
+            actual = { ...TRABAJO, desde: ev.ocurrido_en };
         } else if (TIPOS_PAUSA_INICIO[ev.tipo]) {
             if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
-            actual = { tipo: TIPOS_PAUSA_INICIO[ev.tipo], desde: ev.ocurrido_en };
-        } else if (ev.tipo === 'fin_bano' || ev.tipo === 'fin_almuerzo' || ev.tipo === 'fin_desconexion') {
+            actual = { ...TIPOS_PAUSA_INICIO[ev.tipo], desde: ev.ocurrido_en };
+        } else if (FIN_PAUSA.has(ev.tipo)) {
             if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
-            actual = { tipo: 'work', desde: ev.ocurrido_en };
+            actual = { ...TRABAJO, desde: ev.ocurrido_en };
         } else if (ev.tipo === 'inicio_desconexion') {
             // Desconectado de AsisLock: no es tiempo laborado, queda como hueco en la barra.
             if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
@@ -59,7 +71,7 @@ function detalleEvento(ev, jornada) {
             ? <span className="ai-badge ai-badge--warning">+{jornada.minutosTarde} min tarde</span>
             : <span className="ai-badge ai-badge--success">Puntual</span>;
     }
-    if (ev.tipo === 'fin_bano' || ev.tipo === 'fin_almuerzo' || ev.tipo === 'fin_desconexion') {
+    if (ev.tipo === 'fin_bano' || ev.tipo === 'fin_break' || ev.tipo === 'fin_almuerzo' || ev.tipo === 'fin_capacitacion' || ev.tipo === 'fin_desconexion') {
         return <span className="ai-muted">Regresó {formatearHora12(ev.ocurrido_en)}</span>;
     }
     if (ev.tipo === 'inicio_desconexion') {
@@ -117,7 +129,6 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
     const marcasEje = [];
     for (let m = ejeMin; m <= ejeMax; m += 120) marcasEje.push(m);
 
-    const SEG_CLASE = { work: 'work', pause: 'pause', lunch: 'lunch' };
 
     return (
         <>
@@ -205,9 +216,9 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                             return (
                                 <div
                                     key={i}
-                                    className={`seg ${seg.enVivo ? 'live' : SEG_CLASE[seg.tipo]}`}
+                                    className={`seg ${seg.enVivo ? 'live' : seg.clase}`}
                                     style={{ left: pct(desdeMin), width: `calc(${pct(hastaMin)} - ${pct(desdeMin)})` }}
-                                    title={`${seg.tipo === 'work' ? 'Trabajo' : seg.tipo === 'pause' ? 'Baño' : 'Almuerzo'} · ${formatearHora12(seg.desde)}–${formatearHora12(seg.hasta)} · ${formatearDuracion(duracionMin)}`}
+                                    title={`${seg.label} · ${formatearHora12(seg.desde)}–${formatearHora12(seg.hasta)} · ${formatearDuracion(duracionMin)}`}
                                 />
                             );
                         })}
