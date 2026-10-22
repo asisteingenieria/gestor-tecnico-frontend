@@ -28,6 +28,18 @@ function claseDia(dia) {
 
 const hFmt = (min) => `${((Number(min) || 0) / 60).toLocaleString('es-CO', { maximumFractionDigits: 1 })} h`;
 
+// Tendencia de la puntualidad vs el mes anterior (en puntos porcentuales). Subir es bueno (verde).
+function Tendencia({ totales, anterior, periodoAnterior }) {
+    if (!anterior || anterior.porcentaje_puntualidad == null || totales.porcentaje_puntualidad == null) {
+        return <span className="ai-muted" title={anterior ? '' : `Sin datos en ${periodoAnterior}`}>—</span>;
+    }
+    const delta = totales.porcentaje_puntualidad - anterior.porcentaje_puntualidad;
+    const color = delta > 0 ? 'var(--success)' : delta < 0 ? 'var(--danger)' : 'var(--ink-subtle)';
+    const flecha = delta > 0 ? '▲' : delta < 0 ? '▼' : '=';
+    const titulo = `Mes anterior (${periodoAnterior}): puntualidad ${anterior.porcentaje_puntualidad}% · ausencias ${anterior.ausencias} · extra ${((anterior.minutos_extra || 0) / 60).toFixed(1)} h`;
+    return <span style={{ color, fontWeight: 600 }} title={titulo}>{flecha} {delta > 0 ? '+' : ''}{delta} pp</span>;
+}
+
 function diasDelMes(periodo) {
     const [a, m] = periodo.split('-').map(Number);
     const total = new Date(Date.UTC(a, m, 0)).getUTCDate();
@@ -146,6 +158,7 @@ const AsistenciaMensual = () => {
                                         <th>Campaña</th>
                                         <th className="ai-num">Empleados</th>
                                         <th style={{ minWidth: 160 }}>Puntualidad</th>
+                                        <th className="ai-num" title={`Puntualidad vs ${nombrePeriodo(datos.periodo_anterior)}`}>Tendencia</th>
                                         <th className="ai-num">Días trab.</th>
                                         <th className="ai-num">Ausencias</th>
                                         <th className="ai-num">Días tarde</th>
@@ -170,6 +183,7 @@ const AsistenciaMensual = () => {
                                                         <span style={{ fontSize: 12, width: 34, textAlign: 'right' }}>{pct != null ? `${pct}%` : '—'}</span>
                                                     </div>
                                                 </td>
+                                                <td className="ai-num"><Tendencia totales={c.totales} anterior={c.anterior} periodoAnterior={datos.periodo_anterior} /></td>
                                                 <td className="ai-num">{c.totales.dias_trabajados}</td>
                                                 <td className="ai-num" style={{ color: c.totales.ausencias > 0 ? 'var(--danger)' : 'inherit' }}>{c.totales.ausencias}</td>
                                                 <td className="ai-num">{c.totales.dias_tarde}</td>
@@ -190,6 +204,7 @@ const AsistenciaMensual = () => {
                                             <td>Total</td>
                                             <td className="ai-num">{totales.empleados}</td>
                                             <td>{totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'}</td>
+                                            <td></td>
                                             <td className="ai-num">{totales.dias_trabajados}</td>
                                             <td className="ai-num">{totales.ausencias}</td>
                                             <td className="ai-num">{totales.dias_tarde}</td>
