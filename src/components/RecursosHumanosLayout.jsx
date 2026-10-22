@@ -5,7 +5,7 @@ import { novedadRrhhService, contratacionHydraService } from '../services/api';
 import { iniciales } from '../utils/formatoRRHH';
 import {
     Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus, Clock, FileSpreadsheet, History,
-    Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
+    BarChart3, Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../assets/asiste-ui/asiste-mark-white.png';
 
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
 // trazabilidad de asistencia por campaña (asistencia.md §32).
 const NAV_FINANCIERA = [
     { to: '/recursos-humanos/reportes-horas-extra', label: 'Horas extra', icon: FileSpreadsheet },
+    { to: '/recursos-humanos/asistencia-mensual', label: 'Asistencia mensual', icon: BarChart3 },
     { to: '/recursos-humanos/trazabilidad', label: 'Trazabilidad', icon: History }
 ];
 

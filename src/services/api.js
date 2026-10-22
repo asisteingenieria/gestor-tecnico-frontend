@@ -304,6 +304,7 @@ export const asistenciaService = {
 // de todos los empleados por campaña.
 export const financieraService = {
     getReporteHorasExtra: (periodo, campaniaId) => api.get('/asistencia/financiera/reporte-horas-extra', { params: { periodo, ...(campaniaId ? { campania_id: campaniaId } : {}) } }),
+    getResumenMensual: (periodo, campaniaId) => api.get('/asistencia/financiera/resumen-mensual', { params: { periodo, ...(campaniaId ? { campania_id: campaniaId } : {}) } }),
     getCampanias: () => api.get('/asistencia/financiera/campanias'),
     getEmpleados: (campaniaId) => api.get('/asistencia/financiera/empleados', { params: campaniaId ? { campania_id: campaniaId } : {} }),
     getTrazabilidad: (empleadoId, fecha) => api.get(`/asistencia/financiera/empleados/${empleadoId}/jornada/${fecha}/trazabilidad`)

@@ -50,6 +50,7 @@ import TrazabilidadEmpleado from './components/asistencia/TrazabilidadEmpleado';
 import GestionHorarios from './components/asistencia/GestionHorarios';
 import ReporteHorasExtra from './components/asistencia/ReporteHorasExtra';
 import ReportesHorasExtra from './components/financiera/ReportesHorasExtra';
+import AsistenciaMensualFinanciera from './components/financiera/AsistenciaMensual';
 import TrazabilidadPorCampania from './components/financiera/TrazabilidadPorCampania';
 
 // Financiera entra por las mismas pantallas y layout que RRHH (asistencia.md §32).
@@ -505,6 +506,7 @@ function App() {
               <Route path="recursos-humanos/contratacion-hydra" element={<RecursosHumanosRoute><ContratacionHydra /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/contratacion-hydra/:id" element={<RecursosHumanosRoute><LoteHydra /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/reportes-horas-extra" element={<FinancieraRoute><ReportesHorasExtra /></FinancieraRoute>} />
+              <Route path="recursos-humanos/asistencia-mensual" element={<FinancieraRoute><AsistenciaMensualFinanciera /></FinancieraRoute>} />
               <Route path="recursos-humanos/trazabilidad" element={<FinancieraRoute><TrazabilidadPorCampania /></FinancieraRoute>} />
               <Route path="recursos-humanos/trazabilidad/:empleadoId" element={<FinancieraRoute><TrazabilidadEmpleado financiera /></FinancieraRoute>} />
 
