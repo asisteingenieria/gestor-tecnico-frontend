@@ -23,3 +23,5 @@ Thumbs.db
 
 # Vite
 *.local
+# Build output (lo genera `npm run build` en cada despliegue; no se versiona)
+dist/
