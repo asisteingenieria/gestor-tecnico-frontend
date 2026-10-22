@@ -6,7 +6,7 @@ import { formatearFecha } from '../../utils/fecha';
 import { formatearDuracion } from '../../utils/tiempoAsistencia';
 import { nombrePropio, iniciales } from '../../utils/formatoRRHH';
 import { avisarCambioContadores } from '../../utils/eventosAsistencia';
-import { OPCIONES_CLASE } from '../../utils/reporteHorasExtra';
+import { OPCIONES_CLASE, etiquetaClase } from '../../utils/reporteHorasExtra';
 
 const ESTADO_BADGE = {
     pendiente: { label: 'Pendiente', clase: 'ai-badge--info' },
@@ -29,10 +29,6 @@ function esDelMesActual(fechaIso) {
     return f.getMonth() === hoy.getMonth() && f.getFullYear() === hoy.getFullYear();
 }
 
-function horaAminutos(hora) {
-    const [h, m] = hora.split(':').map(Number);
-    return h * 60 + m;
-}
 
 // Sirve tanto para el empleado (solo ve "Mis solicitudes") como para el director
 // (además ve y resuelve la bandeja de su equipo) — una sola pantalla, dos vistas.
@@ -47,16 +43,18 @@ const HorasExtra = () => {
     const [procesando, setProcesando] = useState(null);
     const [tab, setTab] = useState('pendiente');
 
+    // Al aprobar, el jefe confirma la clasificación del servidor o la ajusta (abre un editor de
+    // tramos con la propuesta ya cargada). asistencia.md §32.
     const [aprobandoId, setAprobandoId] = useState(null);
-    const [minutosAprobar, setMinutosAprobar] = useState('');
-    // Al aprobar, el jefe puede ajustar la clase que eligió el agente (asistencia.md §32).
-    const [claseAprobar, setClaseAprobar] = useState('extras_diurnas');
+    const [tramosAjuste, setTramosAjuste] = useState([]);
     const [rechazandoId, setRechazandoId] = useState(null);
     const [comentarioRechazo, setComentarioRechazo] = useState('');
 
     const [modalSolicitud, setModalSolicitud] = useState(false);
-    const [formSolicitud, setFormSolicitud] = useState({ fecha: new Date().toISOString().slice(0, 10), inicio: '', fin: '', clase: 'extras_diurnas', motivo: '' });
+    const [formSolicitud, setFormSolicitud] = useState({ fecha: new Date().toISOString().slice(0, 10), inicio: '', fin: '', motivo: '' });
     const [enviando, setEnviando] = useState(false);
+    // Clasificación que sugiere el servidor para la franja que va ingresando el agente.
+    const [previa, setPrevia] = useState(null);
 
     const cargar = useCallback(async () => {
         try {
@@ -93,13 +91,43 @@ const HorasExtra = () => {
         };
     }, [bandeja, misSolicitudes, isDirectorOperaciones]);
 
-    const confirmarAprobacion = async (id) => {
-        if (minutosAprobar === '') return;
+    // Aprobar aceptando la clasificación del servidor tal cual (sin mandar tramos).
+    const aprobarDirecto = async (id) => {
         setProcesando(id);
         try {
-            await asistenciaService.aprobarHoraExtra(id, { minutos_aprobados: Number(minutosAprobar), clase: claseAprobar });
+            await asistenciaService.aprobarHoraExtra(id, {});
             setAprobandoId(null);
-            setMinutosAprobar('');
+            await cargar();
+            avisarCambioContadores();
+        } catch (err) {
+            setMensaje(err.response?.data?.message || 'No se pudo aprobar');
+        } finally {
+            setProcesando(null);
+        }
+    };
+
+    const abrirAjuste = (h) => {
+        setRechazandoId(null);
+        setAprobandoId(h.idhora_extra);
+        setTramosAjuste(h.tramos?.length
+            ? h.tramos.map((t) => ({ clase: t.clase, minutos: String(t.minutos) }))
+            : [{ clase: 'extras_diurnas', minutos: '' }]);
+    };
+
+    const cambiarTramo = (i, campo, valor) => setTramosAjuste((prev) => prev.map((t, j) => (j === i ? { ...t, [campo]: valor } : t)));
+    const agregarTramo = () => setTramosAjuste((prev) => [...prev, { clase: 'extras_diurnas', minutos: '' }]);
+    const quitarTramo = (i) => setTramosAjuste((prev) => prev.filter((_, j) => j !== i));
+
+    const confirmarAjuste = async (id) => {
+        const tramos = tramosAjuste
+            .map((t) => ({ clase: t.clase, minutos: Math.round(Number(t.minutos) || 0) }))
+            .filter((t) => t.minutos > 0);
+        if (tramos.length === 0) return;
+        setProcesando(id);
+        try {
+            await asistenciaService.aprobarHoraExtra(id, { tramos });
+            setAprobandoId(null);
+            setTramosAjuste([]);
             await cargar();
             avisarCambioContadores();
         } catch (err) {
@@ -124,9 +152,18 @@ const HorasExtra = () => {
         }
     };
 
-    const minutosSolicitud = formSolicitud.inicio && formSolicitud.fin
-        ? Math.max(0, horaAminutos(formSolicitud.fin) - horaAminutos(formSolicitud.inicio))
-        : 0;
+    const franjaValida = Boolean(formSolicitud.inicio && formSolicitud.fin && formSolicitud.inicio !== formSolicitud.fin);
+
+    // Pide al servidor cómo clasificaría la franja, para mostrarla antes de enviar. Se recalcula al
+    // cambiar fecha u horas mientras el modal está abierto.
+    useEffect(() => {
+        if (!modalSolicitud || !franjaValida) { setPrevia(null); return; }
+        let vigente = true;
+        asistenciaService.previsualizarHoraExtra({ fecha: formSolicitud.fecha, hora_inicio: formSolicitud.inicio, hora_fin: formSolicitud.fin })
+            .then(({ data }) => { if (vigente) setPrevia(data); })
+            .catch(() => { if (vigente) setPrevia(null); });
+        return () => { vigente = false; };
+    }, [modalSolicitud, franjaValida, formSolicitud.fecha, formSolicitud.inicio, formSolicitud.fin]);
 
     const enviarSolicitud = async (e) => {
         e.preventDefault();
@@ -136,12 +173,13 @@ const HorasExtra = () => {
         try {
             await asistenciaService.solicitarHoraExtra({
                 fecha: formSolicitud.fecha,
-                minutos_estimados: minutosSolicitud,
-                clase: formSolicitud.clase,
+                hora_inicio: formSolicitud.inicio,
+                hora_fin: formSolicitud.fin,
                 motivo: formSolicitud.motivo
             });
             setModalSolicitud(false);
-            setFormSolicitud({ fecha: new Date().toISOString().slice(0, 10), inicio: '', fin: '', clase: 'extras_diurnas', motivo: '' });
+            setFormSolicitud({ fecha: new Date().toISOString().slice(0, 10), inicio: '', fin: '', motivo: '' });
+            setPrevia(null);
             await cargar();
             setAviso('Solicitud enviada. Queda pendiente hasta que tu jefe la apruebe.');
         } catch (err) {
@@ -227,18 +265,33 @@ const HorasExtra = () => {
                                         </div>
                                         {h.motivo && <q className="ai-muted">{h.motivo}</q>}
 
+                                        {h.tramos?.length > 0 && (
+                                            <div className="ai-req-meta" style={{ marginTop: 4, flexWrap: 'wrap' }}>
+                                                {h.tramos.map((t) => (
+                                                    <span key={t.clase} className="ai-badge ai-badge--neutral">{etiquetaClase(t.clase)}: {formatearDuracion(t.minutos)}</span>
+                                                ))}
+                                            </div>
+                                        )}
+
                                         {aprobandoId === h.idhora_extra && (
-                                            <div className="ai-row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
-                                                <input
-                                                    type="number" min="1" autoFocus className="ai-input" style={{ width: 90 }}
-                                                    value={minutosAprobar} onChange={(e) => setMinutosAprobar(e.target.value)}
-                                                    aria-label="Minutos aprobados"
-                                                />
-                                                <select className="ai-input" style={{ width: 200 }} value={claseAprobar} onChange={(e) => setClaseAprobar(e.target.value)} aria-label="Clase de la hora extra">
-                                                    {OPCIONES_CLASE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                                </select>
-                                                <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => confirmarAprobacion(h.idhora_extra)} disabled={procesando === h.idhora_extra}>Confirmar</button>
-                                                <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => setAprobandoId(null)}>Cancelar</button>
+                                            <div style={{ marginTop: 8 }}>
+                                                <p className="ai-help" style={{ marginBottom: 6 }}>Ajusta la clasificación si hace falta; el total aprobado es la suma de los tramos.</p>
+                                                {tramosAjuste.map((t, i) => (
+                                                    <div key={i} className="ai-row" style={{ marginBottom: 6, gap: 6, flexWrap: 'wrap' }}>
+                                                        <select className="ai-input" style={{ width: 210 }} value={t.clase} onChange={(e) => cambiarTramo(i, 'clase', e.target.value)} aria-label="Clase de la hora extra">
+                                                            {OPCIONES_CLASE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                        </select>
+                                                        <input type="number" min="1" className="ai-input" style={{ width: 90 }} value={t.minutos} onChange={(e) => cambiarTramo(i, 'minutos', e.target.value)} aria-label="Minutos" placeholder="min" />
+                                                        {tramosAjuste.length > 1 && (
+                                                            <button type="button" className="ai-icon-btn" onClick={() => quitarTramo(i)} aria-label="Quitar tramo"><X size={14} strokeWidth={1.75} /></button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                <div className="ai-row" style={{ gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                                                    <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={agregarTramo}><Plus size={14} strokeWidth={1.75} /> Clase</button>
+                                                    <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => confirmarAjuste(h.idhora_extra)} disabled={procesando === h.idhora_extra}>Confirmar</button>
+                                                    <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => setAprobandoId(null)}>Cancelar</button>
+                                                </div>
                                             </div>
                                         )}
                                         {rechazandoId === h.idhora_extra && (
@@ -253,9 +306,10 @@ const HorasExtra = () => {
                                         )}
                                     </div>
                                     {h.estado === 'pendiente' && aprobandoId !== h.idhora_extra && rechazandoId !== h.idhora_extra && (
-                                        <div className="ai-row">
+                                        <div className="ai-row" style={{ flexWrap: 'wrap', gap: 6 }}>
                                             <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => setRechazandoId(h.idhora_extra)}><X size={14} strokeWidth={1.75} /> Rechazar</button>
-                                            <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => { setAprobandoId(h.idhora_extra); setMinutosAprobar(String(h.minutos_estimados)); setClaseAprobar(h.clase || 'extras_diurnas'); }}><Check size={14} strokeWidth={1.75} /> Aprobar</button>
+                                            <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => abrirAjuste(h)}>Ajustar</button>
+                                            <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => aprobarDirecto(h.idhora_extra)} disabled={procesando === h.idhora_extra}><Check size={14} strokeWidth={1.75} /> Aprobar</button>
                                         </div>
                                     )}
                                 </div>
@@ -312,14 +366,23 @@ const HorasExtra = () => {
                                         <input type="time" required className="ai-input" value={formSolicitud.fin} onChange={(e) => setFormSolicitud({ ...formSolicitud, fin: e.target.value })} />
                                     </div>
                                 </div>
-                                <p className="ai-help">Duración: {formatearDuracion(minutosSolicitud)}</p>
-                                <div className="ai-field">
-                                    <label className="ai-label">Clase de la hora extra <em>*</em></label>
-                                    <select required className="ai-input" value={formSolicitud.clase} onChange={(e) => setFormSolicitud({ ...formSolicitud, clase: e.target.value })}>
-                                        {OPCIONES_CLASE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
-                                    <p className="ai-help">Tu jefe puede ajustarla al aprobar.</p>
-                                </div>
+                                {franjaValida && (
+                                    <div className="ai-field">
+                                        <label className="ai-label">Clasificación</label>
+                                        {previa?.tramos?.length > 0 ? (
+                                            <>
+                                                <div className="ai-req-meta" style={{ flexWrap: 'wrap' }}>
+                                                    {previa.tramos.map((t) => (
+                                                        <span key={t.clase} className="ai-badge ai-badge--neutral">{etiquetaClase(t.clase)}: {formatearDuracion(t.minutos)}</span>
+                                                    ))}
+                                                </div>
+                                                <p className="ai-help">La determina el sistema según tu horario, la fecha y el umbral nocturno. Tu jefe puede ajustarla al aprobar.</p>
+                                            </>
+                                        ) : (
+                                            <p className="ai-help">{previa ? 'Esa franja no suma tiempo clasificable.' : 'Calculando…'}</p>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="ai-field">
                                     <label className="ai-label">Motivo <em>*</em></label>
                                     <textarea required className="ai-input" style={{ height: 'auto', padding: '10px 12px' }} rows={3} value={formSolicitud.motivo} onChange={(e) => setFormSolicitud({ ...formSolicitud, motivo: e.target.value })} />
@@ -327,7 +390,7 @@ const HorasExtra = () => {
                             </div>
                             <div className="ai-modal-foot">
                                 <button type="button" className="ai-btn ai-btn--secondary" onClick={() => setModalSolicitud(false)}>Cancelar</button>
-                                <button type="submit" className="ai-btn ai-btn--primary" disabled={enviando || minutosSolicitud <= 0}>{enviando ? 'Enviando...' : 'Enviar solicitud'}</button>
+                                <button type="submit" className="ai-btn ai-btn--primary" disabled={enviando || !franjaValida}>{enviando ? 'Enviando...' : 'Enviar solicitud'}</button>
                             </div>
                         </form>
                     </div>

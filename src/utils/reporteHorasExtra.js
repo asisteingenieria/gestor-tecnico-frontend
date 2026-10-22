@@ -10,8 +10,13 @@ export const CLASES_HORAS = [
     { campo: 'extras_dominicales_festivas', label: 'Extras dominicales / festivas (115%)', corto: 'Ext. dom. 115%' }
 ];
 
-// La clase que el agente elige al pedir la hora extra (y el jefe ajusta al aprobar).
+// Opciones de clase para cuando el jefe ajusta la clasificación al aprobar, o asigna una hora extra
+// directa. El agente ya no la elige: el servidor clasifica su franja (migración 074).
 export const OPCIONES_CLASE = CLASES_HORAS.map((c) => ({ value: c.campo, label: c.label }));
+
+// Etiqueta corta de una clase (para mostrar los tramos que calculó el servidor).
+const ETIQUETA_CORTA = Object.fromEntries(CLASES_HORAS.map((c) => [c.campo, c.corto]));
+export const etiquetaClase = (campo) => ETIQUETA_CORTA[campo] || campo;
 
 export const formatearHoras = (h) => (Number(h) || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 });
 

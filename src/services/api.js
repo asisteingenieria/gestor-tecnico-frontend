@@ -267,6 +267,7 @@ export const asistenciaService = {
     getMisJornadas: (params = {}) => api.get('/asistencia/mis-jornadas', { params }),
     getMisEstadisticas: (params = {}) => api.get('/asistencia/mis-estadisticas', { params }),
     solicitarHoraExtra: (data) => api.post('/asistencia/horas-extra/solicitar', data),
+    previsualizarHoraExtra: (data) => api.post('/asistencia/horas-extra/previsualizar', data),
     getMisHorasExtra: (params = {}) => api.get('/asistencia/mis-horas-extra', { params }),
     // Campana: alertas de traspasos dirigidas a mí
     getMisAlertas: () => api.get('/asistencia/mis-alertas'),
