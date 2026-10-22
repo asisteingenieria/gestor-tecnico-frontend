@@ -45,10 +45,12 @@ import MiTrazabilidad from './components/asistencia/MiTrazabilidad';
 import MisEstadisticas from './components/asistencia/MisEstadisticas';
 import HorasExtra from './components/asistencia/HorasExtra';
 import EquipoAsistencia from './components/asistencia/EquipoAsistencia';
+import EquipoMensual from './components/asistencia/EquipoMensual';
 import TrazabilidadEmpleado from './components/asistencia/TrazabilidadEmpleado';
 import GestionHorarios from './components/asistencia/GestionHorarios';
 import ReporteHorasExtra from './components/asistencia/ReporteHorasExtra';
 import ReportesHorasExtra from './components/financiera/ReportesHorasExtra';
+import AsistenciaMensualFinanciera from './components/financiera/AsistenciaMensual';
 import TrazabilidadPorCampania from './components/financiera/TrazabilidadPorCampania';
 
 // Financiera entra por las mismas pantallas y layout que RRHH (asistencia.md §32).
@@ -504,6 +506,7 @@ function App() {
               <Route path="recursos-humanos/contratacion-hydra" element={<RecursosHumanosRoute><ContratacionHydra /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/contratacion-hydra/:id" element={<RecursosHumanosRoute><LoteHydra /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/reportes-horas-extra" element={<FinancieraRoute><ReportesHorasExtra /></FinancieraRoute>} />
+              <Route path="recursos-humanos/asistencia-mensual" element={<FinancieraRoute><AsistenciaMensualFinanciera /></FinancieraRoute>} />
               <Route path="recursos-humanos/trazabilidad" element={<FinancieraRoute><TrazabilidadPorCampania /></FinancieraRoute>} />
               <Route path="recursos-humanos/trazabilidad/:empleadoId" element={<FinancieraRoute><TrazabilidadEmpleado financiera /></FinancieraRoute>} />
 
@@ -531,6 +534,7 @@ function App() {
               <Route path="operaciones/trazabilidad" element={<DirectorOperacionesRoute><MiTrazabilidad /></DirectorOperacionesRoute>} />
               <Route path="operaciones/estadisticas" element={<DirectorOperacionesRoute><MisEstadisticas /></DirectorOperacionesRoute>} />
               <Route path="operaciones/equipo" element={<DirectorOperacionesRoute><EquipoAsistencia /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/equipo/mes" element={<DirectorOperacionesRoute><EquipoMensual /></DirectorOperacionesRoute>} />
               <Route path="operaciones/equipo/:empleadoId/trazabilidad" element={<DirectorOperacionesRoute><TrazabilidadEmpleado /></DirectorOperacionesRoute>} />
               <Route path="operaciones/horarios" element={<DirectorOperacionesRoute><GestionHorarios /></DirectorOperacionesRoute>} />
               <Route path="operaciones/horas-extra" element={<DirectorOperacionesRoute><HorasExtra /></DirectorOperacionesRoute>} />

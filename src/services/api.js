@@ -278,6 +278,7 @@ export const asistenciaService = {
     getJornadasDe: (empleadoId, params = {}) => api.get(`/asistencia/equipo/${empleadoId}/jornadas`, { params }),
     getTrazabilidadDe: (empleadoId, fecha) => api.get(`/asistencia/equipo/${empleadoId}/jornada/${fecha}/trazabilidad`),
     getEstadisticasEquipo: (params = {}) => api.get('/asistencia/equipo/estadisticas', { params }),
+    getResumenMensualEquipo: (periodo) => api.get('/asistencia/equipo/resumen-mensual', { params: { periodo } }),
     registrarEventoManual: (jornadaId, data) => api.post(`/asistencia/equipo/jornada/${jornadaId}/evento`, data),
 
     getPlantillas: () => api.get('/asistencia/horarios/plantillas'),
@@ -303,6 +304,7 @@ export const asistenciaService = {
 // de todos los empleados por campaña.
 export const financieraService = {
     getReporteHorasExtra: (periodo, campaniaId) => api.get('/asistencia/financiera/reporte-horas-extra', { params: { periodo, ...(campaniaId ? { campania_id: campaniaId } : {}) } }),
+    getResumenMensual: (periodo, campaniaId) => api.get('/asistencia/financiera/resumen-mensual', { params: { periodo, ...(campaniaId ? { campania_id: campaniaId } : {}) } }),
     getCampanias: () => api.get('/asistencia/financiera/campanias'),
     getEmpleados: (campaniaId) => api.get('/asistencia/financiera/empleados', { params: campaniaId ? { campania_id: campaniaId } : {} }),
     getTrazabilidad: (empleadoId, fecha) => api.get(`/asistencia/financiera/empleados/${empleadoId}/jornada/${fecha}/trazabilidad`)

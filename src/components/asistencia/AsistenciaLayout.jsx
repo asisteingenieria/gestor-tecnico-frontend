@@ -5,7 +5,7 @@ import { asistenciaService } from '../../services/api';
 import { alCambiarContadores } from '../../utils/eventosAsistencia';
 import CampanaAlertas from './CampanaAlertas';
 import {
-    Clock, Calendar, History, BarChart3, Users, CalendarClock, Clock3, FileSpreadsheet,
+    Clock, Calendar, History, BarChart3, Users, CalendarClock, CalendarRange, Clock3, FileSpreadsheet,
     ChevronDown, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../../assets/asiste-ui/asiste-mark-white.png';
@@ -54,6 +54,7 @@ const AsistenciaLayout = () => {
 
     const navEquipo = isDirectorOperaciones ? [
         { to: `${base}/equipo`, label: 'Equipo hoy', icon: Users, count: alertasEquipo, alert: true },
+        { to: `${base}/equipo/mes`, label: 'Equipo · mes', icon: CalendarRange },
         { to: `${base}/horarios`, label: 'Horarios', icon: CalendarClock },
         { to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3, count: pendientesHorasExtra },
         { to: `${base}/reporte-horas-extra`, label: 'Reporte horas extra', icon: FileSpreadsheet }
