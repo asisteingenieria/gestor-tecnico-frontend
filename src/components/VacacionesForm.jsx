@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { vacacionesService } from '../services/api';
+import ComboboxBuscable from './ComboboxBuscable';
 import { X, Save, Plus, Trash2, CalendarClock } from 'lucide-react';
 
 const fecha = (v) => (v ? String(v).substring(0, 10) : '');
@@ -58,8 +59,13 @@ const VacacionesForm = ({ isOpen, onClose, vacaciones = null, onSuccess }) => {
         cargar();
     }, [vacaciones]);
 
-    const onSelectEmpleado = (e) => {
-        const id = e.target.value;
+    // El empleado se busca escribiendo su nombre o su cédula (son ~400: un <select> no sirve).
+    const opcionesEmpleado = empleados.map(emp => ({
+        id: emp.id,
+        nombre: `${emp.nombre_completo} — ${emp.numero_identificacion}`
+    }));
+
+    const onSelectEmpleado = (id) => {
         setEmpleadoId(id);
         const emp = empleados.find(x => String(x.id) === String(id));
         setContratoId(emp?.idcontrato || '');
@@ -144,15 +150,16 @@ const VacacionesForm = ({ isOpen, onClose, vacaciones = null, onSuccess }) => {
 
                             <div className="ai-stack">
                                 <p className="ai-overline">Empleado</p>
-                                <div className="ai-field">
-                                    <label className="ai-label">Empleado <em>*</em></label>
-                                    <select value={empleadoId} onChange={onSelectEmpleado} required className="ai-input" disabled={!!vacaciones}>
-                                        <option value="">Seleccionar...</option>
-                                        {empleados.map(emp => (
-                                            <option key={emp.id} value={emp.id}>{emp.nombre_completo} — {emp.numero_identificacion}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <ComboboxBuscable
+                                    label="Empleado"
+                                    opciones={opcionesEmpleado}
+                                    value={empleadoId}
+                                    onChange={onSelectEmpleado}
+                                    placeholder="Nombre o cédula…"
+                                    required
+                                    disabled={!!vacaciones}
+                                    unidad="empleados"
+                                />
 
                                 <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Corte de vacaciones</p>
                                 <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
