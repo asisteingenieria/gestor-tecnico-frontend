@@ -6,6 +6,7 @@ import { formatearFecha } from '../../utils/fecha';
 import { formatearDuracion } from '../../utils/tiempoAsistencia';
 import { nombrePropio, iniciales } from '../../utils/formatoRRHH';
 import { avisarCambioContadores } from '../../utils/eventosAsistencia';
+import { OPCIONES_CLASE } from '../../utils/reporteHorasExtra';
 
 const ESTADO_BADGE = {
     pendiente: { label: 'Pendiente', clase: 'ai-badge--info' },
@@ -48,11 +49,13 @@ const HorasExtra = () => {
 
     const [aprobandoId, setAprobandoId] = useState(null);
     const [minutosAprobar, setMinutosAprobar] = useState('');
+    // Al aprobar, el jefe puede ajustar la clase que eligió el agente (asistencia.md §32).
+    const [claseAprobar, setClaseAprobar] = useState('extras_diurnas');
     const [rechazandoId, setRechazandoId] = useState(null);
     const [comentarioRechazo, setComentarioRechazo] = useState('');
 
     const [modalSolicitud, setModalSolicitud] = useState(false);
-    const [formSolicitud, setFormSolicitud] = useState({ fecha: new Date().toISOString().slice(0, 10), inicio: '', fin: '', motivo: '' });
+    const [formSolicitud, setFormSolicitud] = useState({ fecha: new Date().toISOString().slice(0, 10), inicio: '', fin: '', clase: 'extras_diurnas', motivo: '' });
     const [enviando, setEnviando] = useState(false);
 
     const cargar = useCallback(async () => {
@@ -94,7 +97,7 @@ const HorasExtra = () => {
         if (minutosAprobar === '') return;
         setProcesando(id);
         try {
-            await asistenciaService.aprobarHoraExtra(id, { minutos_aprobados: Number(minutosAprobar) });
+            await asistenciaService.aprobarHoraExtra(id, { minutos_aprobados: Number(minutosAprobar), clase: claseAprobar });
             setAprobandoId(null);
             setMinutosAprobar('');
             await cargar();
@@ -134,10 +137,11 @@ const HorasExtra = () => {
             await asistenciaService.solicitarHoraExtra({
                 fecha: formSolicitud.fecha,
                 minutos_estimados: minutosSolicitud,
+                clase: formSolicitud.clase,
                 motivo: formSolicitud.motivo
             });
             setModalSolicitud(false);
-            setFormSolicitud({ fecha: new Date().toISOString().slice(0, 10), inicio: '', fin: '', motivo: '' });
+            setFormSolicitud({ fecha: new Date().toISOString().slice(0, 10), inicio: '', fin: '', clase: 'extras_diurnas', motivo: '' });
             await cargar();
             setAviso('Solicitud enviada. Queda pendiente hasta que tu jefe la apruebe.');
         } catch (err) {
@@ -224,11 +228,15 @@ const HorasExtra = () => {
                                         {h.motivo && <q className="ai-muted">{h.motivo}</q>}
 
                                         {aprobandoId === h.idhora_extra && (
-                                            <div className="ai-row" style={{ marginTop: 8 }}>
+                                            <div className="ai-row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
                                                 <input
-                                                    type="number" min="1" autoFocus className="ai-input" style={{ width: 100 }}
+                                                    type="number" min="1" autoFocus className="ai-input" style={{ width: 90 }}
                                                     value={minutosAprobar} onChange={(e) => setMinutosAprobar(e.target.value)}
+                                                    aria-label="Minutos aprobados"
                                                 />
+                                                <select className="ai-input" style={{ width: 200 }} value={claseAprobar} onChange={(e) => setClaseAprobar(e.target.value)} aria-label="Clase de la hora extra">
+                                                    {OPCIONES_CLASE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                </select>
                                                 <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => confirmarAprobacion(h.idhora_extra)} disabled={procesando === h.idhora_extra}>Confirmar</button>
                                                 <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => setAprobandoId(null)}>Cancelar</button>
                                             </div>
@@ -247,7 +255,7 @@ const HorasExtra = () => {
                                     {h.estado === 'pendiente' && aprobandoId !== h.idhora_extra && rechazandoId !== h.idhora_extra && (
                                         <div className="ai-row">
                                             <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => setRechazandoId(h.idhora_extra)}><X size={14} strokeWidth={1.75} /> Rechazar</button>
-                                            <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => { setAprobandoId(h.idhora_extra); setMinutosAprobar(String(h.minutos_estimados)); }}><Check size={14} strokeWidth={1.75} /> Aprobar</button>
+                                            <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => { setAprobandoId(h.idhora_extra); setMinutosAprobar(String(h.minutos_estimados)); setClaseAprobar(h.clase || 'extras_diurnas'); }}><Check size={14} strokeWidth={1.75} /> Aprobar</button>
                                         </div>
                                     )}
                                 </div>
@@ -305,6 +313,13 @@ const HorasExtra = () => {
                                     </div>
                                 </div>
                                 <p className="ai-help">Duración: {formatearDuracion(minutosSolicitud)}</p>
+                                <div className="ai-field">
+                                    <label className="ai-label">Clase de la hora extra <em>*</em></label>
+                                    <select required className="ai-input" value={formSolicitud.clase} onChange={(e) => setFormSolicitud({ ...formSolicitud, clase: e.target.value })}>
+                                        {OPCIONES_CLASE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    </select>
+                                    <p className="ai-help">Tu jefe puede ajustarla al aprobar.</p>
+                                </div>
                                 <div className="ai-field">
                                     <label className="ai-label">Motivo <em>*</em></label>
                                     <textarea required className="ai-input" style={{ height: 'auto', padding: '10px 12px' }} rows={3} value={formSolicitud.motivo} onChange={(e) => setFormSolicitud({ ...formSolicitud, motivo: e.target.value })} />

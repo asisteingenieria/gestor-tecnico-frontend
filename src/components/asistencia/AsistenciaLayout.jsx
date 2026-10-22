@@ -56,7 +56,7 @@ const AsistenciaLayout = () => {
         { to: `${base}/equipo`, label: 'Equipo hoy', icon: Users, count: alertasEquipo, alert: true },
         { to: `${base}/horarios`, label: 'Horarios', icon: CalendarClock },
         { to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3, count: pendientesHorasExtra },
-        { to: `${base}/reporte-horas-extra`, label: 'Reporte a financiera', icon: FileSpreadsheet }
+        { to: `${base}/reporte-horas-extra`, label: 'Reporte horas extra', icon: FileSpreadsheet }
     ] : [];
 
     // Los contadores del menú se recargan al cambiar de pantalla y cuando una pantalla avisa

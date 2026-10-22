@@ -294,20 +294,14 @@ export const asistenciaService = {
     rechazarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/rechazar`, data),
     asignarHoraExtra: (data) => api.post('/asistencia/horas-extra/asignar', data),
 
-    // Reporte mensual de horas extras del jefe a financiera (asistencia.md §32)
-    getReporteHorasExtra: (periodo) => api.get('/asistencia/reporte-horas-extra', { params: { periodo } }),
-    guardarReporteHorasExtra: (periodo, filas) => api.put('/asistencia/reporte-horas-extra', { periodo, filas }),
-    enviarReporteHorasExtra: (periodo, filas) => api.post('/asistencia/reporte-horas-extra/enviar', { periodo, filas })
+    // Reporte mensual de horas extras del jefe: solo lectura, se llena solo (asistencia.md §32).
+    getReporteHorasExtra: (periodo) => api.get('/asistencia/reporte-horas-extra', { params: { periodo } })
 };
 
-// Rol financiera (asistencia.md §32): reportes de horas extras de los jefes y trazabilidad de
-// todos los empleados por campaña.
+// Rol financiera (asistencia.md §32): reporte de horas extras con dinero (en vivo) y trazabilidad
+// de todos los empleados por campaña.
 export const financieraService = {
-    getReportesDelPeriodo: (periodo) => api.get('/asistencia/financiera/reportes-horas-extra', { params: { periodo } }),
-    getReporte: (id) => api.get(`/asistencia/financiera/reportes-horas-extra/${id}`),
-    aprobarReporte: (id) => api.put(`/asistencia/financiera/reportes-horas-extra/${id}/aprobar`),
-    devolverReporte: (id, observacion) => api.put(`/asistencia/financiera/reportes-horas-extra/${id}/devolver`, { observacion }),
-    fijarFechaLimite: (periodo, fechaLimite) => api.put(`/asistencia/financiera/periodos/${periodo}`, { fecha_limite: fechaLimite }),
+    getReporteHorasExtra: (periodo, campaniaId) => api.get('/asistencia/financiera/reporte-horas-extra', { params: { periodo, ...(campaniaId ? { campania_id: campaniaId } : {}) } }),
     getCampanias: () => api.get('/asistencia/financiera/campanias'),
     getEmpleados: (campaniaId) => api.get('/asistencia/financiera/empleados', { params: campaniaId ? { campania_id: campaniaId } : {} }),
     getTrazabilidad: (empleadoId, fecha) => api.get(`/asistencia/financiera/empleados/${empleadoId}/jornada/${fecha}/trazabilidad`)
