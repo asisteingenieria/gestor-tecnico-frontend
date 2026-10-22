@@ -52,6 +52,13 @@ function construirSegmentos(eventos, finAbierto) {
         } else if (FIN_PAUSA.has(ev.tipo)) {
             if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
             actual = { ...TRABAJO, desde: ev.ocurrido_en };
+        } else if (ev.tipo === 'inicio_extra') {
+            // Hora extra (bloque aparte tras la salida): tiempo trabajado, color de trabajo.
+            if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
+            actual = { clase: 'work', label: 'Hora extra', desde: ev.ocurrido_en };
+        } else if (ev.tipo === 'fin_extra') {
+            if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
+            actual = null;
         } else if (ev.tipo === 'inicio_desconexion') {
             // Desconectado de AsisLock: no es tiempo laborado, queda como hueco en la barra.
             if (actual) segmentos.push({ ...actual, hasta: ev.ocurrido_en });
@@ -104,6 +111,7 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
     if (!datos) return null;
 
     const { jornada, eventos } = datos;
+    const horaExtra = datos.hora_extra;
     const asislock = datos.asislock;
     const badge = ESTADO_BADGE[jornada.estado] || ESTADO_BADGE.pendiente;
     const minutosPausas = (jornada.minutosPausaBano || 0) + (jornada.minutosPausaAlmuerzo || 0);
@@ -230,6 +238,35 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                     </div>
                 </div>
             </div>
+
+            {horaExtra && (
+                <div className="ai-panel">
+                    <div className="ai-panel-head"><h3 className="ai-panel-title">Hora extra</h3></div>
+                    <div className="ai-stack" style={{ padding: '4px 4px 10px', gap: 8 }}>
+                        {horaExtra.solicitudes.map((s, i) => (
+                            <p key={i} className="ai-muted" style={{ fontSize: 13, margin: 0 }}>
+                                Solicitó hora extra de <b>{s.hora_inicio}</b> a <b>{s.hora_fin}</b>
+                                {s.aprobado_en && <> · aprobada {new Date(s.aprobado_en).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</>}
+                            </p>
+                        ))}
+                        {horaExtra.extra ? (
+                            <p style={{ fontSize: 13, margin: 0 }}>
+                                Ingresó al tiempo extra a las <b>{formatearHora12(horaExtra.extra.inicio_real)}</b>
+                                {horaExtra.extra.en_curso
+                                    ? <> y sigue trabajando ({formatearDuracion(horaExtra.extra.minutos)} hasta ahora).</>
+                                    : <> hasta las <b>{formatearHora12(horaExtra.extra.fin_real)}</b> ({formatearDuracion(horaExtra.extra.minutos)}).</>}
+                                {horaExtra.extra.excedio_min > 0 && (
+                                    <span className="ai-badge ai-badge--warning" style={{ marginLeft: 6 }}>
+                                        Siguió {formatearDuracion(horaExtra.extra.excedio_min)} más allá del fin aprobado
+                                    </span>
+                                )}
+                            </p>
+                        ) : (
+                            <p className="ai-muted" style={{ fontSize: 13, margin: 0 }}>Aún no registra ingreso al tiempo extra.</p>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <div className="ai-panel">
                 <table className="ai-table ai-table--dense">
