@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { novedadRrhhService, contratacionHydraService, financieraService } from '../services/api';
-import { periodoAnterior } from '../utils/reporteHorasExtra';
+import { novedadRrhhService, contratacionHydraService } from '../services/api';
 import { iniciales } from '../utils/formatoRRHH';
 import {
     Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus, Clock, FileSpreadsheet, History,
@@ -23,7 +22,7 @@ const NAV_ITEMS = [
 // Financiera ve todo lo de RRHH y además los reportes de horas extras de los jefes y la
 // trazabilidad de asistencia por campaña (asistencia.md §32).
 const NAV_FINANCIERA = [
-    { to: '/recursos-humanos/reportes-horas-extra', label: 'Reportes horas extra', icon: FileSpreadsheet, countKey: 'reportes' },
+    { to: '/recursos-humanos/reportes-horas-extra', label: 'Horas extra', icon: FileSpreadsheet },
     { to: '/recursos-humanos/trazabilidad', label: 'Trazabilidad', icon: History }
 ];
 
@@ -35,7 +34,6 @@ const RecursosHumanosLayout = () => {
     const [totalNovedades, setTotalNovedades] = useState(null);
     // Lotes de Hydra que todavía requieren trabajo de RRHH (en completitud o listos).
     const [lotesAbiertos, setLotesAbiertos] = useState(null);
-    const [reportesPorRevisar, setReportesPorRevisar] = useState(null);
     const [tema, setTema] = useState(() => (typeof document !== 'undefined' && document.documentElement.dataset.theme) || 'light');
     const menuRef = useRef(null);
 
@@ -48,14 +46,7 @@ const RecursosHumanosLayout = () => {
             .catch(() => setLotesAbiertos(null));
     }, []);
 
-    useEffect(() => {
-        if (!isFinanciera) return;
-        financieraService.getReportesDelPeriodo(periodoAnterior())
-            .then(({ data }) => setReportesPorRevisar(data.resumen?.por_revisar || null))
-            .catch(() => setReportesPorRevisar(null));
-    }, [isFinanciera]);
-
-    const contadores = { novedades: totalNovedades, contratacion: lotesAbiertos || null, reportes: reportesPorRevisar };
+    const contadores = { novedades: totalNovedades, contratacion: lotesAbiertos || null };
     const navItems = isFinanciera
         ? [...NAV_ITEMS.slice(0, -1), ...NAV_FINANCIERA, NAV_ITEMS[NAV_ITEMS.length - 1]]
         : NAV_ITEMS;
