@@ -19,7 +19,7 @@ const MiJornada = () => {
     } = useJornada();
 
     const [mostrarModalExtra, setMostrarModalExtra] = useState(false);
-    const [formExtra, setFormExtra] = useState({ minutos_estimados: '', motivo: '' });
+    const [formExtra, setFormExtra] = useState({ inicio: '', fin: '', motivo: '' });
     const [enviandoExtra, setEnviandoExtra] = useState(false);
     const [mensajeExtra, setMensajeExtra] = useState(null);
     // Confirmación en la página, no dentro del modal: el modal se cierra al enviar.
@@ -38,10 +38,11 @@ const MiJornada = () => {
         try {
             await asistenciaService.solicitarHoraExtra({
                 fecha: jornada.fecha,
-                minutos_estimados: Number(formExtra.minutos_estimados),
+                hora_inicio: formExtra.inicio,
+                hora_fin: formExtra.fin,
                 motivo: formExtra.motivo || undefined
             });
-            setFormExtra({ minutos_estimados: '', motivo: '' });
+            setFormExtra({ inicio: '', fin: '', motivo: '' });
             setMostrarModalExtra(false);
             setAvisoExtra('Solicitud de hora extra enviada. Queda pendiente hasta que tu jefe la apruebe.');
         } catch (err) {
@@ -140,17 +141,25 @@ const MiJornada = () => {
                         </div>
                         <form onSubmit={solicitarExtra}>
                             <div className="ai-modal-body ai-stack">
-                                <div className="ai-field">
-                                    <label className="ai-label">Minutos estimados <em>*</em></label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        required
-                                        className="ai-input"
-                                        value={formExtra.minutos_estimados}
-                                        onChange={(e) => setFormExtra({ ...formExtra, minutos_estimados: e.target.value })}
-                                    />
+                                <div className="ai-form-grid">
+                                    <div className="ai-field">
+                                        <label className="ai-label">Hora inicio <em>*</em></label>
+                                        <input
+                                            type="time" required className="ai-input"
+                                            value={formExtra.inicio}
+                                            onChange={(e) => setFormExtra({ ...formExtra, inicio: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="ai-field">
+                                        <label className="ai-label">Hora fin <em>*</em></label>
+                                        <input
+                                            type="time" required className="ai-input"
+                                            value={formExtra.fin}
+                                            onChange={(e) => setFormExtra({ ...formExtra, fin: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
+                                <p className="ai-help">La clase (diurna, nocturna, festiva…) la determina el sistema; tu jefe la confirma al aprobar.</p>
                                 <div className="ai-field">
                                     <label className="ai-label">Motivo (opcional)</label>
                                     <textarea
@@ -169,7 +178,7 @@ const MiJornada = () => {
                             </div>
                             <div className="ai-modal-foot">
                                 <button type="button" className="ai-btn ai-btn--secondary" onClick={() => setMostrarModalExtra(false)}>Cancelar</button>
-                                <button type="submit" className="ai-btn ai-btn--primary" disabled={enviandoExtra}>
+                                <button type="submit" className="ai-btn ai-btn--primary" disabled={enviandoExtra || !formExtra.inicio || !formExtra.fin || formExtra.inicio === formExtra.fin}>
                                     {enviandoExtra ? 'Enviando...' : 'Enviar solicitud'}
                                 </button>
                             </div>

@@ -3,9 +3,11 @@ import { asistenciaService } from '../services/api';
 
 const RESYNC_INTERVAL_MS = 60000;
 
-// Estado en vivo de "mi jornada de hoy": marca entrada al montar (idempotente), interpola
-// el contador localmente cada segundo usando el offset contra el reloj del servidor (nunca
-// el reloj del cliente) y resincroniza cada 60s, tras cada marcaje y al recuperar el foco.
+// Estado en vivo de "mi jornada de hoy": SOLO LECTURA al montar. La entrada la registra AsisLock
+// (login biométrico), no abrir el monitor: por eso aquí se consulta el estado, no se marca entrada
+// —si no, entrar a ver la traza arrancaba la jornada sin que el agente hubiera llegado—. Interpola
+// el contador localmente cada segundo usando el offset contra el reloj del servidor (nunca el
+// reloj del cliente) y resincroniza cada 60s, tras cada marcaje y al recuperar el foco.
 export function useJornada() {
     const [jornada, setJornada] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -40,16 +42,17 @@ export function useJornada() {
         }
     }, [aplicarJornada]);
 
-    // Al montar: marcar entrada (idempotente) para arrancar/recuperar la jornada de hoy
+    // Al montar: consultar el estado de hoy (solo lectura). La entrada viene de AsisLock, no de
+    // abrir esta pantalla, así que ver el monitor no arranca ni cuenta la jornada.
     useEffect(() => {
         (async () => {
             setLoading(true);
             try {
-                const { data } = await asistenciaService.marcarEntrada();
+                const { data } = await asistenciaService.getMiJornadaHoy();
                 aplicarJornada(data);
                 setError(null);
             } catch (err) {
-                setError(err.response?.data?.message || 'No se pudo marcar tu entrada');
+                setError(err.response?.data?.message || 'No se pudo cargar tu jornada');
             } finally {
                 setLoading(false);
             }
