@@ -4,7 +4,7 @@ import { Loader2, FileSpreadsheet, Download, DollarSign, Clock, Users } from 'lu
 import { financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import { descargarCsv } from '../../utils/csv';
-import { CLASES_HORAS, formatearHoras, formatearPesos, periodoActual, periodoAnterior, nombrePeriodo } from '../../utils/reporteHorasExtra';
+import { CLASES_HORAS, formatearHoras, formatearPesos, periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
 
 // Reporte de horas extras para financiera (asistencia.md §32). Es el mismo reporte que ve el jefe
 // pero de todos los empleados (o de una campaña), con el valor en dinero de cada hora, en vivo a
@@ -12,8 +12,9 @@ import { CLASES_HORAS, formatearHoras, formatearPesos, periodoActual, periodoAnt
 
 const ReportesHorasExtra = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    // Se reporta el mes que cerró: por defecto el anterior.
-    const periodo = searchParams.get('periodo') || periodoAnterior();
+    // El reporte es en vivo: por defecto el mes en curso (igual que el del jefe), para ver las
+    // horas extra a medida que se aprueban. El selector permite ir a meses anteriores.
+    const periodo = searchParams.get('periodo') || periodoActual();
     const campaniaId = searchParams.get('campania') || '';
     const [datos, setDatos] = useState(null);
     const [campanias, setCampanias] = useState([]);
