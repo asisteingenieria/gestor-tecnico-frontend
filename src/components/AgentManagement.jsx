@@ -5,6 +5,7 @@ import api from '../services/api';
 import AgentForm from './AgentForm';
 import EmpleadoDrawer from './EmpleadoDrawer';
 import RetiroModal from './RetiroModal';
+import TraspasoForm from './TraspasoForm';
 import ConfirmarEliminarModal from './ConfirmarEliminarModal';
 import ImportEmpleadosModal from './ImportEmpleadosModal';
 import Pagination from './Pagination';
@@ -132,7 +133,9 @@ const FiltroChip = ({ etiqueta, opciones, seleccion, onChange }) => {
 };
 
 const AgentManagement = () => {
-    const { isRecursosHumanos } = useAuth();
+    const { isRecursosHumanos, isFinanciera, isAdmin } = useAuth();
+    // El gasto en salarios es de financiera/admin; recursosHumanos solo ve contratación.
+    const puedeVerGasto = isFinanciera || isAdmin;
     const [empleados, setEmpleados] = useState([]);
     const [gastoTotal, setGastoTotal] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -146,6 +149,7 @@ const AgentManagement = () => {
     const [pageSize, setPageSize] = useState(20);
     const [perfilEmpleadoId, setPerfilEmpleadoId] = useState(null);
     const [retiroEmpleadoId, setRetiroEmpleadoId] = useState(null);
+    const [traspasoEmpleadoId, setTraspasoEmpleadoId] = useState(null);
     const [showImportModal, setShowImportModal] = useState(false);
     const [empleadoAEliminar, setEmpleadoAEliminar] = useState(null);
     const [vista, setVista] = useState('tabla');
@@ -157,6 +161,7 @@ const AgentManagement = () => {
     useEffect(() => {
         fetchEmpleados();
         fetchGastoTotal();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- se carga una vez al montar
     }, []);
 
     // Búsqueda con debounce de 300ms
@@ -184,6 +189,7 @@ const AgentManagement = () => {
     };
 
     const fetchGastoTotal = async () => {
+        if (!puedeVerGasto) return;
         try {
             const response = await api.get('/users-company/gasto-total');
             setGastoTotal(response.data.gasto);
@@ -306,7 +312,7 @@ const AgentManagement = () => {
                     </div>
                 </div>
 
-                <div className="ai-kpi-strip">
+                <div className="ai-kpi-strip" style={puedeVerGasto ? undefined : { gridTemplateColumns: 'repeat(3, 1fr)' }}>
                     <div>
                         <span className="ai-kpi-icon"><Users size={18} strokeWidth={1.75} /></span>
                         <div>
@@ -328,13 +334,15 @@ const AgentManagement = () => {
                             <p className="ai-kpi-value ai-num">{totalActivos}</p>
                         </div>
                     </div>
-                    <div>
-                        <span className="ai-kpi-icon"><Wallet size={18} strokeWidth={1.75} /></span>
+                    {puedeVerGasto && (
                         <div>
-                            <p className="ai-kpi-label">Gasto mensual en personal</p>
-                            <p className="ai-kpi-value ai-num">{gastoTotal ? formatSalario(gastoTotal.gasto_mensual_total) : '—'}</p>
+                            <span className="ai-kpi-icon"><Wallet size={18} strokeWidth={1.75} /></span>
+                            <div>
+                                <p className="ai-kpi-label">Gasto mensual en personal</p>
+                                <p className="ai-kpi-value ai-num">{gastoTotal ? formatSalario(gastoTotal.gasto_mensual_total) : '—'}</p>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {error && (
@@ -500,6 +508,20 @@ const AgentManagement = () => {
                         setPerfilEmpleadoId(null);
                         setRetiroEmpleadoId(id);
                     }}
+                    onTraspaso={(id) => {
+                        setPerfilEmpleadoId(null);
+                        setTraspasoEmpleadoId(id);
+                    }}
+                />
+            )}
+
+            {traspasoEmpleadoId && (
+                <TraspasoForm
+                    isOpen={!!traspasoEmpleadoId}
+                    onClose={() => setTraspasoEmpleadoId(null)}
+                    traspaso={null}
+                    empleadoInicialId={traspasoEmpleadoId}
+                    onSuccess={() => setTraspasoEmpleadoId(null)}
                 />
             )}
 

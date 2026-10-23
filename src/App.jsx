@@ -51,7 +51,6 @@ import GestionHorarios from './components/asistencia/GestionHorarios';
 import ReporteHorasExtra from './components/asistencia/ReporteHorasExtra';
 import ReportesHorasExtra from './components/financiera/ReportesHorasExtra';
 import AsistenciaMensualFinanciera from './components/financiera/AsistenciaMensual';
-import TrazabilidadPorCampania from './components/financiera/TrazabilidadPorCampania';
 
 // Financiera entra por las mismas pantallas y layout que RRHH (asistencia.md §32).
 const esRRHH = (role) => role === 'recursosHumanos' || role === 'financiera';
@@ -507,7 +506,8 @@ function App() {
               <Route path="recursos-humanos/contratacion-hydra/:id" element={<RecursosHumanosRoute><LoteHydra /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/reportes-horas-extra" element={<FinancieraRoute><ReportesHorasExtra /></FinancieraRoute>} />
               <Route path="recursos-humanos/asistencia-mensual" element={<FinancieraRoute><AsistenciaMensualFinanciera /></FinancieraRoute>} />
-              <Route path="recursos-humanos/trazabilidad" element={<FinancieraRoute><TrazabilidadPorCampania /></FinancieraRoute>} />
+              {/* La trazabilidad por campaña quedó dentro del reporte de asistencia. */}
+              <Route path="recursos-humanos/trazabilidad" element={<Navigate to="/recursos-humanos/asistencia-mensual" replace />} />
               <Route path="recursos-humanos/trazabilidad/:empleadoId" element={<FinancieraRoute><TrazabilidadEmpleado financiera /></FinancieraRoute>} />
 
               {/* Rutas de técnico de inventario */}
