@@ -63,7 +63,8 @@ function nuevoDesdeActual(a) {
     };
 }
 
-const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
+// empleadoInicialId: abre un traspaso nuevo con el empleado ya elegido (desde el drawer del empleado).
+const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess, empleadoInicialId = null }) => {
     const [empleados, setEmpleados] = useState([]);
     const [catalogos, setCatalogos] = useState(CATALOGOS_VACIOS);
     const [empleadoId, setEmpleadoId] = useState('');
@@ -106,6 +107,7 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
                 setEmpleados(empRes.data.empleados);
                 setCatalogos({ ...CATALOGOS_VACIOS, ...catRes.data.catalogos });
                 setSoportesGuardados(sopRes?.data.soportes || []);
+                setError('');
 
                 if (traspaso) {
                     setEmpleadoId(traspaso.empleado_id || '');
@@ -116,8 +118,9 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
                     setActual(Object.fromEntries(CAMPOS_ACTUALES.map(c => [c, c.startsWith('fecha') ? fecha(traspaso[c]) : val(traspaso[c])])));
                     setNuevo(Object.fromEntries(NUEVOS.map(c => [c, c.startsWith('fecha') ? fecha(traspaso[c]) : val(traspaso[c])])));
                     if (traspaso.empleado_id) await cargarJefatura(traspaso.empleado_id);
+                } else if (empleadoInicialId) {
+                    await onSelectEmpleado(empleadoInicialId);
                 }
-                setError('');
             } catch (err) {
                 console.error('Error al cargar datos del formulario:', err);
                 setError('Error al cargar los datos del formulario');
@@ -126,7 +129,8 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
             }
         };
         cargar();
-    }, [traspaso]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- se carga una vez al abrir el formulario
+    }, [traspaso, empleadoInicialId]);
 
     const onSelectEmpleado = async (id) => {
         setEmpleadoId(id);
@@ -400,7 +404,7 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess }) => {
                                         onChange={onSelectEmpleado}
                                         placeholder="Nombre o cédula…"
                                         required
-                                        disabled={!!traspaso}
+                                        disabled={!!traspaso || !!empleadoInicialId}
                                         unidad="empleados"
                                     />
                                     <div className="ai-field">

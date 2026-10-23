@@ -40,7 +40,7 @@ const Overline = ({ children }) => (
 
 const TABS = ['Información', 'Activos', 'Novedades', 'Historial'];
 
-const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro }) => {
+const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTraspaso }) => {
     const [tab, setTab] = useState('Información');
     const [empleado, setEmpleado] = useState(null);
     const [catalogos, setCatalogos] = useState(null);
@@ -120,6 +120,7 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro }) => 
 
     const estado = empleado?.estado_contrato_nombre;
     const estadoClase = estado === 'activo' ? 'ai-badge--success' : ['retirado', 'inactivo'].includes(estado) ? 'ai-badge--danger' : 'ai-badge--warning';
+    const puedeTraspasar = !!contrato?.idcontrato && !['retirado', 'inactivo'].includes(estado);
 
     return (
         <div className="ai-overlay ai-scope" style={{ position: 'fixed', inset: 0, zIndex: 50, justifyContent: 'flex-end', padding: 0 }} onClick={onClose}>
@@ -339,7 +340,13 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro }) => 
                 </div>
 
                 <div className="ai-modal-foot">
-                    <button type="button" className="ai-btn ai-btn--secondary" disabled title="Próximamente">
+                    <button
+                        type="button"
+                        className="ai-btn ai-btn--secondary"
+                        onClick={() => onTraspaso?.(empleadoId)}
+                        disabled={!puedeTraspasar}
+                        title={empleado && !puedeTraspasar ? 'Solo se traspasa a un empleado con contrato vigente' : undefined}
+                    >
                         <ArrowLeftRight size={16} strokeWidth={1.75} />
                         Traspasar
                     </button>

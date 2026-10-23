@@ -88,10 +88,10 @@ const TrazabilidadEmpleado = ({ financiera = false }) => {
     return (
         <div className="ai-content">
             <Link
-                to={financiera ? `/recursos-humanos/trazabilidad${empleado?.idcampania ? `?campania=${empleado.idcampania}` : ''}` : '/operaciones/equipo'}
+                to={financiera ? `/recursos-humanos/asistencia-mensual?periodo=${fecha.slice(0, 7)}${empleado?.idcampania ? `&campania=${empleado.idcampania}` : ''}` : '/operaciones/equipo'}
                 className="ai-link"
             >
-                <ArrowLeft size={14} strokeWidth={1.75} /> {financiera ? 'Volver a la campaña' : 'Volver al equipo'}
+                <ArrowLeft size={14} strokeWidth={1.75} /> {financiera ? 'Volver al reporte' : 'Volver al equipo'}
             </Link>
 
             <div className="ai-page-head">

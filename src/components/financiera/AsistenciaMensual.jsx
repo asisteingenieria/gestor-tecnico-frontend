@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Users, Clock, CalendarX, AlertTriangle, Download, BarChart3 } from 'lucide-react';
+import { Loader2, Users, Clock, CalendarX, Download, BarChart3, Search, History, X, Timer } from 'lucide-react';
 import { financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula, iniciales } from '../../utils/formatoRRHH';
 import { descargarCsv } from '../../utils/csv';
 import { periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
 
-// Resumen mensual de asistencia para financiera/admin (asistencia.md §35): estadísticas comparativas
-// por campaña de toda la organización y, al abrir una campaña, su detalle (KPIs, calendario y tabla),
-// la misma vista que ve el jefe de su equipo.
+// Reporte de asistencia para financiera/admin (asistencia.md §35-§36): estadísticas comparativas por
+// campaña de toda la organización. "Ver detalle" abre una ventana con el detalle completo de la
+// campaña (KPIs, calendario diario y tabla por empleado, con buscador y exportación). Absorbe la
+// antigua pestaña "Trazabilidad por campaña": cada celda del calendario y cada empleado abren su
+// trazabilidad diaria. La campaña abierta vive en la URL (?campania=) para volver a ella.
 
 const CELDA = {
     puntual: { bg: 'var(--success)', label: 'Puntual' },
@@ -86,10 +88,11 @@ const AsistenciaMensual = () => {
         setSearchParams(next);
     };
 
-    const dias = useMemo(() => diasDelMes(periodo), [periodo]);
     const porCampania = datos?.por_campania ?? [];
     const totales = datos?.totales;
-    const campania = datos?.campania;
+    // El detalle que trae la respuesta solo vale si es de la campaña abierta (mientras recarga, no).
+    const campania = datos?.campania && String(datos.campania.idcampania) === campaniaId ? datos.campania : null;
+    const filaCampania = porCampania.find((c) => String(c.idcampania) === campaniaId);
 
     const exportarComparativo = () => {
         const cuerpo = porCampania.map((c) => [
@@ -103,22 +106,16 @@ const AsistenciaMensual = () => {
         );
     };
 
-    const porFecha = (e) => {
-        const mapa = {};
-        for (const d of e.dias || []) mapa[d.fecha] = d;
-        return mapa;
-    };
-
     return (
         <div className="ai-content">
             <div className="ai-page-head">
                 <div>
-                    <h1 className="ai-page-title">Asistencia · comparativo mensual</h1>
-                    <p className="ai-page-sub">{nombrePeriodo(periodo)} · todas las campañas, en tiempo real</p>
+                    <h1 className="ai-page-title">Reporte de asistencia</h1>
+                    <p className="ai-page-sub">{nombrePeriodo(periodo)} · comparativo por campaña; abre una campaña para ver su detalle completo</p>
                 </div>
                 <div className="ai-row">
-                    <select className="ai-input" style={{ width: 220 }} value={campaniaId} onChange={(e) => cambiar('campania', e.target.value)} aria-label="Campaña">
-                        <option value="">Todas las campañas</option>
+                    <select className="ai-input" style={{ width: 220 }} value={campaniaId} onChange={(e) => cambiar('campania', e.target.value)} aria-label="Abrir campaña">
+                        <option value="">Abrir campaña…</option>
                         {campanias.map((c) => <option key={c.idcampania} value={c.idcampania}>{primeraMayuscula(c.nombre)}</option>)}
                     </select>
                     <input
@@ -128,7 +125,7 @@ const AsistenciaMensual = () => {
                 </div>
             </div>
 
-            {loading ? (
+            {loading && !datos ? (
                 <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
                     <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
                 </div>
@@ -168,35 +165,26 @@ const AsistenciaMensual = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {porCampania.map((c) => {
-                                        const pct = c.totales.porcentaje_puntualidad;
-                                        const activa = String(c.idcampania) === String(campaniaId);
-                                        return (
-                                            <tr key={c.idcampania ?? 'sin'} style={activa ? { background: 'var(--primary-soft)' } : undefined}>
-                                                <td style={{ fontWeight: 600 }}>{primeraMayuscula(c.campania)}</td>
-                                                <td className="ai-num">{c.totales.empleados}</td>
-                                                <td>
-                                                    <div className="ai-row" style={{ gap: 8 }}>
-                                                        <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'var(--surface-0)', overflow: 'hidden', minWidth: 80 }}>
-                                                            <div style={{ width: `${pct ?? 0}%`, height: '100%', background: pct >= 90 ? 'var(--success)' : pct >= 75 ? '#f59e0b' : 'var(--danger)' }} />
-                                                        </div>
-                                                        <span style={{ fontSize: 12, width: 34, textAlign: 'right' }}>{pct != null ? `${pct}%` : '—'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="ai-num"><Tendencia totales={c.totales} anterior={c.anterior} periodoAnterior={datos.periodo_anterior} /></td>
-                                                <td className="ai-num">{c.totales.dias_trabajados}</td>
-                                                <td className="ai-num" style={{ color: c.totales.ausencias > 0 ? 'var(--danger)' : 'inherit' }}>{c.totales.ausencias}</td>
-                                                <td className="ai-num">{c.totales.dias_tarde}</td>
-                                                <td className="ai-num">{hFmt(c.totales.minutos_trabajados)}</td>
-                                                <td className="ai-num">{hFmt(c.totales.minutos_extra)}</td>
-                                                <td className="ai-num">
-                                                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => cambiar('campania', activa ? '' : String(c.idcampania))}>
-                                                        {activa ? 'Ocultar' : 'Ver detalle'}
+                                    {porCampania.map((c) => (
+                                        <tr key={c.idcampania ?? 'sin'}>
+                                            <td style={{ fontWeight: 600 }}>{primeraMayuscula(c.campania)}</td>
+                                            <td className="ai-num">{c.totales.empleados}</td>
+                                            <td><BarraPuntualidad pct={c.totales.porcentaje_puntualidad} /></td>
+                                            <td className="ai-num"><Tendencia totales={c.totales} anterior={c.anterior} periodoAnterior={datos.periodo_anterior} /></td>
+                                            <td className="ai-num">{c.totales.dias_trabajados}</td>
+                                            <td className="ai-num" style={{ color: c.totales.ausencias > 0 ? 'var(--danger)' : 'inherit' }}>{c.totales.ausencias}</td>
+                                            <td className="ai-num">{c.totales.dias_tarde}</td>
+                                            <td className="ai-num">{hFmt(c.totales.minutos_trabajados)}</td>
+                                            <td className="ai-num">{hFmt(c.totales.minutos_extra)}</td>
+                                            <td className="ai-num">
+                                                {c.idcampania != null && (
+                                                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => cambiar('campania', String(c.idcampania))}>
+                                                        Ver detalle
                                                     </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                                 {totales && (
                                     <tfoot>
@@ -217,12 +205,114 @@ const AsistenciaMensual = () => {
                             </table>
                         </div>
                     </div>
+                </>
+            )}
 
-                    {campania && (
+            {campaniaId && (
+                <DetalleCampaniaModal
+                    periodo={periodo}
+                    periodoAnterior={datos?.periodo_anterior}
+                    nombre={campania?.nombre || filaCampania?.campania || campanias.find((c) => String(c.idcampania) === campaniaId)?.nombre}
+                    fila={filaCampania}
+                    campania={campania}
+                    loading={loading}
+                    onClose={() => cambiar('campania', '')}
+                />
+            )}
+        </div>
+    );
+};
+
+// Ventana con el detalle completo de una campaña en el mes.
+const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania, loading, onClose }) => {
+    const [busqueda, setBusqueda] = useState('');
+    const dias = useMemo(() => diasDelMes(periodo), [periodo]);
+
+    useEffect(() => {
+        const cerrarConEscape = (e) => { if (e.key === 'Escape') onClose(); };
+        window.addEventListener('keydown', cerrarConEscape);
+        return () => window.removeEventListener('keydown', cerrarConEscape);
+    }, [onClose]);
+
+    const empleados = useMemo(() => {
+        const lista = campania?.empleados ?? [];
+        const q = busqueda.trim().toLowerCase();
+        if (!q) return lista;
+        return lista.filter((e) => (e.nombre || '').toLowerCase().includes(q) || String(e.documento || '').includes(q));
+    }, [campania, busqueda]);
+
+    const t = fila?.totales;
+
+    const exportarEmpleados = () => {
+        descargarCsv(
+            `asistencia_${(nombre || 'campania').replace(/\s+/g, '_').toLowerCase()}_${periodo}.csv`,
+            ['Empleado', 'Cédula', 'Cargo', 'Días trab.', 'Ausencias', 'Días tarde', 'Min. tarde', 'Puntualidad %',
+                'H. trabajadas', 'H. extra', 'Baño', 'Break', 'Almuerzo', 'Capacitación'],
+            (campania?.empleados ?? []).map((e) => [
+                nombrePropio(e.nombre), e.documento, primeraMayuscula(e.cargo || ''), e.dias_trabajados, e.ausencias,
+                e.dias_tarde, e.minutos_tarde, e.porcentaje_puntualidad ?? '', hFmt(e.minutos_trabajados), hFmt(e.minutos_extra),
+                hFmt(e.minutos_bano), hFmt(e.minutos_break), hFmt(e.minutos_almuerzo), hFmt(e.minutos_capacitacion)
+            ])
+        );
+    };
+
+    const porFecha = (e) => {
+        const mapa = {};
+        for (const d of e.dias || []) mapa[d.fecha] = d;
+        return mapa;
+    };
+
+    return (
+        <div className="ai-overlay ai-scope" onClick={onClose}>
+            <div className="ai-modal" style={{ maxWidth: 1200 }} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Detalle de ${nombre || 'la campaña'}`}>
+                <div className="ai-modal-head">
+                    <span className="ai-modal-icon"><BarChart3 size={20} strokeWidth={1.75} /></span>
+                    <div>
+                        <h2 className="ai-modal-title">{primeraMayuscula(nombre || 'Campaña')}</h2>
+                        <p className="ai-modal-sub">
+                            {nombrePeriodo(periodo)}
+                            {campania && ` · ${campania.empleados.length} empleado${campania.empleados.length === 1 ? '' : 's'}`}
+                        </p>
+                    </div>
+                    <button type="button" className="ai-icon-btn" onClick={onClose} aria-label="Cerrar"><X size={18} strokeWidth={1.75} /></button>
+                </div>
+
+                <div className="ai-modal-body" style={{ maxHeight: '75vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {loading || !campania ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+                            <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
+                        </div>
+                    ) : (
                         <>
+                            {t && (
+                                <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
+                                    <Kpi label="Puntualidad" valor={t.porcentaje_puntualidad != null ? `${t.porcentaje_puntualidad}%` : '—'} icon={<Clock size={16} strokeWidth={1.75} />}
+                                        extra={<Tendencia totales={t} anterior={fila.anterior} periodoAnterior={periodoAnterior} />} />
+                                    <Kpi label="Días trabajados" valor={t.dias_trabajados} icon={<BarChart3 size={16} strokeWidth={1.75} />} />
+                                    <Kpi label="Ausencias" valor={t.ausencias} alerta={t.ausencias > 0} icon={<CalendarX size={16} strokeWidth={1.75} />} />
+                                    <Kpi label="Días tarde" valor={t.dias_tarde} icon={<Timer size={16} strokeWidth={1.75} />} />
+                                    <Kpi label="H. trabajadas" valor={hFmt(t.minutos_trabajados)} icon={<Clock size={16} strokeWidth={1.75} />} />
+                                    <Kpi label="H. extra" valor={hFmt(t.minutos_extra)} icon={<Clock size={16} strokeWidth={1.75} />} />
+                                </div>
+                            )}
+
+                            <div className="ai-row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                <div className="ai-input" style={{ maxWidth: 320, flex: 1 }}>
+                                    <Search size={16} strokeWidth={1.75} className="ai-ic" />
+                                    <input
+                                        type="text" placeholder="Buscar por nombre o cédula" value={busqueda} autoFocus
+                                        onChange={(e) => setBusqueda(e.target.value)}
+                                        style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
+                                    />
+                                </div>
+                                <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportarEmpleados} disabled={campania.empleados.length === 0}>
+                                    <Download size={14} strokeWidth={1.75} /> Exportar empleados
+                                </button>
+                            </div>
+
                             <div className="ai-panel">
                                 <div className="ai-panel-head">
-                                    <h3 className="ai-panel-title">Campaña: {primeraMayuscula(campania.nombre)} · calendario</h3>
+                                    <h3 className="ai-panel-title">Calendario diario <span className="ai-muted" style={{ fontWeight: 400, fontSize: 13 }}>· clic en un día para ver su trazabilidad</span></h3>
                                     <div className="ai-row" style={{ gap: 12, flexWrap: 'wrap' }}>
                                         {['puntual', 'tarde', 'ausente', 'curso', 'pendiente'].map((k) => (
                                             <span key={k} className="ai-row" style={{ gap: 5, fontSize: 12, color: 'var(--ink-muted)' }}>
@@ -240,7 +330,7 @@ const AsistenciaMensual = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {campania.empleados.map((e) => {
+                                            {empleados.map((e) => {
                                                 const mapa = porFecha(e);
                                                 return (
                                                     <tr key={e.users_company_id}>
@@ -266,7 +356,7 @@ const AsistenciaMensual = () => {
                             </div>
 
                             <div className="ai-panel">
-                                <div className="ai-panel-head"><h3 className="ai-panel-title">Detalle por empleado · {primeraMayuscula(campania.nombre)}</h3></div>
+                                <div className="ai-panel-head"><h3 className="ai-panel-title">Detalle por empleado</h3></div>
                                 <div style={{ overflowX: 'auto' }}>
                                     <table className="ai-table ai-table--dense">
                                         <thead>
@@ -282,19 +372,25 @@ const AsistenciaMensual = () => {
                                                 <th className="ai-num">Break</th>
                                                 <th className="ai-num">Almuerzo</th>
                                                 <th className="ai-num">Capac.</th>
+                                                <th className="ai-num">Trazabilidad</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {campania.empleados.map((e) => (
+                                            {empleados.length === 0 && (
+                                                <tr><td colSpan={12} className="ai-muted" style={{ textAlign: 'center', padding: 16 }}>
+                                                    {busqueda ? 'Nadie coincide con la búsqueda.' : 'Esta campaña no tiene empleados en el mes.'}
+                                                </td></tr>
+                                            )}
+                                            {empleados.map((e) => (
                                                 <tr key={e.users_company_id}>
                                                     <td>
-                                                        <Link to={`/recursos-humanos/trazabilidad/${e.users_company_id}`} className="ai-row" style={{ gap: 8, textDecoration: 'none', color: 'inherit' }}>
+                                                        <span className="ai-row" style={{ gap: 8 }}>
                                                             <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(e.nombre)}</span>
                                                             <span>
                                                                 <div style={{ fontWeight: 600 }}>{nombrePropio(e.nombre)}</div>
                                                                 <div className="ai-muted" style={{ fontSize: 12 }}>CC {e.documento}{e.cargo ? ` · ${primeraMayuscula(e.cargo)}` : ''}</div>
                                                             </span>
-                                                        </Link>
+                                                        </span>
                                                     </td>
                                                     <td className="ai-num" style={{ fontWeight: 600 }}>{e.dias_trabajados}</td>
                                                     <td className="ai-num" style={{ color: e.ausencias > 0 ? 'var(--danger)' : 'inherit' }}>{e.ausencias}</td>
@@ -306,6 +402,14 @@ const AsistenciaMensual = () => {
                                                     <td className="ai-num ai-muted">{hFmt(e.minutos_break)}</td>
                                                     <td className="ai-num ai-muted">{hFmt(e.minutos_almuerzo)}</td>
                                                     <td className="ai-num ai-muted">{hFmt(e.minutos_capacitacion)}</td>
+                                                    <td className="ai-num">
+                                                        <Link
+                                                            to={`/recursos-humanos/trazabilidad/${e.users_company_id}`}
+                                                            className="ai-icon-btn" title="Ver trazabilidad diaria" aria-label={`Ver trazabilidad de ${e.nombre}`}
+                                                        >
+                                                            <History size={16} strokeWidth={1.75} />
+                                                        </Link>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -314,16 +418,26 @@ const AsistenciaMensual = () => {
                             </div>
                         </>
                     )}
-                </>
-            )}
+                </div>
+            </div>
         </div>
     );
 };
 
-const Kpi = ({ label, valor, icon, alerta }) => (
+const BarraPuntualidad = ({ pct }) => (
+    <div className="ai-row" style={{ gap: 8 }}>
+        <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'var(--surface-0)', overflow: 'hidden', minWidth: 80 }}>
+            <div style={{ width: `${pct ?? 0}%`, height: '100%', background: pct >= 90 ? 'var(--success)' : pct >= 75 ? '#f59e0b' : 'var(--danger)' }} />
+        </div>
+        <span style={{ fontSize: 12, width: 34, textAlign: 'right' }}>{pct != null ? `${pct}%` : '—'}</span>
+    </div>
+);
+
+const Kpi = ({ label, valor, icon, alerta, extra }) => (
     <div className="ai-kpi" style={alerta ? { borderColor: 'var(--danger)' } : undefined}>
         <div className="ai-kpi-head"><span className="ai-kpi-label">{label}</span><span className="ai-kpi-icon">{icon}</span></div>
         <div className="ai-kpi-value">{valor}</div>
+        {extra && <div style={{ fontSize: 12, marginTop: 2 }}>{extra}</div>}
     </div>
 );
 
