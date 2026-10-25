@@ -5,7 +5,7 @@ import { novedadRrhhService, contratacionHydraService } from '../services/api';
 import { iniciales } from '../utils/formatoRRHH';
 import {
     Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus, Clock, FileSpreadsheet,
-    BarChart3, Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
+    BarChart3, LayoutDashboard, Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../assets/asiste-ui/asiste-mark-white.png';
 
@@ -22,6 +22,8 @@ const NAV_ITEMS = [
 // Financiera ve todo lo de RRHH y además los reportes de horas extras de los jefes y la
 // trazabilidad de asistencia por campaña (asistencia.md §32).
 const NAV_FINANCIERA = [
+    // Home (asistencia.md §37): tablero del mes de RRHH, asistencia, horas extra y costos. Va primero.
+    { to: '/recursos-humanos/home', label: 'Home', icon: LayoutDashboard },
     { to: '/recursos-humanos/reportes-horas-extra', label: 'Horas extra', icon: FileSpreadsheet },
     // Reporte + trazabilidad en una sola pestaña: comparativo, calendario diario y detalle por empleado.
     { to: '/recursos-humanos/asistencia-mensual', label: 'Reporte Asistencia', icon: BarChart3 }
@@ -49,7 +51,7 @@ const RecursosHumanosLayout = () => {
 
     const contadores = { novedades: totalNovedades, contratacion: lotesAbiertos || null };
     const navItems = isFinanciera
-        ? [...NAV_ITEMS.slice(0, -1), ...NAV_FINANCIERA, NAV_ITEMS[NAV_ITEMS.length - 1]]
+        ? [NAV_FINANCIERA[0], ...NAV_ITEMS.slice(0, -1), ...NAV_FINANCIERA.slice(1), NAV_ITEMS[NAV_ITEMS.length - 1]]
         : NAV_ITEMS;
 
     useEffect(() => {

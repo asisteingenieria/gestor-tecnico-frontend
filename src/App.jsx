@@ -51,6 +51,7 @@ import GestionHorarios from './components/asistencia/GestionHorarios';
 import ReporteHorasExtra from './components/asistencia/ReporteHorasExtra';
 import ReportesHorasExtra from './components/financiera/ReportesHorasExtra';
 import AsistenciaMensualFinanciera from './components/financiera/AsistenciaMensual';
+import HomeFinanciera from './components/financiera/HomeFinanciera';
 
 // Financiera entra por las mismas pantallas y layout que RRHH (asistencia.md §32).
 const esRRHH = (role) => role === 'recursosHumanos' || role === 'financiera';
@@ -140,6 +141,10 @@ const RedirectByRole = () => {
     return <Navigate to="/disenos" replace />;
   }
 
+  if (user?.role === 'financiera') {
+    return <Navigate to="/recursos-humanos/home" replace />;
+  }
+
   if (esRRHH(user?.role)) {
     return <Navigate to="/recursos-humanos" replace />;
   }
@@ -186,6 +191,10 @@ const DashboardRoute = () => {
 
   if (user?.role === 'disenador') {
     return <Navigate to="/disenos" replace />;
+  }
+
+  if (user?.role === 'financiera') {
+    return <Navigate to="/recursos-humanos/home" replace />;
   }
 
   if (esRRHH(user?.role)) {
@@ -364,6 +373,14 @@ const RecursosHumanosRoute = ({ children }) => {
   return children;
 };
 
+// Home de financiera (asistencia.md §37): también lo ve el admin, desde su propio layout.
+const HomeFinancieraRoute = ({ children }) => {
+  const { isFinanciera, isAdmin, loading } = useAuth();
+  if (loading) return null;
+  if (!isFinanciera && !isAdmin) return <Navigate to="/" replace />;
+  return children;
+};
+
 // Componente para rutas que requieren rol de financiera
 const FinancieraRoute = ({ children }) => {
   const { isFinanciera, loading } = useAuth();
@@ -504,6 +521,7 @@ function App() {
               <Route path="recursos-humanos/vacaciones" element={<RecursosHumanosRoute><PasivoVacacional /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/contratacion-hydra" element={<RecursosHumanosRoute><ContratacionHydra /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/contratacion-hydra/:id" element={<RecursosHumanosRoute><LoteHydra /></RecursosHumanosRoute>} />
+              <Route path="recursos-humanos/home" element={<HomeFinancieraRoute><HomeFinanciera /></HomeFinancieraRoute>} />
               <Route path="recursos-humanos/reportes-horas-extra" element={<FinancieraRoute><ReportesHorasExtra /></FinancieraRoute>} />
               <Route path="recursos-humanos/asistencia-mensual" element={<FinancieraRoute><AsistenciaMensualFinanciera /></FinancieraRoute>} />
               {/* La trazabilidad por campaña quedó dentro del reporte de asistencia. */}
