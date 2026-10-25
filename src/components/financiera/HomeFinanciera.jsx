@@ -17,14 +17,14 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 // Home de financiera/admin (asistencia.md §37): lo que hay que mirar del mes en RRHH, asistencia,
 // horas extra y costos. Todo sale de GET /asistencia/financiera/home.
 //
-// Gráficas según la guía de visualización: azul/naranja/aqua validados para daltonismo en claro y
-// oscuro sobre las superficies de la app (el aqua en claro queda bajo 3:1: siempre con leyenda y
-// vista de tabla), gris para lo que es contexto, una escala por gráfica,
+// Gráficas según la guía de visualización: azul/naranja/violeta/aqua validados para daltonismo en
+// claro y oscuro sobre las superficies de la app (el aqua en claro queda bajo 3:1: siempre con
+// leyenda y vista de tabla), gris para lo que es contexto, una escala por gráfica,
 // barras delgadas con el extremo de dato redondeado, y una vista de tabla en cada tarjeta.
 
 const PALETA = {
-    claro: { serie1: '#2a78d6', serie2: '#eb6834', serie3: '#1baf7a', contexto: '#c5cdd8', superficie: '#ffffff', grid: '#e7edf4', eje: '#c3ccd8', texto: '#52627a', meta: '#0f1f35' },
-    oscuro: { serie1: '#3987e5', serie2: '#d95926', serie3: '#199e70', contexto: '#33445c', superficie: '#111f33', grid: '#1f3149', eje: '#33445c', texto: '#9fb0c7', meta: '#e8eef7' }
+    claro: { serie1: '#2a78d6', serie2: '#eb6834', serie3: '#1baf7a', serie4: '#6250d6', contexto: '#c5cdd8', superficie: '#ffffff', grid: '#e7edf4', eje: '#c3ccd8', texto: '#52627a', meta: '#0f1f35' },
+    oscuro: { serie1: '#3987e5', serie2: '#d95926', serie3: '#199e70', serie4: '#9085e9', contexto: '#33445c', superficie: '#111f33', grid: '#1f3149', eje: '#33445c', texto: '#9fb0c7', meta: '#e8eef7' }
 };
 
 const CLASES = {
@@ -103,6 +103,7 @@ const barra = (extra) => ({ borderRadius: 4, borderSkipped: 'start', maxBarThick
 const PARTES_COSTO = [
     { clave: 'salarios', etiqueta: 'Nómina', color: 'serie1' },
     { clave: 'prestaciones', etiqueta: 'Prestaciones', color: 'serie2' },
+    { clave: 'aportes', etiqueta: 'Aportes', color: 'serie4' },
     { clave: 'bonos', etiqueta: 'Bonos', color: 'serie3' }
 ];
 const LEYENDA_COSTO = (c) => PARTES_COSTO.map((p) => ({ color: c[p.color], texto: p.etiqueta }));
@@ -339,11 +340,11 @@ const Tablero = ({ datos, c }) => {
                 <Tarjeta
                     titulo="Costo total de nómina por campaña"
                     subtitulo={<Leyenda items={LEYENDA_COSTO(c)} />}
-                    fuente="Costo del mes elegido: nómina prorrateada por días + prestaciones + bonos, según la campaña actual del contrato."
+                    fuente="Costo del mes elegido: nómina prorrateada por días + prestaciones + aportes + bonos, según la campaña actual del contrato."
                     vacio={nominaOrdenada.length === 0 && 'No hay salarios registrados.'}
                     tabla={{
-                        columnas: ['Campaña', 'Empleados', 'Nómina', 'Prestaciones', 'Bonos', 'Total'],
-                        filas: nominaOrdenada.map((x) => [primeraMayuscula(x.campania), x.empleados, cop(x.salarios), cop(x.prestaciones), cop(x.bonos), cop(x.costo_total)])
+                        columnas: ['Campaña', 'Empleados', ...PARTES_COSTO.map((p) => p.etiqueta), 'Total'],
+                        filas: nominaOrdenada.map((x) => [primeraMayuscula(x.campania), x.empleados, ...PARTES_COSTO.map((p) => cop(x[p.clave])), cop(x.costo_total)])
                     }}
                 >
                     <div style={{ height: alto(nominaOrdenada.length) }}>
@@ -495,28 +496,32 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
     const iMes = historico.findIndex((m) => m.periodo === periodo);
     const mes = historico[iMes];
     const previo = iMes > 0 ? historico[iMes - 1] : null;
-    const pctPrestaciones = costo.factores.reduce((a, f) => a + f.porcentaje, 0);
+    const prestaciones = costo.factores.filter((f) => f.categoria !== 'aporte');
+    const aportes = costo.factores.filter((f) => f.categoria === 'aporte');
+    const pctPrestaciones = prestaciones.reduce((a, f) => a + f.porcentaje, 0);
+    const pct = (n) => `${String(Math.round(n * 1000) / 1000).replace('.', ',')} %`;
     const variacion = (actual, antes) => (antes > 0 ? Math.round(((actual - antes) / antes) * 1000) / 10 : null);
     const etiquetaMes = (m) => `${nombrePeriodo(m.periodo)}${m.en_curso ? ' (en curso, proyectado)' : ''}`;
 
     const exportar = () => {
         const filas = historico.map((m, i) => [
-            etiquetaMes(m), m.empleados, Math.round(m.salarios), Math.round(m.prestaciones), Math.round(m.bonos), Math.round(m.total),
+            etiquetaMes(m), m.empleados, ...PARTES_COSTO.map((p) => Math.round(m[p.clave] ?? 0)), Math.round(m.total),
             i > 0 ? variacion(m.total, historico[i - 1].total) ?? '' : ''
         ]);
         const cursando = historico.find((m) => m.en_curso);
         if (cursando?.causado) {
-            filas.push([`${nombrePeriodo(cursando.periodo)} (causado a hoy)`, '', cursando.causado.salarios, cursando.causado.prestaciones, cursando.causado.bonos, cursando.causado.total, '']);
+            filas.push([`${nombrePeriodo(cursando.periodo)} (causado a hoy)`, '', ...PARTES_COSTO.map((p) => cursando.causado[p.clave] ?? 0), cursando.causado.total, '']);
         }
-        descargarCsv(`costo_nomina_hasta_${periodo}.csv`, ['Mes', 'Empleados', 'Nómina', 'Prestaciones', 'Bonos', 'Costo total', 'Var. total %'], filas);
+        descargarCsv(`costo_nomina_hasta_${periodo}.csv`, ['Mes', 'Empleados', ...PARTES_COSTO.map((p) => p.etiqueta), 'Costo total', 'Var. total %'], filas);
     };
 
     if (!mes) return null;
     const tiles = [
         { etiqueta: 'Nómina', clave: 'salarios', color: c.serie1, nota: `${entero(mes.empleados)} empleados` },
-        { etiqueta: 'Prestaciones', clave: 'prestaciones', color: c.serie2, nota: `${String(Math.round(pctPrestaciones * 100) / 100).replace('.', ',')} % de la nómina` },
+        { etiqueta: 'Prestaciones', clave: 'prestaciones', color: c.serie2, nota: `${pct(pctPrestaciones)} de la nómina` },
+        { etiqueta: 'Aportes', clave: 'aportes', color: c.serie4, nota: 'Seguridad social y parafiscales' },
         { etiqueta: 'Bonos', clave: 'bonos', color: c.serie3, nota: 'No prestacional + cafetería' },
-        { etiqueta: 'Costo total', clave: 'total', nota: 'Nómina + prestaciones + bonos', total: true }
+        { etiqueta: 'Costo total', clave: 'total', nota: 'Nómina + prestaciones + aportes + bonos', total: true }
     ];
 
     return (
@@ -565,8 +570,9 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
                         <table className="ai-table ai-table--dense">
                             <thead>
                                 <tr>
-                                    <th>Mes</th><th className="ai-num">Empleados</th><th className="ai-num">Nómina</th><th className="ai-num">Prestaciones</th>
-                                    <th className="ai-num">Bonos</th><th className="ai-num">Costo total</th><th className="ai-num">Var. total</th>
+                                    <th>Mes</th><th className="ai-num">Empleados</th>
+                                    {PARTES_COSTO.map((p) => <th key={p.clave} className="ai-num">{p.etiqueta}</th>)}
+                                    <th className="ai-num">Costo total</th><th className="ai-num">Var. total</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -578,9 +584,7 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
                                             <tr style={m.periodo === periodo ? { background: 'var(--primary-soft)' } : undefined}>
                                                 <td style={{ fontWeight: 600 }}>{etiquetaMes(m)}</td>
                                                 <td className="ai-num">{entero(m.empleados)}</td>
-                                                <td className="ai-num">{cop(m.salarios)}</td>
-                                                <td className="ai-num">{cop(m.prestaciones)}</td>
-                                                <td className="ai-num">{cop(m.bonos)}</td>
+                                                {PARTES_COSTO.map((p) => <td key={p.clave} className="ai-num">{cop(m[p.clave])}</td>)}
                                                 <td className="ai-num" style={{ fontWeight: 600 }}>{cop(m.total)}</td>
                                                 <td className="ai-num">{v == null ? '—' : `${v > 0 ? '+' : ''}${String(v).replace('.', ',')} %`}</td>
                                             </tr>
@@ -588,9 +592,7 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
                                                 <tr className="ai-muted">
                                                     <td style={{ paddingLeft: 24 }}>Causado a hoy</td>
                                                     <td />
-                                                    <td className="ai-num">{cop(m.causado.salarios)}</td>
-                                                    <td className="ai-num">{cop(m.causado.prestaciones)}</td>
-                                                    <td className="ai-num">{cop(m.causado.bonos)}</td>
+                                                    {PARTES_COSTO.map((p) => <td key={p.clave} className="ai-num">{cop(m.causado[p.clave])}</td>)}
                                                     <td className="ai-num">{cop(m.causado.total)}</td>
                                                     <td />
                                                 </tr>
@@ -623,19 +625,25 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
                 )}
             </div>
 
-            <div style={{ padding: '12px 16px 0', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--ink-muted)', fontWeight: 600, alignSelf: 'center' }}>Prestaciones de {nombrePeriodo(periodo).toLowerCase()}:</span>
-                {(nomina.detalle_prestaciones || []).map((d) => (
-                    <span key={d.codigo} className="ai-badge" style={{ height: 'auto', padding: '4px 10px', fontSize: 12 }}>
-                        {d.nombre} {String(d.porcentaje).replace('.', ',')} % · {copCompacto(d.valor)}
-                    </span>
-                ))}
-            </div>
+            {[['Prestaciones', nomina.detalle_prestaciones], ['Aportes', nomina.detalle_aportes]].map(([titulo, detalle]) => (detalle?.length ? (
+                <div key={titulo} style={{ padding: '12px 16px 0', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: 'var(--ink-muted)', fontWeight: 600, alignSelf: 'center', minWidth: 92 }}>{titulo}:</span>
+                    {detalle.map((d) => (
+                        <span key={d.codigo} className="ai-badge" style={{ height: 'auto', padding: '4px 10px', fontSize: 12 }}
+                            title={d.exonerable ? 'Exonerado para quien gana menos de 10 SMMLV (art. 114-1 E.T.)' : undefined}>
+                            {d.exonerable && d.valor === 0 ? `${d.nombre} ${pct(d.porcentaje)} · exonerado` : `${d.nombre} ${pct(d.porcentaje_efectivo ?? d.porcentaje)} · ${copCompacto(d.valor)}`}
+                        </span>
+                    ))}
+                </div>
+            ) : null))}
 
             <p className="ai-muted" style={{ fontSize: 12, margin: '8px 16px 12px' }}>
                 Fuente: vigencias del historial salarial de cada contrato, prorrateadas por días (mes comercial de {costo.dias_mes_comercial} días)
-                entre el ingreso y el retiro. Prestaciones = {costo.factores.map((f) => `${f.nombre.toLowerCase()} ${String(f.porcentaje).replace('.', ',')} %`).join(' + ')} del
-                salario básico; los bonos no son base. No incluye aportes a seguridad social ni parafiscales.
+                entre el ingreso y el retiro. Prestaciones = {prestaciones.map((f) => `${f.nombre.toLowerCase()} ${pct(f.porcentaje)}`).join(' + ')} del
+                salario básico; los bonos no son base.
+                {aportes.length > 0 && <> Aportes del empleador sobre el IBC (salario + lo que los bonos pasen del 40 % de la remuneración):
+                    {' '}{aportes.map((f) => `${f.nombre} ${f.codigo === 'arl' ? 'según la tarifa de cada empleado' : pct(f.porcentaje)}`).join(', ')};
+                    {' '}{aportes.filter((f) => f.exonerable).map((f) => f.nombre).join(', ')} exonerados por debajo de 10 SMMLV. Los porcentajes del chip son los efectivos del mes.</>}
                 {historico.some((m) => m.en_curso) ? ' * Mes en curso: proyectado al cierre con la nómina vigente hoy.' : ''}
             </p>
         </div>
