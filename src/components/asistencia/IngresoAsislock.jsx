@@ -11,12 +11,23 @@ const ACCION = {
     entrada: 'Abrió la jornada',
     reconexion: 'Reconexión',
     desconexion: 'Desconexión',
-    salida: 'Salida'
+    salida: 'Salida',
+    pausa_bano: 'Inició baño',
+    pausa_break: 'Inició break',
+    pausa_almuerzo: 'Inició almuerzo',
+    pausa_capacitacion: 'Inició capacitación',
+    fin_pausa: 'Terminó la pausa',
+    entrada_extra: 'Inició hora extra',
+    fin_extra: 'Terminó hora extra'
 };
 
 const MOTIVO = {
     ya_conectado: 'Ya estaba conectado',
     ya_desconectado: 'Ya estaba desconectado',
+    ya_en_pausa: 'Ya estaba en ese estado',
+    desconectado: 'Estaba desconectado',
+    en_hora_extra: 'Ya estaba en hora extra',
+    empleado_no_encontrado: 'Cédula sin ficha en RRHH',
     sin_entrada: 'Sin entrada ese día',
     jornada_finalizada: 'La jornada ya estaba cerrada',
     fuera_de_orden: 'Llegó fuera de orden',
@@ -71,6 +82,7 @@ export const RegistrosAsislock = ({ registros }) => {
                         <tr>
                             <th>Hora</th>
                             <th>Evento</th>
+                            <th>Estado en AsisLock</th>
                             <th>Ingreso</th>
                             <th>En la jornada</th>
                             <th>Aplicativo</th>
@@ -83,6 +95,7 @@ export const RegistrosAsislock = ({ registros }) => {
                             <tr key={i}>
                                 <td className="ai-num">{new Date(r.ocurrido_en).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                                 <td>{r.evento === 'login' ? 'Login' : 'Logout'}</td>
+                                <td>{r.estado_conexion != null && r.estado_conexion !== '' ? String(r.estado_conexion) : <span className="ai-muted">—</span>}</td>
                                 <td>
                                     {r.evento === 'login'
                                         ? <BadgeIngreso modalidad={r.modalidad} vacio={r.conectado_biometrico || '—'} />

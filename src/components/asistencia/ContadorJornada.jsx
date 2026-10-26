@@ -35,7 +35,7 @@ const ContadorJornada = ({ jornada, segundosTrabajadosHoy }) => {
     const minutosResto = minutosTrabajados % 60;
     const segundosResto = segundos % 60;
 
-    const minutosPausas = (jornada.minutos_pausa_bano || 0) + (jornada.minutos_pausa_almuerzo || 0);
+    const minutosPausas = (jornada.minutos_pausa_bano || 0) + (jornada.minutos_break || 0) + (jornada.minutos_pausa_almuerzo || 0);
     const pctTrabajo = turnoMin ? Math.min(100, (minutosTrabajados / turnoMin) * 100) : 0;
     const pctPausa = turnoMin ? Math.max(0, Math.min(100 - pctTrabajo, (minutosPausas / turnoMin) * 100)) : 0;
     const largoTrabajo = (pctTrabajo / 100) * CIRCUNFERENCIA;
@@ -111,6 +111,14 @@ const ContadorJornada = ({ jornada, segundosTrabajadosHoy }) => {
                     <div className="ai-fact">
                         <dt>Baño hoy</dt>
                         <dd>{jornada.minutos_pausa_bano || 0} min</dd>
+                    </div>
+                    <div className="ai-fact">
+                        <dt>Break hoy</dt>
+                        <dd>{jornada.minutos_break || 0} min</dd>
+                    </div>
+                    <div className="ai-fact">
+                        <dt>Capacitación</dt>
+                        <dd>{jornada.minutos_capacitacion || 0} min</dd>
                     </div>
                     <div className="ai-fact">
                         <dt>Almuerzo</dt>

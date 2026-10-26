@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Coffee, Utensils, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { formatearHora12, formatearMinSeg } from '../../utils/tiempoAsistencia';
+import { datosPausa } from '../../utils/pausasAsistencia';
 
 const TarjetaPausa = ({ jornada, pausaSegundosTranscurridos, onFinalizarPausa }) => {
     const [cargando, setCargando] = useState(false);
@@ -8,6 +9,7 @@ const TarjetaPausa = ({ jornada, pausaSegundosTranscurridos, onFinalizarPausa })
     if (!pausa) return null;
 
     const esAlmuerzo = pausa.tipo === 'almuerzo';
+    const { enEstado, terminar, Icono, badge } = datosPausa(pausa.tipo);
     const limiteMin = esAlmuerzo ? jornada.horario?.minutos_almuerzo : null;
     const transcurridosSeg = Math.max(0, pausaSegundosTranscurridos ?? pausa.minutosTranscurridos * 60);
     const restanteSeg = limiteMin != null ? limiteMin * 60 - transcurridosSeg : null;
@@ -22,12 +24,12 @@ const TarjetaPausa = ({ jornada, pausaSegundosTranscurridos, onFinalizarPausa })
 
     return (
         <div className="ai-panel ai-clock ai-clock--pause" style={{ alignItems: 'center', textAlign: 'center', maxWidth: 460, margin: '0 auto' }}>
-            <span className={`ai-badge ${esAlmuerzo ? 'ai-badge--warning' : 'ai-badge--info'}`}>
-                {esAlmuerzo ? <Utensils size={14} strokeWidth={1.75} /> : <Coffee size={14} strokeWidth={1.75} />}
-                {esAlmuerzo ? 'En almuerzo' : 'En baño'} desde {horaInicio}
+            <span className={`ai-badge ${badge}`}>
+                <Icono size={14} strokeWidth={1.75} />
+                {enEstado} desde {horaInicio}
             </span>
 
-            <span className="ai-overline">{limiteMin != null ? 'TIEMPO RESTANTE' : 'TIEMPO EN PAUSA'}</span>
+            <span className="ai-overline">{limiteMin != null ? 'TIEMPO RESTANTE' : (pausa.tipo === 'capacitacion' ? 'TIEMPO EN CAPACITACIÓN' : 'TIEMPO EN PAUSA')}</span>
 
             <div className="ai-timer" style={{ fontSize: 72 }}>
                 {restanteSeg != null
@@ -40,7 +42,9 @@ const TarjetaPausa = ({ jornada, pausaSegundosTranscurridos, onFinalizarPausa })
             <p className="ai-muted" style={{ fontSize: 13, margin: 0 }}>
                 {esAlmuerzo && limiteMin != null
                     ? `Almuerzo de ${limiteMin} min · regresa antes de las ${horaInicio ? formatearHoraLimite(pausa.desde, limiteMin) : ''}`
-                    : 'Si tardas más de lo habitual, quedará una alerta en tu trazabilidad.'}
+                    : pausa.tipo === 'capacitacion'
+                        ? 'La capacitación cuenta como tiempo laborado.'
+                        : 'Si tardas más de lo habitual, quedará una alerta en tu trazabilidad.'}
             </p>
 
             {limiteMin != null && (
@@ -59,8 +63,8 @@ const TarjetaPausa = ({ jornada, pausaSegundosTranscurridos, onFinalizarPausa })
                 onClick={ejecutar}
                 disabled={cargando}
             >
-                {cargando ? <Loader2 size={18} strokeWidth={1.75} className="animate-spin" /> : (esAlmuerzo ? <Utensils size={18} strokeWidth={1.75} /> : <Coffee size={18} strokeWidth={1.75} />)}
-                {esAlmuerzo ? 'Terminar almuerzo y volver' : 'Volver del baño'}
+                {cargando ? <Loader2 size={18} strokeWidth={1.75} className="animate-spin" /> : <Icono size={18} strokeWidth={1.75} />}
+                {terminar}
             </button>
         </div>
     );

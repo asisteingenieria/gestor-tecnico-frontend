@@ -1,7 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { asistenciaService } from '../services/api';
+import { escucharAsistencia, socketAsistenciaConectado } from '../utils/socketAsistencia';
 
 const RESYNC_INTERVAL_MS = 60000;
+// Sin socket (red que no deja pasar websockets) se consulta más seguido para no quedar atrás.
+const RESYNC_SIN_SOCKET_MS = 15000;
+
+// Segundos laborados exactos (el backend los manda desde 2026-10-26; antes solo minutos).
+const segundosBase = (data) => data.segundos_trabajados ?? data.minutos_trabajados * 60;
+// ¿Suma tiempo ahora? En curso, y en capacitación (cuenta como laborada).
+const cuentaTiempo = (data) => data.cuenta_tiempo ?? data.estado === 'en_curso';
+// La pausa se cuenta desde que empezó (pausa_activa.desde), no desde que se abrió la pantalla.
+const segundosDesde = (iso, ahoraServidorMs) => Math.max(0, Math.floor((ahoraServidorMs - new Date(iso).getTime()) / 1000));
 
 // Estado en vivo de "mi jornada de hoy": SOLO LECTURA al montar. La entrada la registra AsisLock
 // (login biométrico), no abrir el monitor: por eso aquí se consulta el estado, no se marca entrada
@@ -24,12 +34,13 @@ export function useJornada() {
     const aplicarJornada = useCallback((data) => {
         jornadaRef.current = data;
         setJornada(data);
-        setMinutosTrabajados(data.minutos_trabajados);
-        setSegundosTrabajadosHoy(data.minutos_trabajados * 60);
-        setSegundosParaHabilitarSalida(data.segundos_para_habilitar_salida);
-        setPausaMinutosTranscurridos(data.pausa_activa?.minutosTranscurridos ?? null);
-        setPausaSegundosTranscurridos(data.pausa_activa ? data.pausa_activa.minutosTranscurridos * 60 : null);
         offsetRef.current = Date.now() - new Date(data.servidor_ahora).getTime();
+        setMinutosTrabajados(data.minutos_trabajados);
+        setSegundosTrabajadosHoy(segundosBase(data));
+        setSegundosParaHabilitarSalida(data.segundos_para_habilitar_salida);
+        const pausaSeg = data.pausa_activa ? segundosDesde(data.pausa_activa.desde, new Date(data.servidor_ahora).getTime()) : null;
+        setPausaMinutosTranscurridos(pausaSeg === null ? null : Math.floor(pausaSeg / 60));
+        setPausaSegundosTranscurridos(pausaSeg);
     }, []);
 
     const resync = useCallback(async () => {
@@ -59,9 +70,20 @@ export function useJornada() {
         })();
     }, [aplicarJornada]);
 
-    // Resync periódico cada 60s
+    // Aviso en vivo del backend: cada cambio de jornada (login/logout o estado en AsisLock, o un
+    // marcaje en el portal) recarga el estado sin que el agente tenga que refrescar la página.
+    useEffect(() => escucharAsistencia('asistencia:mi-jornada', () => { resync(); }), [resync]);
+
+    // Resync periódico: cada 60 s con socket; cada 15 s si el socket no está conectado.
     useEffect(() => {
-        const id = setInterval(resync, RESYNC_INTERVAL_MS);
+        let ultimo = Date.now();
+        const id = setInterval(() => {
+            const cada = socketAsistenciaConectado() ? RESYNC_INTERVAL_MS : RESYNC_SIN_SOCKET_MS;
+            if (Date.now() - ultimo >= cada && document.visibilityState === 'visible') {
+                ultimo = Date.now();
+                resync();
+            }
+        }, 5000);
         return () => clearInterval(id);
     }, [resync]);
 
@@ -84,16 +106,18 @@ export function useJornada() {
             const baseServidor = new Date(actual.servidor_ahora).getTime();
             const transcurridoSeg = Math.max(0, Math.floor((ahoraServidor - baseServidor) / 1000));
 
-            if (actual.estado === 'en_curso') {
-                setMinutosTrabajados(actual.minutos_trabajados + Math.floor(transcurridoSeg / 60));
-                setSegundosTrabajadosHoy(actual.minutos_trabajados * 60 + transcurridoSeg);
+            if (cuentaTiempo(actual)) {
+                const segundos = segundosBase(actual) + transcurridoSeg;
+                setMinutosTrabajados(Math.floor(segundos / 60));
+                setSegundosTrabajadosHoy(segundos);
             }
             if (actual.segundos_para_habilitar_salida !== null) {
                 setSegundosParaHabilitarSalida(Math.max(0, actual.segundos_para_habilitar_salida - transcurridoSeg));
             }
             if (actual.pausa_activa) {
-                setPausaMinutosTranscurridos(actual.pausa_activa.minutosTranscurridos + Math.floor(transcurridoSeg / 60));
-                setPausaSegundosTranscurridos(actual.pausa_activa.minutosTranscurridos * 60 + transcurridoSeg);
+                const pausaSeg = segundosDesde(actual.pausa_activa.desde, ahoraServidor);
+                setPausaMinutosTranscurridos(Math.floor(pausaSeg / 60));
+                setPausaSegundosTranscurridos(pausaSeg);
             }
         }, 1000);
         return () => clearInterval(id);
