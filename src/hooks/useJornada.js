@@ -10,6 +10,9 @@ const RESYNC_SIN_SOCKET_MS = 15000;
 const segundosBase = (data) => data.segundos_trabajados ?? data.minutos_trabajados * 60;
 // ¿Suma tiempo ahora? En curso, y en capacitación (cuenta como laborada).
 const cuentaTiempo = (data) => data.cuenta_tiempo ?? data.estado === 'en_curso';
+// Tiempo en jornada (desde la entrada, con pausas incluidas): corre mientras no haya salida.
+const segundosJornadaBase = (data) => data.segundos_en_jornada ?? segundosBase(data);
+const jornadaAbierta = (data) => data.estado === 'en_curso' || data.estado === 'en_pausa';
 // La pausa se cuenta desde que empezó (pausa_activa.desde), no desde que se abrió la pantalla.
 const segundosDesde = (iso, ahoraServidorMs) => Math.max(0, Math.floor((ahoraServidorMs - new Date(iso).getTime()) / 1000));
 
@@ -24,6 +27,7 @@ export function useJornada() {
     const [error, setError] = useState(null);
     const [minutosTrabajados, setMinutosTrabajados] = useState(0);
     const [segundosTrabajadosHoy, setSegundosTrabajadosHoy] = useState(0);
+    const [segundosEnJornada, setSegundosEnJornada] = useState(0);
     const [segundosParaHabilitarSalida, setSegundosParaHabilitarSalida] = useState(null);
     const [pausaMinutosTranscurridos, setPausaMinutosTranscurridos] = useState(null);
     const [pausaSegundosTranscurridos, setPausaSegundosTranscurridos] = useState(null);
@@ -37,6 +41,7 @@ export function useJornada() {
         offsetRef.current = Date.now() - new Date(data.servidor_ahora).getTime();
         setMinutosTrabajados(data.minutos_trabajados);
         setSegundosTrabajadosHoy(segundosBase(data));
+        setSegundosEnJornada(segundosJornadaBase(data));
         setSegundosParaHabilitarSalida(data.segundos_para_habilitar_salida);
         const pausaSeg = data.pausa_activa ? segundosDesde(data.pausa_activa.desde, new Date(data.servidor_ahora).getTime()) : null;
         setPausaMinutosTranscurridos(pausaSeg === null ? null : Math.floor(pausaSeg / 60));
@@ -111,6 +116,7 @@ export function useJornada() {
                 setMinutosTrabajados(Math.floor(segundos / 60));
                 setSegundosTrabajadosHoy(segundos);
             }
+            if (jornadaAbierta(actual)) setSegundosEnJornada(segundosJornadaBase(actual) + transcurridoSeg);
             if (actual.segundos_para_habilitar_salida !== null) {
                 setSegundosParaHabilitarSalida(Math.max(0, actual.segundos_para_habilitar_salida - transcurridoSeg));
             }
@@ -155,6 +161,7 @@ export function useJornada() {
         error,
         minutosTrabajados,
         segundosTrabajadosHoy,
+        segundosEnJornada,
         segundosParaHabilitarSalida,
         pausaMinutosTranscurridos,
         pausaSegundosTranscurridos,

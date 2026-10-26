@@ -22,17 +22,20 @@ function instanteBogota(fechaISO, horaTime) {
     return Date.UTC(y, m - 1, d, hh + 5, mm, ss || 0);
 }
 
-const ContadorJornada = ({ jornada, segundosTrabajadosHoy }) => {
+// El reloj grande es el tiempo EN JORNADA (desde la entrada, pausas incluidas), para que al volver
+// de un break siga desde donde iba; el laborado y cada estado van en el desglose de la derecha.
+const ContadorJornada = ({ jornada, segundosTrabajadosHoy, segundosEnJornada }) => {
     if (!jornada) return null;
 
     const badge = ESTADO_BADGE[jornada.estado] || ESTADO_BADGE.pendiente;
     const horario = jornada.horario;
     const turnoMin = horario ? minutosDesdeMedianoche(horario.hora_salida) - minutosDesdeMedianoche(horario.hora_entrada) : null;
 
-    const segundos = Math.max(0, segundosTrabajadosHoy || 0);
-    const minutosTrabajados = Math.floor(segundos / 60);
-    const horas = Math.floor(minutosTrabajados / 60);
-    const minutosResto = minutosTrabajados % 60;
+    const minutosTrabajados = Math.floor(Math.max(0, segundosTrabajadosHoy || 0) / 60);
+    const segundos = Math.max(0, segundosEnJornada ?? segundosTrabajadosHoy ?? 0);
+    const minutosJornada = Math.floor(segundos / 60);
+    const horas = Math.floor(minutosJornada / 60);
+    const minutosResto = minutosJornada % 60;
     const segundosResto = segundos % 60;
 
     const minutosPausas = (jornada.minutos_pausa_bano || 0) + (jornada.minutos_break || 0) + (jornada.minutos_pausa_almuerzo || 0);
@@ -76,14 +79,14 @@ const ContadorJornada = ({ jornada, segundosTrabajadosHoy }) => {
                         )}
                     </svg>
                     <div className="ai-ring-in">
-                        <span className="ai-overline">TIEMPO LABORADO</span>
+                        <span className="ai-overline">TIEMPO EN JORNADA</span>
                         <div className="ai-timer">
                             {horas}:{String(minutosResto).padStart(2, '0')}
                             <small>:{String(segundosResto).padStart(2, '0')}</small>
                         </div>
                         {turnoMin != null && (
                             <span className="ai-muted" style={{ fontSize: 13 }}>
-                                de {formatearDuracion(turnoMin)} · {Math.round(pctTrabajo)}%
+                                de {formatearDuracion(turnoMin)} · {Math.min(100, Math.round((minutosJornada / turnoMin) * 100))}%
                             </span>
                         )}
                     </div>
@@ -109,16 +112,26 @@ const ContadorJornada = ({ jornada, segundosTrabajadosHoy }) => {
                         </dd>
                     </div>
                     <div className="ai-fact">
+                        <dt>Laborado</dt>
+                        <dd>{formatearDuracion(minutosTrabajados)}</dd>
+                    </div>
+                    {(jornada.minutos_desconexion || 0) > 0 && (
+                        <div className="ai-fact">
+                            <dt>Desconectado</dt>
+                            <dd>{formatearDuracion(jornada.minutos_desconexion)}</dd>
+                        </div>
+                    )}
+                    <div className="ai-fact">
                         <dt>Baño hoy</dt>
-                        <dd>{jornada.minutos_pausa_bano || 0} min</dd>
+                        <dd>{formatearDuracion(jornada.minutos_pausa_bano)}</dd>
                     </div>
                     <div className="ai-fact">
                         <dt>Break hoy</dt>
-                        <dd>{jornada.minutos_break || 0} min</dd>
+                        <dd>{formatearDuracion(jornada.minutos_break)}</dd>
                     </div>
                     <div className="ai-fact">
                         <dt>Capacitación</dt>
-                        <dd>{jornada.minutos_capacitacion || 0} min</dd>
+                        <dd>{formatearDuracion(jornada.minutos_capacitacion)}</dd>
                     </div>
                     <div className="ai-fact">
                         <dt>Almuerzo</dt>
