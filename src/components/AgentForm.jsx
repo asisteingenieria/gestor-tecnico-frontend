@@ -585,6 +585,16 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
     )?.nombre || '';
     const mostrarFinContrato = tipoContratoNombre !== '' && !tipoContratoNombre.toLowerCase().includes('indefinido');
 
+    // Al crear, todo dato que aplica a cualquier empleado es obligatorio; los que no todos tienen
+    // (segundo nombre/apellido, RUT, libreta militar, documento secundario, piso, jefaturas, SSFF,
+    // periodo de prueba, bonos, fechas de afiliación, recursos) quedan opcionales. Al editar no se
+    // exige: hay fichas importadas incompletas que no deben quedar bloqueadas.
+    const obligatorioPaso1 = !agente;
+    // Los del paso 2 solo cuando se ve el paso 2, para no bloquear "Siguiente" con campos ocultos.
+    const obligatorioPaso2 = !agente && paso === 2;
+    // Aprendizaje y prestación de servicios no cotizan pensión, cesantías ni caja.
+    const sinPrestaciones = /aprendizaje|prestaci/i.test(tipoContratoNombre);
+
     // Aprendizaje sugiere "Fin de contrato" a 6 meses del ingreso (duración estándar de un
     // contrato de aprendizaje) -- igual que el periodo de prueba, sigue siendo editable después.
     const handleTipoContratoChange = (e) => {
@@ -760,8 +770,8 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                 <div className="ai-form-grid">
                                     {selectField('Tipo de documento', 'tipo_identificacion_id', personal.tipo_identificacion_id, handleTipoIdentificacionChange, catalogos.tipos_identificacion, { required: true, render: o => `${o.nombre} (${o.codigo})` })}
                                     {textField('Número de identificación', 'numero_identificacion', personal.numero_identificacion, onChange(setPersonal), { required: true, placeholder: 'Número de identificación' })}
-                                    {textField('Fecha de expedición', 'fecha_expedicion', personal.fecha_expedicion, onChange(setPersonal), { type: 'date' })}
-                                    <ComboboxBuscable label="Ciudad de expedición" opciones={catalogos.ciudades} value={personal.ciudad_expedicion_id} onChange={(id) => setPersonal(prev => ({ ...prev, ciudad_expedicion_id: id }))} />
+                                    {textField('Fecha de expedición', 'fecha_expedicion', personal.fecha_expedicion, onChange(setPersonal), { type: 'date', required: obligatorioPaso1 })}
+                                    <ComboboxBuscable label="Ciudad de expedición" opciones={catalogos.ciudades} value={personal.ciudad_expedicion_id} onChange={(id) => setPersonal(prev => ({ ...prev, ciudad_expedicion_id: id }))} required={obligatorioPaso1} />
                                     {mostrarDocumentoSecundario && selectField('Tipo de documento secundario', 'tipo_identificacion_secundaria_id', personal.tipo_identificacion_secundaria_id, onChange(setPersonal), catalogos.tipos_identificacion, { render: o => `${o.nombre} (${o.codigo})` })}
                                     {mostrarDocumentoSecundario && textField('Identificación secundaria', 'numero_identificacion_secundaria', personal.numero_identificacion_secundaria, onChange(setPersonal), { placeholder: 'Ej. PPT, CE' })}
                                     {textField('RUT', 'rut', personal.rut, onChange(setPersonal), { placeholder: 'Número de RUT' })}
@@ -778,23 +788,23 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                         <label className="ai-label">Nombre propio (automático)</label>
                                         <p style={{ margin: 0, fontSize: 14 }}>{nombrePropio || '—'}</p>
                                     </div>
-                                    {textField('Fecha de nacimiento', 'fecha_nacimiento', personal.fecha_nacimiento, onChange(setPersonal), { type: 'date' })}
-                                    <ComboboxBuscable label="Ciudad de nacimiento" opciones={catalogos.ciudades} value={personal.ciudad_nacimiento_id} onChange={(id) => setPersonal(prev => ({ ...prev, ciudad_nacimiento_id: id }))} />
-                                    {selectField('Género', 'genero_id', personal.genero_id, onChange(setPersonal), catalogos.generos)}
-                                    {selectField('Estado civil', 'estado_civil_id', personal.estado_civil_id, onChange(setPersonal), catalogos.estados_civiles)}
-                                    {selectField('Grupo sanguíneo', 'grupo_sanguineo_id', personal.grupo_sanguineo_id, onChange(setPersonal), catalogos.grupos_sanguineos)}
-                                    {textField('Número de hijos', 'numero_hijos', personal.numero_hijos, onChange(setPersonal), { type: 'number', min: 0 })}
-                                    {textField('Correo electrónico', 'email', personal.email, onChange(setPersonal), { type: 'email', placeholder: 'correo@empresa.com' })}
+                                    {textField('Fecha de nacimiento', 'fecha_nacimiento', personal.fecha_nacimiento, onChange(setPersonal), { type: 'date', required: obligatorioPaso1 })}
+                                    <ComboboxBuscable label="Ciudad de nacimiento" opciones={catalogos.ciudades} value={personal.ciudad_nacimiento_id} onChange={(id) => setPersonal(prev => ({ ...prev, ciudad_nacimiento_id: id }))} required={obligatorioPaso1} />
+                                    {selectField('Género', 'genero_id', personal.genero_id, onChange(setPersonal), catalogos.generos, { required: obligatorioPaso1 })}
+                                    {selectField('Estado civil', 'estado_civil_id', personal.estado_civil_id, onChange(setPersonal), catalogos.estados_civiles, { required: obligatorioPaso1 })}
+                                    {selectField('Grupo sanguíneo', 'grupo_sanguineo_id', personal.grupo_sanguineo_id, onChange(setPersonal), catalogos.grupos_sanguineos, { required: obligatorioPaso1 })}
+                                    {textField('Número de hijos', 'numero_hijos', personal.numero_hijos, onChange(setPersonal), { type: 'number', min: 0, required: obligatorioPaso1 })}
+                                    {textField('Correo electrónico', 'email', personal.email, onChange(setPersonal), { type: 'email', placeholder: 'correo@empresa.com', required: obligatorioPaso1 })}
                                     {textField('Teléfono', 'telefono', personal.telefono, onChange(setPersonal), { required: true, type: 'tel', placeholder: 'Ej. 300 123 4567' })}
                                 </div>
 
                                 <p className="ai-overline" style={{ margin: '18px 0 10px' }}>Dirección de residencia</p>
                                 <div className="ai-form-grid">
-                                    {textField('Dirección', 'direccion', direccion.direccion, onChange(setDireccion), { placeholder: 'Ej. Calle 45 # 12-30, Bogotá', span2: true })}
-                                    {textField('Barrio', 'barrio', direccion.barrio, onChange(setDireccion))}
-                                    <ComboboxBuscable label="Ciudad de residencia" opciones={catalogos.ciudades} value={direccion.ciudad_id} onChange={(id) => setDireccion(prev => ({ ...prev, ciudad_id: id }))} />
-                                    {selectField('Zona', 'zona_direccion_id', direccion.zona_direccion_id, onChange(setDireccion), catalogos.zonas_direccion)}
-                                    {selectField('Tipo de vivienda', 'tipo_vivienda_id', direccion.tipo_vivienda_id, onChange(setDireccion), catalogos.tipos_vivienda)}
+                                    {textField('Dirección', 'direccion', direccion.direccion, onChange(setDireccion), { placeholder: 'Ej. Calle 45 # 12-30, Bogotá', span2: true, required: obligatorioPaso1 })}
+                                    {textField('Barrio', 'barrio', direccion.barrio, onChange(setDireccion), { required: obligatorioPaso1 })}
+                                    <ComboboxBuscable label="Ciudad de residencia" opciones={catalogos.ciudades} value={direccion.ciudad_id} onChange={(id) => setDireccion(prev => ({ ...prev, ciudad_id: id }))} required={obligatorioPaso1} />
+                                    {selectField('Zona', 'zona_direccion_id', direccion.zona_direccion_id, onChange(setDireccion), catalogos.zonas_direccion, { required: obligatorioPaso1 })}
+                                    {selectField('Tipo de vivienda', 'tipo_vivienda_id', direccion.tipo_vivienda_id, onChange(setDireccion), catalogos.tipos_vivienda, { required: obligatorioPaso1 })}
                                 </div>
                             </div>
 
@@ -815,7 +825,7 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                     {textField('Piso', 'piso', contrato.piso, onChange(setContrato), { placeholder: 'Ej. 4' })}
                                     {textField('Fecha de ingreso', 'fecha_ingreso', contrato.fecha_ingreso, handleFechaIngresoChange, { type: 'date', required: paso === 2 })}
                                     {textField('Fin periodo de prueba', 'fecha_fin_periodo_prueba', contrato.fecha_fin_periodo_prueba, onChange(setContrato), { type: 'date' })}
-                                    {mostrarFinContrato && textField('Fin de contrato', 'fecha_fin_contrato', contrato.fecha_fin_contrato, onChange(setContrato), { type: 'date' })}
+                                    {mostrarFinContrato && textField('Fin de contrato', 'fecha_fin_contrato', contrato.fecha_fin_contrato, onChange(setContrato), { type: 'date', required: obligatorioPaso2 })}
                                     {/* Al crear, el backend deja el contrato en "activo" por defecto (ver
                                         `estadoContratoActivo()` en UserCompany.js) si no se manda este campo --
                                         por eso solo se expone al editar un empleado ya existente. */}
@@ -823,9 +833,9 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                     {selectField('Jefe inmediato', 'jefe_inmediato_id', contrato.jefe_inmediato_id, onChange(setContrato), jefesInmediatosOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('jefe_inmediato_id') })}
                                     {selectField('Jefe de área', 'jefe_area_id', contrato.jefe_area_id, onChange(setContrato), jefesAreaOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('jefe_area_id') })}
                                     {selectField('Director de área', 'director_area_id', contrato.director_area_id, onChange(setContrato), directoresAreaOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('director_area_id') })}
-                                    {selectField('Empresa', 'empresa_id', contrato.empresa_id, onChange(setContrato), catalogos.empresas)}
-                                    {selectField('Periodo de pago', 'periodo_pago_id', contrato.periodo_pago_id, onChange(setContrato), catalogos.periodos_pago)}
-                                    {selectField('Tipo cotizante', 'tipo_cotizante_id', contrato.tipo_cotizante_id, onChange(setContrato), catalogos.tipos_cotizante)}
+                                    {selectField('Empresa', 'empresa_id', contrato.empresa_id, onChange(setContrato), catalogos.empresas, { required: obligatorioPaso2 })}
+                                    {selectField('Periodo de pago', 'periodo_pago_id', contrato.periodo_pago_id, onChange(setContrato), catalogos.periodos_pago, { required: obligatorioPaso2 })}
+                                    {selectField('Tipo cotizante', 'tipo_cotizante_id', contrato.tipo_cotizante_id, onChange(setContrato), catalogos.tipos_cotizante, { required: obligatorioPaso2 })}
                                     <div className="ai-field">
                                         <label className="ai-label">Dotación</label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, height: 38 }}>
@@ -880,39 +890,39 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                 <div className="ai-form-grid">
                                     {/* Solo entidades vigentes (hoja "EPS AFP CESANTIAS", migración 068),
                                         más la ya guardada del empleado aunque no lo sea. */}
-                                    {selectField('EPS', 'eps_id', segSocial.eps_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_eps, segSocial.eps_id))}
+                                    {selectField('EPS', 'eps_id', segSocial.eps_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_eps, segSocial.eps_id), { required: obligatorioPaso2 })}
                                     {textField('Fecha afiliación EPS', 'eps_fecha_afiliacion', segSocial.eps_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
-                                    {selectField('ARL', 'arl_id', segSocial.arl_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_arl, segSocial.arl_id))}
+                                    {selectField('ARL', 'arl_id', segSocial.arl_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_arl, segSocial.arl_id), { required: obligatorioPaso2 })}
                                     {textField('Fecha afiliación ARL', 'arl_fecha_afiliacion', segSocial.arl_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
-                                    {selectField('Tarifa ARL (%)', 'tarifa_arl', segSocial.tarifa_arl, onChange(setSegSocial), TARIFAS_ARL)}
-                                    {selectField('Fondo de pensiones (AFP)', 'afp_id', segSocial.afp_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_afp, segSocial.afp_id))}
+                                    {selectField('Tarifa ARL (%)', 'tarifa_arl', segSocial.tarifa_arl, onChange(setSegSocial), TARIFAS_ARL, { required: obligatorioPaso2 })}
+                                    {selectField('Fondo de pensiones (AFP)', 'afp_id', segSocial.afp_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_afp, segSocial.afp_id), { required: obligatorioPaso2 && !sinPrestaciones })}
                                     {textField('Fecha afiliación AFP', 'afp_fecha_afiliacion', segSocial.afp_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
-                                    {selectField('Fondo de cesantías', 'cesantias_id', segSocial.cesantias_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_cesantias, segSocial.cesantias_id))}
-                                    {selectField('Caja de compensación', 'caja_id', segSocial.caja_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_caja, segSocial.caja_id))}
+                                    {selectField('Fondo de cesantías', 'cesantias_id', segSocial.cesantias_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_cesantias, segSocial.cesantias_id), { required: obligatorioPaso2 && !sinPrestaciones })}
+                                    {selectField('Caja de compensación', 'caja_id', segSocial.caja_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_caja, segSocial.caja_id), { required: obligatorioPaso2 && !sinPrestaciones })}
                                     {textField('Fecha afiliación caja', 'caja_fecha_afiliacion', segSocial.caja_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
                                 </div>
 
                                 <p className="ai-overline" style={{ margin: '18px 0 10px' }}>Cuenta bancaria</p>
                                 <div className="ai-form-grid">
-                                    {selectField('Banco', 'banco_id', cuenta.banco_id, onChange(setCuenta), catalogos.bancos)}
-                                    {selectField('Tipo de cuenta', 'tipo_cuenta_id', cuenta.tipo_cuenta_id, onChange(setCuenta), catalogos.tipos_cuenta)}
-                                    {textField('Número de cuenta', 'numero_cuenta', cuenta.numero_cuenta, onChange(setCuenta), { placeholder: 'Número de cuenta' })}
+                                    {selectField('Banco', 'banco_id', cuenta.banco_id, onChange(setCuenta), catalogos.bancos, { required: obligatorioPaso2 })}
+                                    {selectField('Tipo de cuenta', 'tipo_cuenta_id', cuenta.tipo_cuenta_id, onChange(setCuenta), catalogos.tipos_cuenta, { required: obligatorioPaso2 })}
+                                    {textField('Número de cuenta', 'numero_cuenta', cuenta.numero_cuenta, onChange(setCuenta), { placeholder: 'Número de cuenta', required: obligatorioPaso2 })}
                                 </div>
 
                                 <p className="ai-overline" style={{ margin: '18px 0 10px' }}>Contacto de emergencia</p>
                                 <div className="ai-form-grid">
-                                    {textField('Nombre', 'nombre', contactoEmergencia.nombre, onChange(setContactoEmergencia), { placeholder: 'Nombre completo' })}
-                                    {textField('Teléfono', 'telefono', contactoEmergencia.telefono, onChange(setContactoEmergencia), { type: 'tel', placeholder: 'Ej. 300 123 4567' })}
-                                    {selectField('Parentesco', 'parentesco_id', contactoEmergencia.parentesco_id, onChange(setContactoEmergencia), catalogos.parentescos)}
+                                    {textField('Nombre', 'nombre', contactoEmergencia.nombre, onChange(setContactoEmergencia), { placeholder: 'Nombre completo', required: obligatorioPaso2 })}
+                                    {textField('Teléfono', 'telefono', contactoEmergencia.telefono, onChange(setContactoEmergencia), { type: 'tel', placeholder: 'Ej. 300 123 4567', required: obligatorioPaso2 })}
+                                    {selectField('Parentesco', 'parentesco_id', contactoEmergencia.parentesco_id, onChange(setContactoEmergencia), catalogos.parentescos, { required: obligatorioPaso2 })}
                                 </div>
 
                                 {contrato.aplica_dotacion && (
                                     <>
                                         <p className="ai-overline" style={{ margin: '18px 0 10px' }}>Dotación</p>
                                         <div className="ai-form-grid">
-                                            {textField('Talla camisa', 'talla_camisa', dotacion.talla_camisa, onChange(setDotacion), { placeholder: 'Ej. L' })}
-                                            {textField('Talla pantalón', 'talla_pantalon', dotacion.talla_pantalon, onChange(setDotacion), { placeholder: 'Ej. 34' })}
-                                            {textField('Talla calzado', 'talla_calzado', dotacion.talla_calzado, onChange(setDotacion), { placeholder: 'Ej. 39' })}
+                                            {textField('Talla camisa', 'talla_camisa', dotacion.talla_camisa, onChange(setDotacion), { placeholder: 'Ej. L', required: obligatorioPaso2 })}
+                                            {textField('Talla pantalón', 'talla_pantalon', dotacion.talla_pantalon, onChange(setDotacion), { placeholder: 'Ej. 34', required: obligatorioPaso2 })}
+                                            {textField('Talla calzado', 'talla_calzado', dotacion.talla_calzado, onChange(setDotacion), { placeholder: 'Ej. 39', required: obligatorioPaso2 })}
                                         </div>
                                     </>
                                 )}
