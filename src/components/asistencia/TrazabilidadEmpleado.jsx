@@ -5,6 +5,7 @@ import { asistenciaService, financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import { formatearFecha } from '../../utils/fecha';
 import { descargarCsv } from '../../utils/csv';
+import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import TrazabilidadView from './TrazabilidadView';
 
 function hoyIso() {
@@ -20,7 +21,8 @@ function sumarDias(fechaIso, dias) {
 
 const ETIQUETAS_EVENTO = {
     entrada: 'Entrada', salida: 'Salida', inicio_bano: 'Inicio baño', fin_bano: 'Fin baño',
-    inicio_almuerzo: 'Inicio almuerzo', fin_almuerzo: 'Fin almuerzo', inicio_extra: 'Inicio hora extra', fin_extra: 'Fin hora extra',
+    inicio_almuerzo: 'Inicio almuerzo', fin_almuerzo: 'Fin almuerzo', inicio_break: 'Inicio break', fin_break: 'Fin break',
+    inicio_capacitacion: 'Inicio capacitación', fin_capacitacion: 'Fin capacitación', inicio_extra: 'Inicio hora extra', fin_extra: 'Fin hora extra',
     inicio_desconexion: 'Desconexión (logout AsisLock)', fin_desconexion: 'Reconexión (login AsisLock)'
 };
 
@@ -40,10 +42,22 @@ const TrazabilidadEmpleado = ({ financiera = false }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const inputFechaRef = useRef(null);
+    // Recarga en vivo: cada aviso de un cambio de jornada de ESTE empleado sube la versión y se
+    // vuelve a pedir la traza sin el spinner (la del jefe y la de financiera/admin).
+    const [version, setVersion] = useState(0);
+    const silenciosoRef = useRef(false);
+
+    useEffect(() => escucharCambiosEmpleados(({ usersCompanyId } = {}) => {
+        if (String(usersCompanyId) !== String(empleadoId)) return;
+        silenciosoRef.current = true;
+        setVersion((v) => v + 1);
+    }), [empleadoId]);
 
     useEffect(() => {
         (async () => {
-            setLoading(true);
+            const silencioso = silenciosoRef.current;
+            silenciosoRef.current = false;
+            if (!silencioso) setLoading(true);
             setError(null);
             try {
                 if (financiera) {
@@ -72,7 +86,7 @@ const TrazabilidadEmpleado = ({ financiera = false }) => {
                 setLoading(false);
             }
         })();
-    }, [empleadoId, fecha, financiera]);
+    }, [empleadoId, fecha, financiera, version]);
 
     const exportar = () => {
         if (!datos) return;

@@ -10,9 +10,10 @@ const RESYNC_SIN_SOCKET_MS = 15000;
 const segundosBase = (data) => data.segundos_trabajados ?? data.minutos_trabajados * 60;
 // ¿Suma tiempo ahora? En curso, y en capacitación (cuenta como laborada).
 const cuentaTiempo = (data) => data.cuenta_tiempo ?? data.estado === 'en_curso';
-// Tiempo en jornada (desde la entrada, con pausas incluidas): corre mientras no haya salida.
+// Tiempo en jornada (desde la entrada, con pausas incluidas): corre hasta la salida; desconectado
+// de AsisLock, hasta la hora de salida programada (o se detiene en la desconexión sin horario).
 const segundosJornadaBase = (data) => data.segundos_en_jornada ?? segundosBase(data);
-const jornadaAbierta = (data) => data.estado === 'en_curso' || data.estado === 'en_pausa';
+const jornadaAbierta = (data) => data.cuenta_jornada ?? (data.estado === 'en_curso' || data.estado === 'en_pausa');
 // La pausa se cuenta desde que empezó (pausa_activa.desde), no desde que se abrió la pantalla.
 const segundosDesde = (iso, ahoraServidorMs) => Math.max(0, Math.floor((ahoraServidorMs - new Date(iso).getTime()) / 1000));
 
