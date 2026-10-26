@@ -8,8 +8,20 @@ import { descargarCsv } from '../../utils/csv';
 import { formatearHora12 } from '../../utils/tiempoAsistencia';
 import { BadgeIngreso } from './IngresoAsislock';
 import { MODALIDAD_INGRESO, textoConexion } from '../../utils/asislock';
+import { datosPausa } from '../../utils/pausasAsistencia';
+import { escucharAsistencia } from '../../utils/socketAsistencia';
 
 const POLL_MS = 30000;
+
+const BadgePausa = ({ pausa }) => {
+    const { etiqueta, Icono, badge } = datosPausa(pausa.tipo);
+    return (
+        <span className={`ai-badge ${badge}`}>
+            <Icono size={12} strokeWidth={1.75} />
+            {etiqueta} · {pausa.minutosTranscurridos} min
+        </span>
+    );
+};
 
 const ESTADO_BADGE = {
     pendiente: { label: 'Sin iniciar', clase: 'ai-badge--neutral' },
@@ -67,6 +79,10 @@ const EquipoAsistencia = () => {
         return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisibility); };
     }, [cargar]);
 
+    // Aviso en vivo: un cambio de jornada de alguien del equipo (AsisLock o portal) recarga la
+    // tabla sin esperar al sondeo de 30 s.
+    useEffect(() => escucharAsistencia('asistencia:equipo', () => { cargar(true); }), [cargar]);
+
     useEffect(() => {
         const id = setInterval(() => {
             if (ultimaActualizacion) setHaceSegundos(Math.floor((Date.now() - ultimaActualizacion) / 1000));
@@ -78,6 +94,8 @@ const EquipoAsistencia = () => {
         enTurno: equipo.filter((e) => e.estado === 'en_curso').length,
         enPausaBano: equipo.filter((e) => e.pausa_activa?.tipo === 'bano').length,
         enPausaAlmuerzo: equipo.filter((e) => e.pausa_activa?.tipo === 'almuerzo').length,
+        enPausaBreak: equipo.filter((e) => e.pausa_activa?.tipo === 'break').length,
+        enCapacitacion: equipo.filter((e) => e.pausa_activa?.tipo === 'capacitacion').length,
         sinIniciar: equipo.filter((e) => e.estado === 'pendiente').length,
         tarde: equipo.filter(esTarde).length,
         ausentes: equipo.filter((e) => e.estado === 'ausente').length,
@@ -149,8 +167,8 @@ const EquipoAsistencia = () => {
                 </button>
                 <div className="ai-kpi">
                     <div className="ai-kpi-head"><span className="ai-kpi-label">En pausa</span><span className="ai-kpi-icon"><Coffee size={16} strokeWidth={1.75} /></span></div>
-                    <div className="ai-kpi-value">{kpis.enPausaBano + kpis.enPausaAlmuerzo}</div>
-                    <div className="ai-kpi-foot">{kpis.enPausaBano} baño · {kpis.enPausaAlmuerzo} almuerzo</div>
+                    <div className="ai-kpi-value">{kpis.enPausaBano + kpis.enPausaBreak + kpis.enPausaAlmuerzo + kpis.enCapacitacion}</div>
+                    <div className="ai-kpi-foot">{kpis.enPausaBano} baño · {kpis.enPausaBreak} break · {kpis.enPausaAlmuerzo} almuerzo · {kpis.enCapacitacion} capacitación</div>
                 </div>
                 <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', border: tab === 'pendiente' ? '1px solid var(--primary)' : undefined }} onClick={() => setTab('pendiente')}>
                     <div className="ai-kpi-head"><span className="ai-kpi-label">Sin iniciar</span><span className="ai-kpi-icon"><Clock size={16} strokeWidth={1.75} /></span></div>
@@ -234,10 +252,7 @@ const EquipoAsistencia = () => {
                                         <td className="ai-num">{formatearDuracion(emp.minutos_trabajados)}</td>
                                         <td>
                                             {emp.pausa_activa ? (
-                                                <span className="ai-badge ai-badge--info">
-                                                    {emp.pausa_activa.tipo === 'bano' ? <Coffee size={12} strokeWidth={1.75} /> : <Utensils size={12} strokeWidth={1.75} />}
-                                                    {emp.pausa_activa.tipo === 'bano' ? 'Baño' : 'Almuerzo'} · {emp.pausa_activa.minutosTranscurridos} min
-                                                </span>
+                                                <BadgePausa pausa={emp.pausa_activa} />
                                             ) : emp.desconexion_activa ? (
                                                 <span className="ai-badge ai-badge--warning">
                                                     Desconectado de AsisLock · {emp.desconexion_activa.minutosTranscurridos} min
