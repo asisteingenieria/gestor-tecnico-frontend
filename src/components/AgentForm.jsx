@@ -87,6 +87,14 @@ const TARIFAS_ARL = [
     { id: '6.960', nombre: 'Clase V — Riesgo máximo (6,960%): construcción y minería' }
 ];
 
+// La BD devuelve el DECIMAL con todos sus ceros ("0.52200"), que no coincide con el `id` del
+// selector ("0.522") y lo dejaba en "Sin especificar" al editar. Se compara por valor numerico.
+const tarifaArlDelSelector = (valor) => {
+    if (valor === null || valor === undefined || valor === '') return '';
+    const tarifa = TARIFAS_ARL.find(t => Number(t.id) === Number(valor));
+    return tarifa ? tarifa.id : String(valor);
+};
+
 const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
     const formRef = useRef(null);
     const [paso, setPaso] = useState(1);
@@ -289,7 +297,7 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                             afp_id: e.seguridad_social.afp_id || '',
                             cesantias_id: e.seguridad_social.cesantias_id || '',
                             caja_id: e.seguridad_social.caja_id || '',
-                            tarifa_arl: e.seguridad_social.tarifa_arl ?? '',
+                            tarifa_arl: tarifaArlDelSelector(e.seguridad_social.tarifa_arl),
                             eps_fecha_afiliacion: fecha(e.seguridad_social.eps_fecha_afiliacion),
                             arl_fecha_afiliacion: fecha(e.seguridad_social.arl_fecha_afiliacion),
                             afp_fecha_afiliacion: fecha(e.seguridad_social.afp_fecha_afiliacion),
