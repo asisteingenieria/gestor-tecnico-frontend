@@ -5,6 +5,7 @@ import { asistenciaService } from '../../services/api';
 import { nombrePropio, primeraMayuscula, iniciales } from '../../utils/formatoRRHH';
 import { descargarCsv } from '../../utils/csv';
 import { periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
+import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 
 // Resumen mensual del equipo para el jefe (asistencia.md §35): KPIs del mes, un calendario tipo
 // heatmap (día × empleado) para ver patrones de un vistazo, y la tabla detallada por empleado.
@@ -46,13 +47,16 @@ const EquipoMensual = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const cargar = useCallback(async () => {
-        setLoading(true);
+    // `silencioso`: recarga en vivo (aviso de un cambio de jornada) sin spinner ni borrar la tabla.
+    const cargar = useCallback(async (silencioso = false) => {
+        if (!silencioso) setLoading(true);
         setError(null);
         try {
             const { data } = await asistenciaService.getResumenMensualEquipo(periodo);
             setDatos(data);
         } catch (err) {
+            // Una recarga en vivo que falla deja la tabla que ya se veía.
+            if (silencioso) return;
             setDatos(null);
             setError(err.response?.data?.message || 'No se pudo cargar el resumen del equipo');
         } finally {
@@ -61,6 +65,12 @@ const EquipoMensual = () => {
     }, [periodo]);
 
     useEffect(() => { cargar(); }, [cargar]);
+
+    // En vivo solo el mes en curso (el único que cambia); la ráfaga de avisos se agrupa en 5 s.
+    useEffect(() => {
+        if (periodo !== periodoActual()) return undefined;
+        return escucharCambiosEmpleados(() => { cargar(true); }, 5000);
+    }, [periodo, cargar]);
 
     const dias = useMemo(() => diasDelMes(periodo), [periodo]);
     const empleados = datos?.empleados ?? [];

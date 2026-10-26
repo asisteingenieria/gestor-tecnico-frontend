@@ -167,6 +167,14 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                         <div className="ai-kpi-value">{formatearDuracion(minutosPausas)}</div>
                     </span>
                 </div>
+                {jornada.minutosDesconexion > 0 && (
+                    <div>
+                        <span>
+                            <span className="ai-kpi-label">Desconectado de AsisLock</span>
+                            <div className="ai-kpi-value">{formatearDuracion(jornada.minutosDesconexion)}</div>
+                        </span>
+                    </div>
+                )}
                 <div>
                     <span>
                         <span className="ai-kpi-label">Estado</span>

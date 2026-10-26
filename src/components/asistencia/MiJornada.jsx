@@ -106,8 +106,10 @@ const MiJornada = () => {
                 <div className="ai-row" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
                     <AlertCircle size={16} strokeWidth={1.75} />
                     <span style={{ fontSize: 13 }}>
-                        Cerraste sesión en AsisLock a las {formatearHora12(jornada.desconexion_activa.desde)}: el tiempo laborado
-                        no corre hasta que vuelvas a iniciar sesión allí.
+                        Cerraste sesión en AsisLock a las {formatearHora12(jornada.desconexion_activa.desde)}.
+                        {horario
+                            ? ` La jornada sigue corriendo hasta tu salida (${formatearHoraTime12(horario.hora_salida)}), pero como tiempo desconectado: no cuenta como laborado hasta que vuelvas a iniciar sesión allí.`
+                            : ' Como no tienes horario asignado hoy, la jornada queda detenida ahí hasta que vuelvas a iniciar sesión.'}
                     </span>
                 </div>
             )}
