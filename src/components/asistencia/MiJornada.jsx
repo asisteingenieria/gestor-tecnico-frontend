@@ -14,7 +14,7 @@ const MiJornada = () => {
     const { user } = useAuth();
     const {
         jornada, loading, error,
-        segundosTrabajadosHoy, segundosParaHabilitarSalida, pausaSegundosTranscurridos,
+        segundosTrabajadosHoy, segundosEnJornada, segundosParaHabilitarSalida, pausaSegundosTranscurridos,
         iniciarPausa, finalizarPausa, marcarSalida
     } = useJornada();
 
@@ -116,7 +116,7 @@ const MiJornada = () => {
                 <TarjetaPausa jornada={jornada} pausaSegundosTranscurridos={pausaSegundosTranscurridos} onFinalizarPausa={finalizarPausa} />
             ) : (
                 <>
-                    <ContadorJornada jornada={jornada} segundosTrabajadosHoy={segundosTrabajadosHoy} />
+                    <ContadorJornada jornada={jornada} segundosTrabajadosHoy={segundosTrabajadosHoy} segundosEnJornada={segundosEnJornada} />
                     <BotonesPausa
                         jornada={jornada}
                         segundosParaHabilitarSalida={segundosParaHabilitarSalida}
