@@ -17,14 +17,14 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 // Home de financiera/admin (asistencia.md §37): lo que hay que mirar del mes en RRHH, asistencia,
 // horas extra y costos. Todo sale de GET /asistencia/financiera/home.
 //
-// Gráficas según la guía de visualización: azul/naranja/violeta/aqua validados para daltonismo en
-// claro y oscuro sobre las superficies de la app (el aqua en claro queda bajo 3:1: siempre con
-// leyenda y vista de tabla), gris para lo que es contexto, una escala por gráfica,
+// Gráficas según la guía de visualización: azul/naranja/violeta/aqua/amarillo validados para
+// daltonismo en claro y oscuro sobre las superficies de la app, en el orden de apilado (el aqua y el
+// amarillo en claro quedan bajo 3:1: siempre con leyenda y vista de tabla), gris para lo que es contexto, una escala por gráfica,
 // barras delgadas con el extremo de dato redondeado, y una vista de tabla en cada tarjeta.
 
 const PALETA = {
-    claro: { serie1: '#2a78d6', serie2: '#eb6834', serie3: '#1baf7a', serie4: '#6250d6', contexto: '#c5cdd8', superficie: '#ffffff', grid: '#e7edf4', eje: '#c3ccd8', texto: '#52627a', meta: '#0f1f35' },
-    oscuro: { serie1: '#3987e5', serie2: '#d95926', serie3: '#199e70', serie4: '#9085e9', contexto: '#33445c', superficie: '#111f33', grid: '#1f3149', eje: '#33445c', texto: '#9fb0c7', meta: '#e8eef7' }
+    claro: { serie1: '#2a78d6', serie2: '#eb6834', serie3: '#1baf7a', serie4: '#6250d6', serie5: '#eda100', contexto: '#c5cdd8', superficie: '#ffffff', grid: '#e7edf4', eje: '#c3ccd8', texto: '#52627a', meta: '#0f1f35' },
+    oscuro: { serie1: '#3987e5', serie2: '#d95926', serie3: '#199e70', serie4: '#9085e9', serie5: '#c98500', contexto: '#33445c', superficie: '#111f33', grid: '#1f3149', eje: '#33445c', texto: '#9fb0c7', meta: '#e8eef7' }
 };
 
 const CLASES = {
@@ -104,7 +104,8 @@ const PARTES_COSTO = [
     { clave: 'salarios', etiqueta: 'Nómina', color: 'serie1' },
     { clave: 'prestaciones', etiqueta: 'Prestaciones', color: 'serie2' },
     { clave: 'aportes', etiqueta: 'Aportes', color: 'serie4' },
-    { clave: 'bonos', etiqueta: 'Bonos', color: 'serie3' }
+    { clave: 'bonos', etiqueta: 'Bonos', color: 'serie3' },
+    { clave: 'auxilio_transporte', etiqueta: 'Auxilio de transporte', color: 'serie5' }
 ];
 const LEYENDA_COSTO = (c) => PARTES_COSTO.map((p) => ({ color: c[p.color], texto: p.etiqueta }));
 
@@ -340,7 +341,7 @@ const Tablero = ({ datos, c }) => {
                 <Tarjeta
                     titulo="Costo total de nómina por campaña"
                     subtitulo={<Leyenda items={LEYENDA_COSTO(c)} />}
-                    fuente="Costo del mes elegido: nómina prorrateada por días + prestaciones + aportes + bonos, según la campaña actual del contrato."
+                    fuente="Costo del mes elegido: nómina prorrateada por días + prestaciones + aportes + bonos + auxilio de transporte, según la campaña actual del contrato."
                     vacio={nominaOrdenada.length === 0 && 'No hay salarios registrados.'}
                     tabla={{
                         columnas: ['Campaña', 'Empleados', ...PARTES_COSTO.map((p) => p.etiqueta), 'Total'],
@@ -521,7 +522,8 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
         { etiqueta: 'Prestaciones', clave: 'prestaciones', color: c.serie2, nota: `${pct(pctPrestaciones)} de la nómina` },
         { etiqueta: 'Aportes', clave: 'aportes', color: c.serie4, nota: 'Seguridad social y parafiscales' },
         { etiqueta: 'Bonos', clave: 'bonos', color: c.serie3, nota: 'No prestacional + cafetería' },
-        { etiqueta: 'Costo total', clave: 'total', nota: 'Nómina + prestaciones + aportes + bonos', total: true }
+        { etiqueta: 'Auxilio de transporte', clave: 'auxilio_transporte', color: c.serie5, nota: `${entero(nomina.empleados_con_auxilio ?? 0)} empleados hasta 2 SMMLV` },
+        { etiqueta: 'Costo total', clave: 'total', nota: 'Suma de las cinco partes', total: true }
     ];
 
     return (
@@ -554,7 +556,7 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
                         <span className="ai-kpi-value" style={{ fontSize: t.total ? 26 : 22, lineHeight: '30px' }} title={cop(mes[t.clave])}>{copCompacto(mes[t.clave])}</span>
                         <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
                             {previo
-                                ? <Delta valor={variacion(mes[t.clave], previo[t.clave])} sufijo="%" texto={`vs ${nombrePeriodo(previo.periodo)}`} neutro />
+                                ? <Delta valor={variacion(mes[t.clave], previo[t.clave])} sufijo="%" texto={`vs ${mesCorto(previo.periodo)}`} neutro />
                                 : 'Sin mes anterior en el histórico'}
                         </span>
                         <span style={{ fontSize: 12, color: 'var(--ink-subtle)' }}>
@@ -640,7 +642,8 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
             <p className="ai-muted" style={{ fontSize: 12, margin: '8px 16px 12px' }}>
                 Fuente: vigencias del historial salarial de cada contrato, prorrateadas por días (mes comercial de {costo.dias_mes_comercial} días)
                 entre el ingreso y el retiro. Prestaciones = {prestaciones.map((f) => `${f.nombre.toLowerCase()} ${pct(f.porcentaje)}`).join(' + ')} del
-                salario básico; los bonos no son base.
+                salario básico (cesantías, intereses y prima también sobre el auxilio de transporte); los bonos no son base.
+                {' '}Auxilio de transporte: valor del año para quien gana hasta 2 SMMLV, prorrateado por días; no es base de aportes.
                 {aportes.length > 0 && <> Aportes del empleador sobre el IBC (salario + lo que los bonos pasen del 40 % de la remuneración):
                     {' '}{aportes.map((f) => `${f.nombre} ${f.codigo === 'arl' ? 'según la tarifa de cada empleado' : pct(f.porcentaje)}`).join(', ')};
                     {' '}{aportes.filter((f) => f.exonerable).map((f) => f.nombre).join(', ')} exonerados por debajo de 10 SMMLV. Los porcentajes del chip son los efectivos del mes.</>}
