@@ -12,9 +12,35 @@ const COLOR_TOKENS = ['hogar', 'tyt', 'tecnologia', 'operacion', 'movil'];
 
 const PLANTILLA_VACIA = {
     nombre: '', hora_entrada: '08:00', hora_salida: '17:00',
-    minutos_almuerzo: 60, hora_almuerzo_inicio: '12:30', tolerancia_entrada_min: 5
+    minutos_almuerzo: 60, hora_almuerzo_inicio: '12:30', tolerancia_entrada_min: 5, centro_costo_id: ''
 };
 const ASIGNACION_VACIA = { empleados: [], desde: '', hasta: '', dias_semana: [1, 2, 3, 4, 5], plantilla_id: '' };
+
+// Un jefe tiene gente de varios centros de costo con horarios distintos: se asigna por centro.
+// La clave agrupa también a quien no tiene centro de costo en su contrato.
+const SIN_CENTRO = 'sin';
+function claveCentro(id) { return id == null ? SIN_CENTRO : String(id); }
+
+// Opciones de plantilla para un centro: primero las de ese centro, luego las generales y al final
+// las de otros centros (se pueden usar igual, para los casos individuales).
+function OpcionesPlantilla({ plantillas, centro }) {
+    const opcion = (p, conCentro = false) => (
+        <option key={p.idhorario_plantilla} value={p.idhorario_plantilla}>
+            {p.nombre}{conCentro && p.centro_costo ? ` (${p.centro_costo})` : ''} · {hhmm(p.hora_entrada)}–{hhmm(p.hora_salida)}
+        </option>
+    );
+    if (!centro || centro === SIN_CENTRO) return plantillas.map((p) => opcion(p, true));
+    const delCentro = plantillas.filter((p) => claveCentro(p.centro_costo_id) === centro);
+    const generales = plantillas.filter((p) => p.centro_costo_id == null);
+    const otras = plantillas.filter((p) => p.centro_costo_id != null && claveCentro(p.centro_costo_id) !== centro);
+    return (
+        <>
+            {delCentro.length > 0 && <optgroup label="De este centro de costo">{delCentro.map((p) => opcion(p))}</optgroup>}
+            {generales.length > 0 && <optgroup label="Generales">{generales.map((p) => opcion(p))}</optgroup>}
+            {otras.length > 0 && <optgroup label="De otros centros">{otras.map((p) => opcion(p, true))}</optgroup>}
+        </>
+    );
+}
 
 function colorDe(indice) {
     const key = COLOR_TOKENS[indice % COLOR_TOKENS.length];
@@ -48,6 +74,7 @@ const GestionHorarios = () => {
     const [loading, setLoading] = useState(true);
     const [mensaje, setMensaje] = useState(null);
     const [busqueda, setBusqueda] = useState('');
+    const [centroFiltro, setCentroFiltro] = useState('');
 
     const [modalPlantilla, setModalPlantilla] = useState(null); // null | 'nueva' | plantilla obj
     const [formPlantilla, setFormPlantilla] = useState(PLANTILLA_VACIA);
@@ -56,6 +83,7 @@ const GestionHorarios = () => {
     const [modalAsignar, setModalAsignar] = useState(false);
     const [formAsignacion, setFormAsignacion] = useState(ASIGNACION_VACIA);
     const [buscarEmpleado, setBuscarEmpleado] = useState('');
+    const [centroAsignar, setCentroAsignar] = useState('');
     const [asignando, setAsignando] = useState(false);
 
     const [celda, setCelda] = useState(null); // { empleado, fecha, existente }
@@ -106,19 +134,45 @@ const GestionHorarios = () => {
         return mapa;
     }, [horariosSemana]);
 
-    const equipoFiltrado = useMemo(() => {
-        if (!busqueda.trim()) return equipo;
-        const q = busqueda.trim().toLowerCase();
-        return equipo.filter((e) => e.nombre.toLowerCase().includes(q));
-    }, [equipo, busqueda]);
+    // Centros de costo del equipo con su conteo, ordenados por nombre (sin centro al final).
+    const centros = useMemo(() => {
+        const mapa = new Map();
+        equipo.forEach((e) => {
+            const clave = claveCentro(e.centro_costo_id);
+            const actual = mapa.get(clave) || { clave, nombre: e.centro_costo || 'Sin centro de costo', campania: e.campania, total: 0 };
+            actual.total += 1;
+            mapa.set(clave, actual);
+        });
+        return [...mapa.values()].sort((a, b) => (a.clave === SIN_CENTRO) - (b.clave === SIN_CENTRO) || a.nombre.localeCompare(b.nombre));
+    }, [equipo]);
+    const nombreCentro = (clave) => centros.find((c) => c.clave === clave)?.nombre || '';
+
+    // Agrupa una lista del equipo por centro de costo, en el orden de `centros`.
+    const agruparPorCentro = (lista) => centros
+        .map((c) => ({ ...c, empleados: lista.filter((e) => claveCentro(e.centro_costo_id) === c.clave) }))
+        .filter((g) => g.empleados.length > 0);
+
+    const q = busqueda.trim().toLowerCase();
+    const gruposSemana = agruparPorCentro(equipo.filter((e) => (!centroFiltro || claveCentro(e.centro_costo_id) === centroFiltro)
+        && (!q || (e.nombre || '').toLowerCase().includes(q))));
+
+    // Con un centro filtrado, el panel muestra las plantillas de ese centro y las generales.
+    const plantillasVisibles = centroFiltro
+        ? plantillas.filter((p) => p.centro_costo_id == null || claveCentro(p.centro_costo_id) === centroFiltro)
+        : plantillas;
 
     // --- Plantillas ---
-    const abrirNuevaPlantilla = () => { setFormPlantilla(PLANTILLA_VACIA); setModalPlantilla('nueva'); };
+    const abrirNuevaPlantilla = () => {
+        // Con un centro filtrado, la plantilla nueva nace para ese centro.
+        setFormPlantilla({ ...PLANTILLA_VACIA, centro_costo_id: centroFiltro && centroFiltro !== SIN_CENTRO ? centroFiltro : '' });
+        setModalPlantilla('nueva');
+    };
     const abrirEditarPlantilla = (p) => {
         setFormPlantilla({
             nombre: p.nombre, hora_entrada: hhmm(p.hora_entrada), hora_salida: hhmm(p.hora_salida),
             minutos_almuerzo: p.minutos_almuerzo, hora_almuerzo_inicio: hhmm(p.hora_almuerzo_inicio),
-            tolerancia_entrada_min: p.tolerancia_entrada_min
+            tolerancia_entrada_min: p.tolerancia_entrada_min,
+            centro_costo_id: p.centro_costo_id != null ? String(p.centro_costo_id) : ''
         });
         setModalPlantilla(p);
     };
@@ -133,7 +187,8 @@ const GestionHorarios = () => {
             hora_salida: `${formPlantilla.hora_salida}:00`,
             hora_almuerzo_inicio: formPlantilla.hora_almuerzo_inicio ? `${formPlantilla.hora_almuerzo_inicio}:00` : null,
             minutos_almuerzo: Number(formPlantilla.minutos_almuerzo),
-            tolerancia_entrada_min: Number(formPlantilla.tolerancia_entrada_min)
+            tolerancia_entrada_min: Number(formPlantilla.tolerancia_entrada_min),
+            centro_costo_id: formPlantilla.centro_costo_id ? Number(formPlantilla.centro_costo_id) : null
         };
         try {
             if (modalPlantilla === 'nueva') {
@@ -189,7 +244,21 @@ const GestionHorarios = () => {
     };
 
     const textoBusqueda = buscarEmpleado.trim().toLowerCase();
-    const empleadosVisibles = equipo.filter((e) => !textoBusqueda || (e.nombre || '').toLowerCase().includes(textoBusqueda));
+    const empleadosVisibles = equipo.filter((e) => (!centroAsignar || claveCentro(e.centro_costo_id) === centroAsignar)
+        && (!textoBusqueda || (e.nombre || '').toLowerCase().includes(textoBusqueda)));
+    const gruposAsignar = agruparPorCentro(empleadosVisibles);
+
+    const abrirAsignar = () => {
+        setFormAsignacion(ASIGNACION_VACIA);
+        setBuscarEmpleado('');
+        setCentroAsignar(centroFiltro);
+        setModalAsignar(true);
+    };
+    // Al cambiar de centro se limpia la selección: se asigna un centro, con su plantilla, a la vez.
+    const cambiarCentroAsignar = (clave) => {
+        setCentroAsignar(clave);
+        setFormAsignacion((prev) => ({ ...prev, empleados: [], plantilla_id: '' }));
+    };
 
     const asignar = async (e) => {
         e.preventDefault();
@@ -290,7 +359,7 @@ const GestionHorarios = () => {
                     <button type="button" className="ai-btn ai-btn--secondary" onClick={abrirNuevaPlantilla}>
                         <Plus size={16} strokeWidth={1.75} /> Nueva plantilla
                     </button>
-                    <button type="button" className="ai-btn ai-btn--primary" onClick={() => setModalAsignar(true)}>
+                    <button type="button" className="ai-btn ai-btn--primary" onClick={abrirAsignar}>
                         <CalendarClock size={16} strokeWidth={1.75} /> Asignar horario
                     </button>
                 </div>
@@ -302,10 +371,13 @@ const GestionHorarios = () => {
 
             <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(0, 1fr)', gap: 'var(--space-5)', alignItems: 'start' }}>
                 <div className="ai-panel">
-                    <div className="ai-panel-head"><h3 className="ai-panel-title">Plantillas de turno</h3></div>
+                    <div className="ai-panel-head">
+                        <h3 className="ai-panel-title">Plantillas de turno</h3>
+                        {centroFiltro && <span className="ai-muted" style={{ fontSize: 12 }}>{nombreCentro(centroFiltro)} y generales</span>}
+                    </div>
                     <div className="ai-panel-body">
-                        {plantillas.map((p, i) => {
-                            const c = colorDe(i);
+                        {plantillasVisibles.map((p) => {
+                            const c = colorDe(plantillas.indexOf(p));
                             const entradaMin = Number(hhmm(p.hora_entrada).split(':')[0]) * 60 + Number(hhmm(p.hora_entrada).split(':')[1]);
                             const salidaMin = Number(hhmm(p.hora_salida).split(':')[0]) * 60 + Number(hhmm(p.hora_salida).split(':')[1]);
                             const cruza = salidaMin <= entradaMin;
@@ -321,6 +393,7 @@ const GestionHorarios = () => {
                                             <button type="button" className="ai-icon-btn ai-icon-btn--danger" onClick={() => eliminarPlantilla(p.idhorario_plantilla)} aria-label="Eliminar"><Trash2 size={14} strokeWidth={1.75} /></button>
                                         </span>
                                     </div>
+                                    <span className="ai-badge ai-badge--neutral" style={{ alignSelf: 'flex-start', height: 20, fontSize: 11 }}>{p.centro_costo || 'General'}</span>
                                     <span className="ai-muted" style={{ fontSize: 13 }}>{hhmm(p.hora_entrada)} – {hhmm(p.hora_salida)}{cruza ? ' (cruza medianoche)' : ''}</span>
                                     <div className="ai-shift-bar">
                                         <span style={{ left: `${(entradaMin / 1440) * 100}%`, width: `${(anchoMin / 1440) * 100}%`, background: c.ink }} />
@@ -331,10 +404,10 @@ const GestionHorarios = () => {
                                 </div>
                             );
                         })}
-                        {plantillas.length === 0 && (
+                        {plantillasVisibles.length === 0 && (
                             <div className="ai-empty">
                                 <CalendarClock size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                                <p>Sin plantillas todavía.</p>
+                                <p>{centroFiltro ? 'Sin plantillas para este centro de costo.' : 'Sin plantillas todavía.'}</p>
                             </div>
                         )}
                     </div>
@@ -347,6 +420,10 @@ const GestionHorarios = () => {
                             <b>{DIAS_LABEL_CORTO[0]} {dias[0].slice(8, 10)} – {DIAS_LABEL_CORTO[6]} {dias[6].slice(8, 10)} {dias[6].slice(0, 4)}</b>
                             <button type="button" className="ai-icon-btn" onClick={() => setSemanaInicio((s) => sumarDias(s, 7))} aria-label="Semana siguiente"><ChevronRight size={16} strokeWidth={1.75} /></button>
                         </div>
+                        <select className="ai-input" style={{ maxWidth: 260, height: 34 }} value={centroFiltro} onChange={(e) => setCentroFiltro(e.target.value)} aria-label="Centro de costo">
+                            <option value="">Todos los centros de costo ({equipo.length})</option>
+                            {centros.map((c) => <option key={c.clave} value={c.clave}>{c.nombre} ({c.total})</option>)}
+                        </select>
                         <div className="ai-input" style={{ maxWidth: 220, height: 34 }}>
                             <Search size={14} strokeWidth={1.75} className="ai-ic" />
                             <input
@@ -372,7 +449,14 @@ const GestionHorarios = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {equipoFiltrado.map((emp) => (
+                                {gruposSemana.map((grupo) => (
+                                    <React.Fragment key={grupo.clave}>
+                                    <tr>
+                                        <td colSpan={8} style={{ background: 'var(--primary-soft)', color: 'var(--primary-soft-ink)', fontWeight: 700, fontSize: 12 }}>
+                                            {grupo.nombre}{grupo.campania ? ` · ${grupo.campania}` : ''} · {grupo.empleados.length} persona{grupo.empleados.length === 1 ? '' : 's'}
+                                        </td>
+                                    </tr>
+                                    {grupo.empleados.map((emp) => (
                                     <tr key={emp.users_company_id}>
                                         <td style={{ fontWeight: 600 }}>{nombrePropio(emp.nombre)}</td>
                                         {dias.map((fecha) => {
@@ -408,8 +492,10 @@ const GestionHorarios = () => {
                                             );
                                         })}
                                     </tr>
+                                    ))}
+                                    </React.Fragment>
                                 ))}
-                                {equipoFiltrado.length === 0 && (
+                                {gruposSemana.length === 0 && (
                                     <tr><td colSpan={8} className="ai-muted" style={{ textAlign: 'center', padding: 20 }}>Nadie coincide con la búsqueda.</td></tr>
                                 )}
                             </tbody>
@@ -431,6 +517,17 @@ const GestionHorarios = () => {
                                 <div className="ai-field span-2">
                                     <label className="ai-label">Nombre <em>*</em></label>
                                     <input required className="ai-input" value={formPlantilla.nombre} onChange={(e) => setFormPlantilla({ ...formPlantilla, nombre: e.target.value })} />
+                                </div>
+                                <div className="ai-field span-2">
+                                    <label className="ai-label">Centro de costo</label>
+                                    <select className="ai-input" value={formPlantilla.centro_costo_id} onChange={(e) => setFormPlantilla({ ...formPlantilla, centro_costo_id: e.target.value })}>
+                                        <option value="">General (cualquier centro de costo)</option>
+                                        {centros.filter((c) => c.clave !== SIN_CENTRO).map((c) => <option key={c.clave} value={c.clave}>{c.nombre}</option>)}
+                                        {/* Un centro que ya no está en el equipo sigue visible al editar. */}
+                                        {modalPlantilla !== 'nueva' && modalPlantilla.centro_costo_id != null && !centros.some((c) => c.clave === String(modalPlantilla.centro_costo_id)) && (
+                                            <option value={String(modalPlantilla.centro_costo_id)}>{modalPlantilla.centro_costo}</option>
+                                        )}
+                                    </select>
                                 </div>
                                 <div className="ai-field">
                                     <label className="ai-label">Entrada <em>*</em></label>
@@ -473,10 +570,17 @@ const GestionHorarios = () => {
                         <form onSubmit={asignar}>
                             <div className="ai-modal-body ai-stack">
                                 <div className="ai-field">
+                                    <label className="ai-label">Centro de costo</label>
+                                    <select className="ai-input" value={centroAsignar} onChange={(e) => cambiarCentroAsignar(e.target.value)}>
+                                        <option value="">Todos los centros de costo ({equipo.length})</option>
+                                        {centros.map((c) => <option key={c.clave} value={c.clave}>{c.nombre} ({c.total})</option>)}
+                                    </select>
+                                </div>
+                                <div className="ai-field">
                                     <label className="ai-label">Plantilla <em>*</em></label>
                                     <select required className="ai-input" value={formAsignacion.plantilla_id} onChange={(e) => setFormAsignacion({ ...formAsignacion, plantilla_id: e.target.value })}>
                                         <option value="">Selecciona una plantilla</option>
-                                        {plantillas.map((p) => <option key={p.idhorario_plantilla} value={p.idhorario_plantilla}>{p.nombre} · {hhmm(p.hora_entrada)}–{hhmm(p.hora_salida)}</option>)}
+                                        <OpcionesPlantilla plantillas={plantillas} centro={centroAsignar} />
                                     </select>
                                 </div>
                                 <div className="ai-form-grid">
@@ -512,17 +616,39 @@ const GestionHorarios = () => {
                                                     ref={(el) => { if (el) el.indeterminate = marcados > 0 && marcados < visibles.length; }}
                                                     onChange={() => toggleTodos(visibles)}
                                                 />
-                                                {buscarEmpleado.trim() ? `Seleccionar los ${visibles.length} de la búsqueda` : `Seleccionar todos (${visibles.length})`}
+                                                {buscarEmpleado.trim()
+                                                    ? `Seleccionar los ${visibles.length} de la búsqueda`
+                                                    : centroAsignar ? `Seleccionar todo ${nombreCentro(centroAsignar)} (${visibles.length})` : `Seleccionar todos (${visibles.length})`}
                                             </label>
                                         );
                                     })()}
                                     <div className="ai-checklist">
-                                        {empleadosVisibles.map((emp) => (
-                                            <label key={emp.users_company_id}>
-                                                <input type="checkbox" checked={formAsignacion.empleados.includes(emp.users_company_id)} onChange={() => toggleEmpleado(emp.users_company_id)} />
-                                                {nombrePropio(emp.nombre)}
-                                            </label>
-                                        ))}
+                                        {gruposAsignar.map((grupo) => {
+                                            const marcadosGrupo = grupo.empleados.filter((emp) => formAsignacion.empleados.includes(emp.users_company_id)).length;
+                                            const variosCentros = gruposAsignar.length > 1;
+                                            return (
+                                                <React.Fragment key={grupo.clave}>
+                                                    {/* Con varios centros a la vista, cada uno tiene su "seleccionar todo". */}
+                                                    {variosCentros && (
+                                                        <label style={{ fontWeight: 700, fontSize: 12, marginTop: 6 }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={marcadosGrupo === grupo.empleados.length}
+                                                                ref={(el) => { if (el) el.indeterminate = marcadosGrupo > 0 && marcadosGrupo < grupo.empleados.length; }}
+                                                                onChange={() => toggleTodos(grupo.empleados)}
+                                                            />
+                                                            {grupo.nombre} ({grupo.empleados.length})
+                                                        </label>
+                                                    )}
+                                                    {grupo.empleados.map((emp) => (
+                                                        <label key={emp.users_company_id} style={variosCentros ? { paddingLeft: 20 } : undefined}>
+                                                            <input type="checkbox" checked={formAsignacion.empleados.includes(emp.users_company_id)} onChange={() => toggleEmpleado(emp.users_company_id)} />
+                                                            {nombrePropio(emp.nombre)}
+                                                        </label>
+                                                    ))}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>
@@ -544,7 +670,7 @@ const GestionHorarios = () => {
                             <span className="ai-modal-icon"><CalendarClock size={20} strokeWidth={1.75} /></span>
                             <div>
                                 <h3 className="ai-modal-title">{nombrePropio(celda.empleado.nombre)}</h3>
-                                <p className="ai-modal-sub">{celda.fecha}</p>
+                                <p className="ai-modal-sub">{celda.fecha}{celda.empleado.centro_costo ? ` · ${celda.empleado.centro_costo}` : ''}</p>
                             </div>
                             <button type="button" className="ai-icon-btn" onClick={() => setCelda(null)} aria-label="Cerrar"><X size={18} strokeWidth={1.75} /></button>
                         </div>
@@ -553,7 +679,7 @@ const GestionHorarios = () => {
                                 <label className="ai-label">Plantilla</label>
                                 <select className="ai-input" value={celdaPlantillaId} onChange={(e) => setCeldaPlantillaId(e.target.value)}>
                                     <option value="">Selecciona una plantilla</option>
-                                    {plantillas.map((p) => <option key={p.idhorario_plantilla} value={p.idhorario_plantilla}>{p.nombre} · {hhmm(p.hora_entrada)}–{hhmm(p.hora_salida)}</option>)}
+                                    <OpcionesPlantilla plantillas={plantillas} centro={claveCentro(celda.empleado.centro_costo_id)} />
                                 </select>
                             </div>
                         </div>
