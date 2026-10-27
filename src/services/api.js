@@ -308,6 +308,8 @@ export const financieraService = {
     getResumenMensual: (periodo, campaniaId) => api.get('/asistencia/financiera/resumen-mensual', { params: { periodo, ...(campaniaId ? { campania_id: campaniaId } : {}) } }),
     getCampanias: () => api.get('/asistencia/financiera/campanias'),
     getEmpleados: (campaniaId) => api.get('/asistencia/financiera/empleados', { params: campaniaId ? { campania_id: campaniaId } : {} }),
+    // Asistencia en vivo de hoy de todos o de una campaña (asistencia.md §47).
+    getEnVivo: (campaniaId) => api.get('/asistencia/financiera/en-vivo', { params: campaniaId ? { campania_id: campaniaId } : {} }),
     getTrazabilidad: (empleadoId, fecha) => api.get(`/asistencia/financiera/empleados/${empleadoId}/jornada/${fecha}/trazabilidad`)
 };
 

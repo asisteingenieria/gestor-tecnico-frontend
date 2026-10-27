@@ -5,7 +5,7 @@ import { novedadRrhhService, contratacionHydraService } from '../services/api';
 import { iniciales } from '../utils/formatoRRHH';
 import {
     Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus, Clock, FileSpreadsheet,
-    BarChart3, LayoutDashboard, Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
+    BarChart3, LayoutDashboard, Activity, Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../assets/asiste-ui/asiste-mark-white.png';
 
@@ -25,6 +25,8 @@ const NAV_FINANCIERA = [
     // Home (asistencia.md §37): tablero del mes de RRHH, asistencia, horas extra y costos. Va primero.
     { to: '/recursos-humanos/home', label: 'Home', icon: LayoutDashboard },
     { to: '/recursos-humanos/reportes-horas-extra', label: 'Horas extra', icon: FileSpreadsheet },
+    // Jornada de hoy de todos en vivo (§47); el histórico es el reporte de asistencia y la trazabilidad.
+    { to: '/recursos-humanos/asistencia-en-vivo', label: 'Asistencia en vivo', icon: Activity },
     // Reporte + trazabilidad en una sola pestaña: comparativo, calendario diario y detalle por empleado.
     { to: '/recursos-humanos/asistencia-mensual', label: 'Reporte Asistencia', icon: BarChart3 }
 ];

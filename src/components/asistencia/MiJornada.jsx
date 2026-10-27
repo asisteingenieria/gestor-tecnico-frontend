@@ -67,7 +67,7 @@ const MiJornada = () => {
     const fechaLarga = fechaLargaCruda ? fechaLargaCruda[0].toUpperCase() + fechaLargaCruda.slice(1) : '';
     const horario = jornada?.horario;
     const turnoTexto = horario
-        ? `Turno ${formatearHoraTime12(horario.hora_entrada)} – ${formatearHoraTime12(horario.hora_salida)}`
+        ? `Turno ${horario.plantilla ? `${horario.plantilla} · ` : ''}${formatearHoraTime12(horario.hora_entrada)} – ${formatearHoraTime12(horario.hora_salida)}`
         : 'Sin horario asignado hoy';
 
     const puedeSolicitarExtra = jornada && jornada.estado !== 'pendiente' && !jornada.pausa_activa;

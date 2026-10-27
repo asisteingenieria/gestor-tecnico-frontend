@@ -23,6 +23,8 @@ const MiHorario = () => {
     const [vista, setVista] = useState('semana');
     const [mesRef, setMesRef] = useState(() => { const d = new Date(); return { anio: d.getFullYear(), mes: d.getMonth() }; });
     const [horarios, setHorarios] = useState([]);
+    // Centro de costo y campaña del contrato: los horarios se definen por centro de costo.
+    const [contexto, setContexto] = useState({ centro_costo: null, campania: null });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -43,7 +45,8 @@ const MiHorario = () => {
             setLoading(true);
             try {
                 const { data } = await asistenciaService.getMiHorario(rango);
-                setHorarios(data);
+                setHorarios(data.horarios);
+                setContexto({ centro_costo: data.centro_costo, campania: data.campania });
                 setError(null);
             } catch (err) {
                 setError(err.response?.data?.message || 'No se pudo cargar tu horario');
@@ -78,7 +81,11 @@ const MiHorario = () => {
             <div className="ai-page-head">
                 <div>
                     <h1 className="ai-page-title">Mi horario</h1>
-                    <p className="ai-page-sub">Tu turno asignado</p>
+                    <p className="ai-page-sub">
+                        Tu turno asignado
+                        {contexto.centro_costo && ` · Centro de costo ${contexto.centro_costo}`}
+                        {contexto.campania && ` · ${contexto.campania}`}
+                    </p>
                 </div>
                 <div className="ai-row">
                     <button type="button" className={`ai-btn ai-btn--sm ${vista === 'semana' ? 'ai-btn--primary' : 'ai-btn--secondary'}`} onClick={() => setVista('semana')}>Semana</button>
@@ -96,6 +103,7 @@ const MiHorario = () => {
                                 <div style={{ font: '600 18px var(--font-display)' }}>Descanso</div>
                             ) : (
                                 <div style={{ font: '600 18px var(--font-display)' }}>
+                                    {turnoHoy.plantilla && <span style={{ marginRight: 10 }}>{turnoHoy.plantilla} ·</span>}
                                     {hhmm(turnoHoy.hora_entrada)} – {hhmm(turnoHoy.hora_salida)}
                                     <span className="ai-muted" style={{ fontSize: 13, fontWeight: 500, marginLeft: 10 }}>
                                         Almuerzo {turnoHoy.minutos_almuerzo} min{turnoHoy.hora_almuerzo_inicio ? ` a las ${hhmm(turnoHoy.hora_almuerzo_inicio)}` : ''} · Tolerancia {turnoHoy.tolerancia_entrada_min} min
@@ -128,7 +136,12 @@ const MiHorario = () => {
                                 {h ? (
                                     h.es_descanso
                                         ? <span className="ai-sh ai-sh--off">Descanso</span>
-                                        : <span className="ai-sh" style={{ background: 'var(--primary-soft)', color: 'var(--primary-soft-ink)' }}>{hhmm(h.hora_entrada)}<small>{hhmm(h.hora_salida)}</small></span>
+                                        : (
+                                            <span className="ai-sh" style={{ background: 'var(--primary-soft)', color: 'var(--primary-soft-ink)' }} title={h.plantilla || undefined}>
+                                                {h.plantilla && <small style={{ fontWeight: 600 }}>{h.plantilla}</small>}
+                                                {hhmm(h.hora_entrada)}<small>{hhmm(h.hora_salida)}</small>
+                                            </span>
+                                        )
                                 ) : <span className="ai-muted" style={{ fontSize: 12 }}>—</span>}
                             </div>
                         );
@@ -155,7 +168,7 @@ const MiHorario = () => {
                                 let clase = '';
                                 if (h?.es_descanso) clase = 'off';
                                 return (
-                                    <div key={c.fecha} className={`d ${clase} ${esHoy ? 'today' : ''}`}>
+                                    <div key={c.fecha} className={`d ${clase} ${esHoy ? 'today' : ''}`} title={h && !h.es_descanso ? `${h.plantilla ? `${h.plantilla} · ` : ''}${hhmm(h.hora_entrada)}–${hhmm(h.hora_salida)}` : undefined}>
                                         {c.dia}
                                         {h && !h.es_descanso && <small>{hhmm(h.hora_entrada)}</small>}
                                         {h?.es_descanso && <small>Descanso</small>}
