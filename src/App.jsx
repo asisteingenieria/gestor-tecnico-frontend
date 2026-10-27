@@ -524,6 +524,8 @@ function App() {
               <Route path="recursos-humanos/home" element={<HomeFinancieraRoute><HomeFinanciera /></HomeFinancieraRoute>} />
               <Route path="recursos-humanos/reportes-horas-extra" element={<FinancieraRoute><ReportesHorasExtra /></FinancieraRoute>} />
               <Route path="recursos-humanos/asistencia-mensual" element={<FinancieraRoute><AsistenciaMensualFinanciera /></FinancieraRoute>} />
+              {/* Tablero en vivo de la jornada de hoy de toda la empresa (asistencia.md §47). */}
+              <Route path="recursos-humanos/asistencia-en-vivo" element={<FinancieraRoute><EquipoAsistencia financiera /></FinancieraRoute>} />
               {/* La trazabilidad por campaña quedó dentro del reporte de asistencia. */}
               <Route path="recursos-humanos/trazabilidad" element={<Navigate to="/recursos-humanos/asistencia-mensual" replace />} />
               <Route path="recursos-humanos/trazabilidad/:empleadoId" element={<FinancieraRoute><TrazabilidadEmpleado financiera /></FinancieraRoute>} />

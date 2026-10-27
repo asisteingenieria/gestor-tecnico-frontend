@@ -29,6 +29,13 @@ function claseDia(dia) {
     return dia.minutos_tarde > 0 ? 'tarde' : 'puntual';
 }
 
+// "Outbound 7-4 · 07:00–16:00": el turno con el nombre de su plantilla (§46).
+function textoTurno(turno) {
+    if (!turno) return '';
+    const horas = `${String(turno.hora_entrada).slice(0, 5)}–${String(turno.hora_salida).slice(0, 5)}`;
+    return turno.plantilla ? `${turno.plantilla} · ${horas}` : horas;
+}
+
 const hFmt = (min) => `${((Number(min) || 0) / 60).toLocaleString('es-CO', { maximumFractionDigits: 1 })} h`;
 
 // Tendencia de la puntualidad vs el mes anterior (en puntos porcentuales). Subir es bueno (verde).
@@ -236,7 +243,18 @@ const AsistenciaMensual = () => {
 // Ventana con el detalle completo de una campaña en el mes.
 const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania, loading, onClose }) => {
     const [busqueda, setBusqueda] = useState('');
+    const [centro, setCentro] = useState('');
     const dias = useMemo(() => diasDelMes(periodo), [periodo]);
+
+    // Centros de costo de la campaña con su conteo: los horarios se definen por centro (§46).
+    const centros = useMemo(() => {
+        const conteo = new Map();
+        for (const e of campania?.empleados ?? []) {
+            const nombreCentro = e.centro_costo || 'Sin centro de costo';
+            conteo.set(nombreCentro, (conteo.get(nombreCentro) || 0) + 1);
+        }
+        return [...conteo.entries()].sort(([a], [b]) => a.localeCompare(b));
+    }, [campania]);
 
     useEffect(() => {
         const cerrarConEscape = (e) => { if (e.key === 'Escape') onClose(); };
@@ -245,21 +263,22 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
     }, [onClose]);
 
     const empleados = useMemo(() => {
-        const lista = campania?.empleados ?? [];
+        const lista = (campania?.empleados ?? []).filter((e) => !centro || (e.centro_costo || 'Sin centro de costo') === centro);
         const q = busqueda.trim().toLowerCase();
         if (!q) return lista;
         return lista.filter((e) => (e.nombre || '').toLowerCase().includes(q) || String(e.documento || '').includes(q));
-    }, [campania, busqueda]);
+    }, [campania, busqueda, centro]);
 
     const t = fila?.totales;
 
     const exportarEmpleados = () => {
         descargarCsv(
             `asistencia_${(nombre || 'campania').replace(/\s+/g, '_').toLowerCase()}_${periodo}.csv`,
-            ['Empleado', 'Cédula', 'Cargo', 'Días trab.', 'Ausencias', 'Días tarde', 'Min. tarde', 'Puntualidad %',
+            ['Empleado', 'Cédula', 'Cargo', 'Centro de costo', 'Turno', 'Días trab.', 'Ausencias', 'Días tarde', 'Min. tarde', 'Puntualidad %',
                 'H. trabajadas', 'H. extra', 'Baño', 'Break', 'Almuerzo', 'Capacitación'],
             (campania?.empleados ?? []).map((e) => [
-                nombrePropio(e.nombre), e.documento, primeraMayuscula(e.cargo || ''), e.dias_trabajados, e.ausencias,
+                nombrePropio(e.nombre), e.documento, primeraMayuscula(e.cargo || ''), e.centro_costo || '', textoTurno(e.turno),
+                e.dias_trabajados, e.ausencias,
                 e.dias_tarde, e.minutos_tarde, e.porcentaje_puntualidad ?? '', hFmt(e.minutos_trabajados), hFmt(e.minutos_extra),
                 hFmt(e.minutos_bano), hFmt(e.minutos_break), hFmt(e.minutos_almuerzo), hFmt(e.minutos_capacitacion)
             ])
@@ -269,6 +288,11 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
     const porFecha = (e) => {
         const mapa = {};
         for (const d of e.dias || []) mapa[d.fecha] = d;
+        return mapa;
+    };
+    const turnosPorFecha = (e) => {
+        const mapa = {};
+        for (const t of e.turnos || []) mapa[String(t.fecha).slice(0, 10)] = t;
         return mapa;
     };
 
@@ -307,13 +331,21 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                             )}
 
                             <div className="ai-row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                                <div className="ai-input" style={{ maxWidth: 320, flex: 1 }}>
-                                    <Search size={16} strokeWidth={1.75} className="ai-ic" />
-                                    <input
-                                        type="text" placeholder="Buscar por nombre o cédula" value={busqueda} autoFocus
-                                        onChange={(e) => setBusqueda(e.target.value)}
-                                        style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
-                                    />
+                                <div className="ai-row" style={{ gap: 12, flex: 1, flexWrap: 'wrap' }}>
+                                    <div className="ai-input" style={{ maxWidth: 320, flex: 1 }}>
+                                        <Search size={16} strokeWidth={1.75} className="ai-ic" />
+                                        <input
+                                            type="text" placeholder="Buscar por nombre o cédula" value={busqueda} autoFocus
+                                            onChange={(e) => setBusqueda(e.target.value)}
+                                            style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
+                                        />
+                                    </div>
+                                    {centros.length > 1 && (
+                                        <select className="ai-input" style={{ maxWidth: 260 }} value={centro} onChange={(e) => setCentro(e.target.value)} aria-label="Centro de costo">
+                                            <option value="">Todos los centros de costo ({campania.empleados.length})</option>
+                                            {centros.map(([nombreCentro, total]) => <option key={nombreCentro} value={nombreCentro}>{nombreCentro} ({total})</option>)}
+                                        </select>
+                                    )}
                                 </div>
                                 <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportarEmpleados} disabled={campania.empleados.length === 0}>
                                     <Download size={14} strokeWidth={1.75} /> Exportar empleados
@@ -342,6 +374,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                         <tbody>
                                             {empleados.map((e) => {
                                                 const mapa = porFecha(e);
+                                                const turnos = turnosPorFecha(e);
                                                 return (
                                                     <tr key={e.users_company_id}>
                                                         <td style={{ position: 'sticky', left: 0, background: 'var(--surface-100)', zIndex: 1, whiteSpace: 'nowrap', maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis' }} title={nombrePropio(e.nombre)}>{nombrePropio(e.nombre)}</td>
@@ -349,7 +382,9 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                                             const clase = claseDia(mapa[d.fecha]);
                                                             const cfg = clase ? CELDA[clase] : null;
                                                             const celda = mapa[d.fecha];
-                                                            const titulo = celda ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${celda.minutos_tarde} min)` : ''}` : `${d.fecha} · sin jornada`;
+                                                            const turno = turnos[d.fecha];
+                                                            const textoTurnoDia = turno ? ` · turno ${turno.es_descanso ? 'descanso' : textoTurno(turno)}` : ' · sin horario';
+                                                            const titulo = (celda ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${celda.minutos_tarde} min)` : ''}` : `${d.fecha} · sin jornada`) + textoTurnoDia;
                                                             return (
                                                                 <td key={d.d} style={{ padding: 0 }}>
                                                                     <Link to={`/recursos-humanos/trazabilidad/${e.users_company_id}?fecha=${d.fecha}`} title={titulo} aria-label={titulo}
@@ -372,6 +407,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                         <thead>
                                             <tr>
                                                 <th>Empleado</th>
+                                                <th>Centro de costo · turno</th>
                                                 <th className="ai-num">Días trab.</th>
                                                 <th className="ai-num">Ausencias</th>
                                                 <th className="ai-num">Días tarde</th>
@@ -387,7 +423,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                         </thead>
                                         <tbody>
                                             {empleados.length === 0 && (
-                                                <tr><td colSpan={12} className="ai-muted" style={{ textAlign: 'center', padding: 16 }}>
+                                                <tr><td colSpan={13} className="ai-muted" style={{ textAlign: 'center', padding: 16 }}>
                                                     {busqueda ? 'Nadie coincide con la búsqueda.' : 'Esta campaña no tiene empleados en el mes.'}
                                                 </td></tr>
                                             )}
@@ -401,6 +437,10 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                                                 <div className="ai-muted" style={{ fontSize: 12 }}>CC {e.documento}{e.cargo ? ` · ${primeraMayuscula(e.cargo)}` : ''}</div>
                                                             </span>
                                                         </span>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ fontWeight: 600, fontSize: 13 }}>{e.centro_costo || 'Sin centro de costo'}</div>
+                                                        <div className="ai-muted" style={{ fontSize: 12 }}>{e.turno ? textoTurno(e.turno) : 'Sin horario en el mes'}</div>
                                                     </td>
                                                     <td className="ai-num" style={{ fontWeight: 600 }}>{e.dias_trabajados}</td>
                                                     <td className="ai-num" style={{ color: e.ausencias > 0 ? 'var(--danger)' : 'inherit' }}>{e.ausencias}</td>

@@ -37,12 +37,12 @@ const MiTrazabilidad = () => {
             setLoading(true);
             setError(null);
             try {
-                const [{ data: trazabilidad }, { data: horarios }] = await Promise.all([
+                const [{ data: trazabilidad }, { data: miHorario }] = await Promise.all([
                     asistenciaService.getTrazabilidad(fecha),
                     asistenciaService.getMiHorario({ desde: fecha, hasta: fecha })
                 ]);
                 setDatos(trazabilidad);
-                setHorario(horarios?.[0] || null);
+                setHorario(miHorario.horarios?.[0] || null);
             } catch (err) {
                 setDatos(null);
                 setHorario(null);

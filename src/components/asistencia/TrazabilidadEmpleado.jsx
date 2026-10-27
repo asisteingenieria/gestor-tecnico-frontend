@@ -101,19 +101,34 @@ const TrazabilidadEmpleado = ({ financiera = false }) => {
 
     return (
         <div className="ai-content">
-            <Link
-                to={financiera ? `/recursos-humanos/asistencia-mensual?periodo=${fecha.slice(0, 7)}${empleado?.idcampania ? `&campania=${empleado.idcampania}` : ''}` : '/operaciones/equipo'}
-                className="ai-link"
-            >
-                <ArrowLeft size={14} strokeWidth={1.75} /> {financiera ? 'Volver al reporte' : 'Volver al equipo'}
-            </Link>
+            {/* Financiera llega desde "Asistencia en vivo" (§47) o desde el reporte mensual. */}
+            {financiera && searchParams.get('origen') === 'en-vivo' ? (
+                <Link to="/recursos-humanos/asistencia-en-vivo" className="ai-link">
+                    <ArrowLeft size={14} strokeWidth={1.75} /> Volver a asistencia en vivo
+                </Link>
+            ) : (
+                <Link
+                    to={financiera ? `/recursos-humanos/asistencia-mensual?periodo=${fecha.slice(0, 7)}${empleado?.idcampania ? `&campania=${empleado.idcampania}` : ''}` : '/operaciones/equipo'}
+                    className="ai-link"
+                >
+                    <ArrowLeft size={14} strokeWidth={1.75} /> {financiera ? 'Volver al reporte' : 'Volver al equipo'}
+                </Link>
+            )}
 
             <div className="ai-page-head">
                 <div>
                     <h1 className="ai-page-title">{empleado ? nombrePropio(empleado.nombre) : 'Trazabilidad del empleado'}</h1>
                     <p className="ai-page-sub">
-                        {empleado && `CC ${empleado.cedula}${empleado.campania ? ` · ${primeraMayuscula(empleado.campania)}` : ''} · `}
+                        {empleado && `CC ${empleado.cedula}${empleado.campania ? ` · ${primeraMayuscula(empleado.campania)}` : ''}${empleado.centro_costo ? ` · ${empleado.centro_costo}` : ''} · `}
                         {formatearFecha(fecha, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                    {/* El turno programado del día, con el nombre de su plantilla (§46). */}
+                    <p className="ai-page-sub" style={{ marginTop: 2 }}>
+                        {horario
+                            ? (horario.es_descanso
+                                ? 'Turno programado: descanso'
+                                : `Turno programado: ${horario.plantilla ? `${horario.plantilla} · ` : ''}${horario.hora_entrada.slice(0, 5)}–${horario.hora_salida.slice(0, 5)}`)
+                            : 'Sin horario asignado ese día'}
                     </p>
                 </div>
                 <div className="ai-row">
