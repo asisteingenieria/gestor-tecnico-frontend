@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { asistenciaService } from '../../services/api';
 import { escucharAsistencia } from '../../utils/socketAsistencia';
-import { Bell, BellRing, CalendarClock, CheckCheck } from 'lucide-react';
+import { Bell, BellRing, CalendarClock, CheckCheck, Clock3 } from 'lucide-react';
 
 // Las alertas de traspasos traen una fecha (DATE); las notificaciones, un instante.
 const fmtDia = (v) => (v ? new Date(v).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '');
@@ -13,10 +13,11 @@ const fmtInstante = (v) => (v
 // Campana del portal. Junta dos fuentes, todas dirigidas a mi ficha (o a mi usuario, financiera):
 // - alertas de traspasos (migración 070): evaluación del encargo al director de área y retorno del
 //   trabajo en casa al jefe inmediato;
-// - notificaciones de asistencia (084): solicitudes de cambio de turno y su respuesta (asistencia.md §50).
+// - notificaciones de asistencia (084/085): solicitudes de cambio de turno y de horas extra, y su
+//   respuesta (asistencia.md §50-§51).
 // Recarga al cambiar de pantalla y en vivo con el aviso `asistencia:notificacion` del socket. Abrir
-// una la marca como leída; la de un cambio de turno lleva a la pantalla de cambios de turno.
-const CampanaAlertas = ({ rutaCambiosTurno }) => {
+// una la marca como leída y lleva a su pantalla (cambios de turno u horas extra), si se le pasó la ruta.
+const CampanaAlertas = ({ rutaCambiosTurno, rutaHorasExtra }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const [items, setItems] = useState([]);
@@ -35,14 +36,16 @@ const CampanaAlertas = ({ rutaCambiosTurno }) => {
                 const deNotificaciones = notificaciones.status === 'fulfilled' && Array.isArray(notificaciones.value.data)
                     ? notificaciones.value.data.map((n) => ({
                         key: `n${n.idnotificacion_asistencia}`, origen: 'asistencia', id: n.idnotificacion_asistencia, mensaje: n.mensaje,
-                        cuando: fmtInstante(n.creada_en), orden: n.creada_en, leida_en: n.leida_en, cambioTurno: Boolean(n.solicitud_cambio_turno_id)
+                        cuando: fmtInstante(n.creada_en), orden: n.creada_en, leida_en: n.leida_en,
+                        Icono: n.hora_extra_id ? Clock3 : CalendarClock,
+                        ruta: n.solicitud_cambio_turno_id ? rutaCambiosTurno : n.hora_extra_id ? rutaHorasExtra : null
                     }))
                     : [];
                 const todas = [...deAlertas, ...deNotificaciones]
                     .sort((a, b) => (Boolean(a.leida_en) - Boolean(b.leida_en)) || String(b.orden).localeCompare(String(a.orden)));
                 setItems(todas);
             });
-    }, []);
+    }, [rutaCambiosTurno, rutaHorasExtra]);
 
     useEffect(() => { cargar(); }, [cargar, location.pathname]);
     useEffect(() => escucharAsistencia('asistencia:notificacion', cargar), [cargar]);
@@ -66,9 +69,9 @@ const CampanaAlertas = ({ rutaCambiosTurno }) => {
                 : asistenciaService.marcarNotificacionLeida(item.id);
             peticion.then(() => marcarLeidaLocal(item.key)).catch(() => {});
         }
-        if (item.cambioTurno && rutaCambiosTurno) {
+        if (item.ruta) {
             setAbierta(false);
-            navigate(rutaCambiosTurno);
+            navigate(item.ruta);
         }
     };
 
@@ -112,8 +115,8 @@ const CampanaAlertas = ({ rutaCambiosTurno }) => {
                     {items.length === 0 ? (
                         <p className="ai-muted" style={{ fontSize: 13, margin: '4px 8px 8px' }}>No tienes notificaciones.</p>
                     ) : items.map((i) => {
-                        const Icono = i.cambioTurno ? CalendarClock : BellRing;
-                        const clicable = !i.leida_en || (i.cambioTurno && rutaCambiosTurno);
+                        const Icono = i.Icono || BellRing;
+                        const clicable = !i.leida_en || Boolean(i.ruta);
                         return (
                             <button
                                 key={i.key}
@@ -123,7 +126,7 @@ const CampanaAlertas = ({ rutaCambiosTurno }) => {
                                     display: 'flex', gap: 10, width: '100%', textAlign: 'left', padding: '8px', border: 0, cursor: clicable ? 'pointer' : 'default',
                                     borderRadius: 'var(--radius-md)', background: i.leida_en ? 'transparent' : 'var(--primary-soft)', color: 'inherit', font: 'inherit', marginBottom: 4
                                 }}
-                                title={i.cambioTurno && rutaCambiosTurno ? 'Ver cambios de turno' : (i.leida_en ? '' : 'Marcar como leída')}
+                                title={i.ruta ? 'Ver la solicitud' : (i.leida_en ? '' : 'Marcar como leída')}
                             >
                                 <Icono size={16} style={{ flex: 'none', marginTop: 2, color: i.leida_en ? 'var(--ink-subtle)' : 'var(--primary)' }} />
                                 <span style={{ fontSize: 13 }}>

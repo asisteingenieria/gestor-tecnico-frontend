@@ -105,7 +105,8 @@ const GestionHorarios = () => {
                 asistenciaService.getEquipo()
             ]);
             setPlantillas(rPlantillas.data);
-            setEquipo(rEquipo.data);
+            // /equipo trae todo el árbol del director (§51); horarios solo asigna a su gente directa.
+            setEquipo(rEquipo.data.filter((e) => e.directo !== false));
             await cargarSemana(semanaInicio);
         } catch (err) {
             setMensaje({ tipo: 'error', texto: err.response?.data?.message || 'No se pudo cargar la información' });

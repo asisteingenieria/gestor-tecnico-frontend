@@ -323,7 +323,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                         <td>
                                             <div style={{ fontWeight: 600, fontSize: 13 }}>{emp.centro_costo || SIN_CENTRO}</div>
                                             <div className="ai-muted" style={{ fontSize: 12 }}>{textoTurno(emp.turno)}</div>
-                                            {financiera && (emp.campania || emp.jefe_area) && (
+                                            {(financiera ? (emp.campania || emp.jefe_area) : emp.jefe_area) && (
                                                 <div className="ai-muted" style={{ fontSize: 11 }}>
                                                     {primeraMayuscula(emp.campania || '')}{emp.campania && emp.jefe_area ? ' · ' : ''}{emp.jefe_area ? `Jefe: ${nombrePropio(emp.jefe_area)}` : ''}
                                                 </div>
