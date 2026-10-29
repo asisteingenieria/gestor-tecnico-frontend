@@ -12,7 +12,7 @@ const COLOR_TOKENS = ['hogar', 'tyt', 'tecnologia', 'operacion', 'movil'];
 
 const PLANTILLA_VACIA = {
     nombre: '', hora_entrada: '08:00', hora_salida: '17:00',
-    minutos_almuerzo: 60, hora_almuerzo_inicio: '12:30', tolerancia_entrada_min: 5, centro_costo_id: ''
+    minutos_almuerzo: 60, hora_almuerzo_inicio: '12:30', tolerancia_entrada_min: 0, centro_costo_id: ''
 };
 const ASIGNACION_VACIA = { empleados: [], desde: '', hasta: '', dias_semana: [1, 2, 3, 4, 5], plantilla_id: '' };
 
