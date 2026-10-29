@@ -186,7 +186,10 @@ const AsistenciaLayout = () => {
 
                 <div className="ai-row" style={{ marginLeft: 'auto', gap: 8 }} data-topnav-actions>
                     <span className="ai-clock-chip">{horaActual}</span>
-                    <CampanaAlertas rutaCambiosTurno={permisosCambioTurno.puede_solicitar || permisosCambioTurno.puede_aprobar ? `${base}/cambios-turno` : null} />
+                    <CampanaAlertas
+                        rutaCambiosTurno={permisosCambioTurno.puede_solicitar || permisosCambioTurno.puede_aprobar ? `${base}/cambios-turno` : null}
+                        rutaHorasExtra={`${base}/horas-extra`}
+                    />
 
                     <div style={{ position: 'relative' }} ref={menuRef}>
                         <button

@@ -266,8 +266,6 @@ export const asistenciaService = {
     getTrazabilidad: (fecha) => api.get(`/asistencia/mi-jornada/${fecha}/trazabilidad`),
     getMisJornadas: (params = {}) => api.get('/asistencia/mis-jornadas', { params }),
     getMisEstadisticas: (params = {}) => api.get('/asistencia/mis-estadisticas', { params }),
-    solicitarHoraExtra: (data) => api.post('/asistencia/horas-extra/solicitar', data),
-    previsualizarHoraExtra: (data) => api.post('/asistencia/horas-extra/previsualizar', data),
     getMisHorasExtra: (params = {}) => api.get('/asistencia/mis-horas-extra', { params }),
     // Campana: alertas de traspasos dirigidas a mí
     getMisAlertas: () => api.get('/asistencia/mis-alertas'),
@@ -295,10 +293,13 @@ export const asistenciaService = {
     actualizarHorario: (id, data) => api.put(`/asistencia/horarios/${id}`, data),
     eliminarHorario: (id) => api.delete(`/asistencia/horarios/${id}`),
 
+    // Horas extra (§51): el jefe las solicita por su equipo y las aprueba su director.
+    solicitarHoraExtra: (data) => api.post('/asistencia/horas-extra/solicitar', data),
+    previsualizarHoraExtra: (data) => api.post('/asistencia/horas-extra/previsualizar', data),
+    getHorasExtraSolicitadas: (params = {}) => api.get('/asistencia/horas-extra/mias', { params }),
     getBandejaHorasExtra: (params = {}) => api.get('/asistencia/horas-extra', { params }),
     aprobarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/aprobar`, data),
     rechazarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/rechazar`, data),
-    asignarHoraExtra: (data) => api.post('/asistencia/horas-extra/asignar', data),
 
     // Reporte mensual de horas extras del jefe: solo lectura, se llena solo (asistencia.md §32).
     getReporteHorasExtra: (periodo) => api.get('/asistencia/reporte-horas-extra', { params: { periodo } })

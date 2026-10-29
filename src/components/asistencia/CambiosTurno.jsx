@@ -6,10 +6,11 @@ import { avisarCambioContadores } from '../../utils/eventosAsistencia';
 import { formatearFecha } from '../../utils/fecha';
 import { nombrePropio } from '../../utils/formatoRRHH';
 
-// Cambios de turno (asistencia.md §50). Una pantalla, tres vistas:
-// - coordinador (jefe inmediato de alguien): pide cambios para cualquier empleado y ve "Mis solicitudes";
-// - jefe (gestiona la asistencia del empleado): "Por aprobar", aprueba —el horario se reemplaza solo— o
-//   rechaza con un motivo;
+// Cambios de turno (asistencia.md §50, flujo de §51). Una pantalla, tres vistas:
+// - jefe de operaciones (gestiona la asistencia de su equipo): pide cambios para su gente y ve
+//   "Mis solicitudes";
+// - director (el jefe de los jefes): "Por aprobar", aprueba —el horario se reemplaza solo— o rechaza
+//   con un motivo;
 // - financiera (`financiera`): todas las solicitudes y su estado, solo lectura.
 // Se recarga sola con el aviso `asistencia:notificacion` del socket.
 
@@ -151,7 +152,7 @@ const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
 };
 
 // ---------------------------------------------------------------------------------------------
-// Buscador de empleado por nombre o cédula (son 400+: se filtra en el navegador).
+// Buscador de empleado de su equipo por nombre o cédula (se filtra en el navegador).
 const SelectorEmpleado = ({ empleados, valor, onCambiar, etiqueta, placeholder }) => {
     const [busqueda, setBusqueda] = useState('');
     const seleccionado = empleados.find((e) => e.users_company_id === valor) || null;
@@ -174,7 +175,7 @@ const SelectorEmpleado = ({ empleados, valor, onCambiar, etiqueta, placeholder }
                         <div style={{ fontSize: 12, marginTop: 2 }}>
                             {seleccionado.gestor_id
                                 ? <>La solicitud le llega a <strong>{nombrePropio(seleccionado.gestor)}</strong></>
-                                : <span style={{ color: 'var(--danger)' }}>No tiene jefe que gestione su asistencia</span>}
+                                : <span style={{ color: 'var(--danger)' }}>No tienes en RRHH un director que apruebe tus solicitudes</span>}
                         </div>
                     </div>
                     <button type="button" className="ai-icon-btn" onClick={() => { onCambiar(null); setBusqueda(''); }} aria-label="Cambiar empleado"><X size={16} strokeWidth={1.75} /></button>
@@ -230,13 +231,13 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
     }, []);
 
     const emp1 = empleados?.find((e) => e.users_company_id === form.empleado) || null;
-    // Para intercambiar, los dos tienen que tener el mismo jefe (es quien aprueba).
+    // Los dos son de su equipo: el segundo puede ser cualquiera menos el primero.
     const candidatos2 = useMemo(
-        () => (empleados || []).filter((e) => emp1 && e.gestor_id === emp1.gestor_id && e.users_company_id !== emp1.users_company_id),
+        () => (empleados || []).filter((e) => emp1 && e.users_company_id !== emp1.users_company_id),
         [empleados, emp1]
     );
 
-    // Plantillas del jefe que va a aprobar.
+    // Las plantillas del jefe que pide (las suyas).
     useEffect(() => {
         setPlantillas([]);
         if (!form.empleado || form.tipo !== 'cambio_horario') return;
@@ -310,7 +311,7 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
             <div className="ai-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="ai-modal-head">
                     <span className="ai-modal-icon"><CalendarClock size={20} strokeWidth={1.75} /></span>
-                    <div><h3 className="ai-modal-title">Solicitar cambio de turno</h3><p className="ai-modal-sub">Le llega al jefe que gestiona la asistencia del empleado</p></div>
+                    <div><h3 className="ai-modal-title">Solicitar cambio de turno</h3><p className="ai-modal-sub">De alguien de tu equipo · lo aprueba tu director</p></div>
                     <button type="button" className="ai-icon-btn" onClick={onCerrar} aria-label="Cerrar"><X size={18} strokeWidth={1.75} /></button>
                 </div>
                 <form onSubmit={enviar}>
@@ -331,8 +332,7 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
 
                         {form.tipo === 'intercambio' && emp1 && (
                             <SelectorEmpleado
-                                empleados={candidatos2} valor={form.empleado2} etiqueta="Segundo empleado (mismo jefe)"
-                                placeholder={`Alguien del equipo de ${nombrePropio(emp1.gestor || '')}`}
+                                empleados={candidatos2} valor={form.empleado2} etiqueta="Segundo empleado"
                                 onCambiar={(id) => set('empleado2', id)}
                             />
                         )}
@@ -358,13 +358,13 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
                                 <div className="ai-field">
                                     <label className="ai-label">Turno nuevo <em>*</em></label>
                                     <div className="ai-seg" style={{ alignSelf: 'flex-start', marginBottom: 8 }}>
-                                        {[['plantilla', 'Plantilla del jefe'], ['horas', 'Horas'], ['descanso', 'Descanso']].map(([valor, texto]) => (
+                                        {[['plantilla', 'Mis plantillas'], ['horas', 'Horas'], ['descanso', 'Descanso']].map(([valor, texto]) => (
                                             <span key={valor} className={form.modo === valor ? 'is-active' : ''} style={{ cursor: 'pointer' }} onClick={() => set('modo', valor)}>{texto}</span>
                                         ))}
                                     </div>
                                     {form.modo === 'plantilla' && (
                                         form.empleado && plantillas.length === 0
-                                            ? <p className="ai-help">El jefe de este empleado no tiene plantillas: indica las horas.</p>
+                                            ? <p className="ai-help">No tienes plantillas: indica las horas.</p>
                                             : (
                                                 <select className="ai-input" value={form.plantillaId} onChange={(e) => set('plantillaId', e.target.value)} disabled={!form.empleado}>
                                                     <option value="">{form.empleado ? 'Selecciona una plantilla' : 'Primero elige el empleado'}</option>
@@ -513,7 +513,7 @@ const CambiosTurno = ({ financiera = false }) => {
                 <div>
                     <h1 className="ai-page-title">Cambios de turno</h1>
                     <p className="ai-page-sub">
-                        {financiera ? 'Todas las solicitudes de los coordinadores y su respuesta' : 'Solicitudes de los coordinadores y aprobación del jefe'}
+                        {financiera ? 'Todas las solicitudes de los jefes y la respuesta de su director' : 'Los pide el jefe de operaciones y los aprueba su director'}
                     </p>
                 </div>
                 {permisos?.puede_solicitar && (
@@ -531,7 +531,7 @@ const CambiosTurno = ({ financiera = false }) => {
             )}
 
             {!financiera && tabs.length === 0 ? (
-                <div className="ai-panel"><div className="ai-empty"><CalendarClock size={36} strokeWidth={1.5} /><p>Los cambios de turno los piden los coordinadores y los aprueban los jefes.</p></div></div>
+                <div className="ai-panel"><div className="ai-empty"><CalendarClock size={36} strokeWidth={1.5} /><p>Los cambios de turno los pide el jefe de operaciones y los aprueba su director.</p></div></div>
             ) : (
                 <>
                     <div className="ai-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
@@ -574,7 +574,7 @@ const CambiosTurno = ({ financiera = false }) => {
                         setModal(false);
                         setTab('mias');
                         setFiltro('');
-                        setAviso('Solicitud enviada. Le llegó al jefe del empleado y te avisaremos cuando la responda.');
+                        setAviso('Solicitud enviada. Le llegó a tu director y te avisaremos cuando la responda.');
                         await cargar();
                     }}
                 />
