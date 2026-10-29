@@ -10,6 +10,7 @@ import { BadgeIngreso } from './IngresoAsislock';
 import { MODALIDAD_INGRESO, textoConexion } from '../../utils/asislock';
 import { datosPausa } from '../../utils/pausasAsistencia';
 import { escucharAsistencia, escucharCambiosEmpleados } from '../../utils/socketAsistencia';
+import SelectorVistaEquipo from './SelectorVistaEquipo';
 
 const POLL_MS = 30000;
 // Financiera ve a toda la empresa: los avisos de una ráfaga (cambio de turno) se agrupan en una recarga.
@@ -198,14 +199,15 @@ const EquipoAsistencia = ({ financiera = false }) => {
         <div className="ai-content">
             <div className="ai-page-head">
                 <div>
-                    <h1 className="ai-page-title">{financiera ? 'Asistencia en vivo' : 'Equipo hoy'}</h1>
+                    <h1 className="ai-page-title">{financiera ? 'Asistencia en vivo' : 'Equipo'}</h1>
                     <p className="ai-page-sub">
                         {financiera
                             ? `${equipo.length} persona${equipo.length === 1 ? '' : 's'} · ${nombreCampania ? primeraMayuscula(nombreCampania) : 'todas las campañas'}`
                             : `${equipo.length} persona${equipo.length === 1 ? '' : 's'} a tu cargo`}
                     </p>
                 </div>
-                <div className="ai-row">
+                <div className="ai-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {!financiera && <SelectorVistaEquipo />}
                     <span className="ai-live">En vivo · actualizado hace {haceSegundos}s</span>
                     <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => cargar(true)}>
                         <RefreshCw size={14} strokeWidth={1.75} className={actualizando ? 'animate-spin' : ''} /> Actualizar

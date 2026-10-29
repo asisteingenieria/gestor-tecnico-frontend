@@ -7,7 +7,7 @@ import { escucharAsistencia } from '../../utils/socketAsistencia';
 import { nombrePropio } from '../../utils/formatoRRHH';
 import CampanaAlertas from './CampanaAlertas';
 import {
-    Clock, Calendar, History, BarChart3, Users, CalendarClock, CalendarRange, Clock3, FileSpreadsheet, Repeat,
+    Clock, Calendar, History, BarChart3, Users, CalendarClock, Clock3, FileSpreadsheet, Repeat,
     ChevronDown, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../../assets/asiste-ui/asiste-mark-white.png';
@@ -60,8 +60,8 @@ const AsistenciaLayout = () => {
     ];
 
     const navEquipo = isDirectorOperaciones ? [
-        { to: `${base}/equipo`, label: 'Equipo hoy', icon: Users, count: alertasEquipo, alert: true },
-        { to: `${base}/equipo/mes`, label: 'Equipo · mes', icon: CalendarRange },
+        // Una sola entrada: hoy en vivo y, con el selector de la página, el histórico mes a mes.
+        { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true },
         { to: `${base}/horarios`, label: 'Horarios', icon: CalendarClock },
         { to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3, count: pendientesHorasExtra },
         { to: `${base}/cambios-turno`, label: 'Cambios de turno', icon: Repeat, count: pendientesCambioTurno, alert: true },
