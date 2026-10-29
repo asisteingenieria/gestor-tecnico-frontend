@@ -62,12 +62,22 @@ const ALERTA_LABEL = {
 };
 const otrasAlertas = (emp) => (emp.alertas || []).filter((a) => a !== 'llegada_tarde');
 
+// Cuadrito de hoy. Sin turno, o en su día de descanso, no se sabe si llegó tarde: gris en vez de verde.
+function claseHoy(emp) {
+    const clase = claseDia(emp);
+    if (!clase || clase === 'pendiente' || clase === 'ausente') return clase;
+    if (emp.turno && !emp.turno.es_descanso) return clase;
+    return clase.startsWith('curso_') ? 'curso_sin_horario' : 'sin_horario';
+}
+
 // Texto de la columna "Llegada": cómo llegó hoy y si sigue en turno.
 function textoLlegada(emp) {
-    const clase = claseDia(emp);
+    const clase = claseHoy(emp);
     if (!clase) return '';
     if (clase === 'pendiente') return 'Aún no llega';
     if (clase === 'ausente') return 'Ausente';
+    if (clase === 'curso_sin_horario') return 'Sin horario · en turno';
+    if (clase === 'sin_horario') return 'Sin horario · terminó';
     const llegada = emp.minutos_tarde > 0 ? `Tarde · ${formatearDuracion(emp.minutos_tarde)}` : 'Puntual';
     return clase.startsWith('curso_') ? `${llegada} · en turno` : `${llegada} · terminó`;
 }
@@ -362,9 +372,9 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                             )}
                                         </td>
                                         <td>
-                                            {claseDia(emp) ? (
-                                                <span className="ai-row" style={{ gap: 6, whiteSpace: 'nowrap', fontSize: 12 }} title={CELDA[claseDia(emp)].label}>
-                                                    <CuadroLlegada clase={claseDia(emp)} />
+                                            {claseHoy(emp) ? (
+                                                <span className="ai-row" style={{ gap: 6, whiteSpace: 'nowrap', fontSize: 12 }} title={CELDA[claseHoy(emp)].label}>
+                                                    <CuadroLlegada clase={claseHoy(emp)} />
                                                     <span style={{ color: emp.minutos_tarde > 0 ? '#b45309' : 'var(--ink-muted)', fontWeight: emp.minutos_tarde > 0 ? 600 : 400 }}>{textoLlegada(emp)}</span>
                                                 </span>
                                             ) : <span className="ai-muted">—</span>}
