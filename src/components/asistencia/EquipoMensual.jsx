@@ -7,36 +7,14 @@ import { descargarCsv } from '../../utils/csv';
 import { periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
 import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
+import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
 
 // Histórico del equipo para el jefe (asistencia.md §35): KPIs del mes, un calendario tipo heatmap
 // (día × empleado) agrupado por centro de costo o por cargo, y la tabla detallada por empleado.
 // Es la segunda vista de "Equipo"; la primera es hoy en vivo (EquipoAsistencia).
 
-const VERDE = 'var(--success)';
-const AMARILLO = '#f59e0b';
 const AZUL = 'var(--primary)';
-// Mitad y mitad: cómo llegó (verde/amarillo) y que sigue en turno (azul).
-const mitades = (llegada) => `linear-gradient(90deg, ${llegada} 50%, ${AZUL} 50%)`;
-
-// Estado de cada día → cómo se pinta en el calendario.
-const CELDA = {
-    puntual: { bg: VERDE, label: 'Puntual' },
-    tarde: { bg: AMARILLO, label: 'Llegó tarde' },
-    ausente: { bg: 'var(--danger)', label: 'Ausente' },
-    curso_puntual: { bg: mitades(VERDE), label: 'En turno · llegó puntual' },
-    curso_tarde: { bg: mitades(AMARILLO), label: 'En turno · llegó tarde' },
-    pendiente: { bg: 'var(--border)', label: 'Pendiente' }
-};
 const LEYENDA = ['puntual', 'tarde', 'ausente', 'curso_puntual', 'curso_tarde', 'pendiente'];
-
-function claseDia(dia) {
-    if (!dia) return null; // sin jornada ese día (no programado)
-    if (dia.estado === 'ausente') return 'ausente';
-    if (dia.estado === 'pendiente') return 'pendiente';
-    const tarde = dia.minutos_tarde > 0;
-    if (dia.estado === 'en_curso' || dia.estado === 'en_pausa') return tarde ? 'curso_tarde' : 'curso_puntual';
-    return tarde ? 'tarde' : 'puntual';
-}
 
 const AGRUPAR = [
     { id: 'centro_costo', label: 'Centro de costo' },
