@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, Search, History, BarChart3 } from 'lucide-react';
+import { Loader2, Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, Search, FileText, BarChart3 } from 'lucide-react';
 import { asistenciaService, financieraService } from '../../services/api';
 import { nombrePropio, iniciales, primeraMayuscula } from '../../utils/formatoRRHH';
 import { formatearDuracion } from '../../utils/tiempoAsistencia';
@@ -11,6 +11,8 @@ import { MODALIDAD_INGRESO, textoConexion } from '../../utils/asislock';
 import { datosPausa } from '../../utils/pausasAsistencia';
 import { escucharAsistencia, escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
+import CuadroLlegada from './CuadroLlegada';
+import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
 
 const POLL_MS = 30000;
 // Financiera ve a toda la empresa: los avisos de una ráfaga (cambio de turno) se agrupan en una recarga.
@@ -48,6 +50,26 @@ const SIN_CENTRO = 'Sin centro de costo';
 
 function esTarde(emp) {
     return emp.alertas?.includes('llegada_tarde');
+}
+
+// Alertas del día (domain/asistencia/calcularJornada.js). La llegada tarde va en su propia columna.
+const ALERTA_LABEL = {
+    bano_excedido: 'Baño excedido',
+    almuerzo_excedido: 'Almuerzo excedido',
+    almuerzo_fuera_de_horario: 'Almuerzo fuera de horario',
+    extra_sin_aprobar: 'Hora extra sin aprobar',
+    sin_marcar_salida: 'Sin marcar salida'
+};
+const otrasAlertas = (emp) => (emp.alertas || []).filter((a) => a !== 'llegada_tarde');
+
+// Texto de la columna "Llegada": cómo llegó hoy y si sigue en turno.
+function textoLlegada(emp) {
+    const clase = claseDia(emp);
+    if (!clase) return '';
+    if (clase === 'pendiente') return 'Aún no llega';
+    if (clase === 'ausente') return 'Ausente';
+    const llegada = emp.minutos_tarde > 0 ? `Tarde · ${formatearDuracion(emp.minutos_tarde)}` : 'Puntual';
+    return clase.startsWith('curso_') ? `${llegada} · en turno` : `${llegada} · terminó`;
 }
 
 // "Outbound 7-4 · 07:00–16:00", "Descanso" o "Sin horario" (§46).
@@ -168,11 +190,12 @@ const EquipoAsistencia = ({ financiera = false }) => {
             MODALIDAD_INGRESO[e.asislock?.modalidad]?.label || '',
             e.asislock?.primer_login ? formatearHora12(e.asislock.primer_login) : '',
             textoConexion(e.asislock) || '',
-            formatearDuracion(e.minutos_trabajados), ESTADO_BADGE[e.estado]?.label || e.estado, e.alertas?.length || 0
+            textoLlegada(e), formatearDuracion(e.minutos_trabajados), ESTADO_BADGE[e.estado]?.label || e.estado,
+            otrasAlertas(e).map((a) => ALERTA_LABEL[a] || a).join(', ')
         ]);
         descargarCsv(
             financiera ? 'asistencia_en_vivo.csv' : 'equipo_hoy.csv',
-            ['Empleado', 'Cédula', 'Cargo', 'Campaña', 'Centro de costo', 'Jefe de área', 'Turno', 'Ingreso', 'Primer login AsisLock', 'AsisLock', 'Tiempo hoy', 'Estado', 'Alertas'],
+            ['Empleado', 'Cédula', 'Cargo', 'Campaña', 'Centro de costo', 'Jefe de área', 'Turno', 'Ingreso', 'Primer login AsisLock', 'AsisLock', 'Llegada', 'Tiempo hoy', 'Estado', 'Alertas'],
             filas
         );
     };
@@ -302,10 +325,11 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                 <th>Empleado</th>
                                 <th>Centro de costo · turno</th>
                                 <th>Ingreso</th>
+                                <th>Llegada</th>
                                 <th>Tiempo hoy</th>
                                 <th>Pausa</th>
                                 <th>Estado</th>
-                                <th>Acciones</th>
+                                <th>Detalle</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -337,6 +361,14 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                                 <div className="ai-muted" style={{ fontSize: 12, marginTop: 2 }}>Login {formatearHora12(emp.asislock.primer_login)}</div>
                                             )}
                                         </td>
+                                        <td>
+                                            {claseDia(emp) ? (
+                                                <span className="ai-row" style={{ gap: 6, whiteSpace: 'nowrap', fontSize: 12 }} title={CELDA[claseDia(emp)].label}>
+                                                    <CuadroLlegada clase={claseDia(emp)} />
+                                                    <span style={{ color: emp.minutos_tarde > 0 ? '#b45309' : 'var(--ink-muted)', fontWeight: emp.minutos_tarde > 0 ? 600 : 400 }}>{textoLlegada(emp)}</span>
+                                                </span>
+                                            ) : <span className="ai-muted">—</span>}
+                                        </td>
                                         <td className="ai-num">{formatearDuracion(emp.minutos_trabajados)}</td>
                                         <td>
                                             {emp.pausa_activa ? (
@@ -348,19 +380,23 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                             ) : <span className="ai-muted">—</span>}
                                         </td>
                                         <td>
-                                            <span className="ai-row" style={{ gap: 6 }}>
-                                                <span className={`ai-badge ${badge.clase}`}>
-                                                    {badge.label}{esTarde(emp) && ` · +${emp.alertas.length > 1 ? emp.alertas.length + ' alertas' : '1 alerta'}`}
-                                                </span>
+                                            <span className="ai-row" style={{ gap: 4, flexWrap: 'wrap' }}>
+                                                <span className={`ai-badge ${badge.clase}`}>{badge.label}</span>
+                                                {otrasAlertas(emp).map((a) => (
+                                                    <span key={a} className="ai-badge ai-badge--warning" title="Alerta del día">
+                                                        <AlertTriangle size={11} strokeWidth={1.75} /> {ALERTA_LABEL[a] || a}
+                                                    </span>
+                                                ))}
                                             </span>
                                         </td>
                                         <td>
-                                            {/* La trazabilidad abre hoy en vivo y se navega día a día hacia atrás (histórico). */}
+                                            {/* Abre la trazabilidad de hoy (entrada, pausas, alertas); desde ahí se navega a días anteriores. */}
                                             <Link
                                                 to={financiera ? `/recursos-humanos/trazabilidad/${emp.users_company_id}?origen=en-vivo` : `/operaciones/equipo/${emp.users_company_id}/trazabilidad`}
-                                                className="ai-icon-btn" title="Jornada en vivo e histórico por día" aria-label={`Ver trazabilidad de ${emp.nombre}`}
+                                                className="ai-btn ai-btn--secondary ai-btn--sm" style={{ whiteSpace: 'nowrap' }}
+                                                title="Detalle del empleado hoy: entrada, pausas, alertas y salida" aria-label={`Detalle de hoy de ${nombrePropio(emp.nombre)}`}
                                             >
-                                                <History size={16} strokeWidth={1.75} />
+                                                <FileText size={14} strokeWidth={1.75} /> Detalle de hoy
                                             </Link>
                                         </td>
                                     </tr>
