@@ -49,6 +49,7 @@ import EquipoMensual from './components/asistencia/EquipoMensual';
 import TrazabilidadEmpleado from './components/asistencia/TrazabilidadEmpleado';
 import GestionHorarios from './components/asistencia/GestionHorarios';
 import ReporteHorasExtra from './components/asistencia/ReporteHorasExtra';
+import CambiosTurno from './components/asistencia/CambiosTurno';
 import ReportesHorasExtra from './components/financiera/ReportesHorasExtra';
 import AsistenciaMensualFinanciera from './components/financiera/AsistenciaMensual';
 import HomeFinanciera from './components/financiera/HomeFinanciera';
@@ -526,6 +527,8 @@ function App() {
               <Route path="recursos-humanos/asistencia-mensual" element={<FinancieraRoute><AsistenciaMensualFinanciera /></FinancieraRoute>} />
               {/* Tablero en vivo de la jornada de hoy de toda la empresa (asistencia.md §47). */}
               <Route path="recursos-humanos/asistencia-en-vivo" element={<FinancieraRoute><EquipoAsistencia financiera /></FinancieraRoute>} />
+              {/* Todas las solicitudes de cambio de turno y su respuesta, solo lectura (asistencia.md §50). */}
+              <Route path="recursos-humanos/cambios-turno" element={<FinancieraRoute><CambiosTurno financiera /></FinancieraRoute>} />
               {/* La trazabilidad por campaña quedó dentro del reporte de asistencia. */}
               <Route path="recursos-humanos/trazabilidad" element={<Navigate to="/recursos-humanos/asistencia-mensual" replace />} />
               <Route path="recursos-humanos/trazabilidad/:empleadoId" element={<FinancieraRoute><TrazabilidadEmpleado financiera /></FinancieraRoute>} />
@@ -547,6 +550,8 @@ function App() {
               <Route path="asistencia/trazabilidad" element={<EmpleadoRoute><MiTrazabilidad /></EmpleadoRoute>} />
               <Route path="asistencia/estadisticas" element={<EmpleadoRoute><MisEstadisticas /></EmpleadoRoute>} />
               <Route path="asistencia/horas-extra" element={<EmpleadoRoute><HorasExtra /></EmpleadoRoute>} />
+              {/* Coordinadores: piden cambios de turno (asistencia.md §50). */}
+              <Route path="asistencia/cambios-turno" element={<EmpleadoRoute><CambiosTurno /></EmpleadoRoute>} />
 
               {/* Rutas de asistencia — director de operaciones */}
               <Route path="operaciones" element={<DirectorOperacionesRoute><MiJornada /></DirectorOperacionesRoute>} />
@@ -558,6 +563,7 @@ function App() {
               <Route path="operaciones/equipo/:empleadoId/trazabilidad" element={<DirectorOperacionesRoute><TrazabilidadEmpleado /></DirectorOperacionesRoute>} />
               <Route path="operaciones/horarios" element={<DirectorOperacionesRoute><GestionHorarios /></DirectorOperacionesRoute>} />
               <Route path="operaciones/horas-extra" element={<DirectorOperacionesRoute><HorasExtra /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/cambios-turno" element={<DirectorOperacionesRoute><CambiosTurno /></DirectorOperacionesRoute>} />
               <Route path="operaciones/reporte-horas-extra" element={<DirectorOperacionesRoute><ReporteHorasExtra /></DirectorOperacionesRoute>} />
             </Route>
 
