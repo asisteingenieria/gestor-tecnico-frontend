@@ -272,6 +272,10 @@ export const asistenciaService = {
     // Campana: alertas de traspasos dirigidas a mí
     getMisAlertas: () => api.get('/asistencia/mis-alertas'),
     marcarAlertaLeida: (id) => api.post(`/asistencia/mis-alertas/${id}/leida`),
+    // Notificaciones de asistencia de la campana (084: cambios de turno), a mi ficha o a mi usuario.
+    getMisNotificaciones: () => api.get('/asistencia/mis-notificaciones'),
+    marcarNotificacionLeida: (id) => api.post(`/asistencia/mis-notificaciones/${id}/leida`),
+    marcarTodasNotificacionesLeidas: () => api.post('/asistencia/mis-notificaciones/leidas'),
 
     // Director de operaciones
     getEquipo: () => api.get('/asistencia/equipo'),
@@ -298,6 +302,21 @@ export const asistenciaService = {
 
     // Reporte mensual de horas extras del jefe: solo lectura, se llena solo (asistencia.md §32).
     getReporteHorasExtra: (periodo) => api.get('/asistencia/reporte-horas-extra', { params: { periodo } })
+};
+
+// Cambios de turno (asistencia.md §50): el coordinador los pide para cualquier empleado y el jefe que
+// gestiona a ese empleado los aprueba (el horario se reemplaza solo) o los rechaza con un motivo.
+export const cambioTurnoService = {
+    getPermisos: () => api.get('/asistencia/cambios-turno/permisos'),
+    getEmpleados: () => api.get('/asistencia/cambios-turno/empleados'),
+    getPlantillas: (empleadoId) => api.get('/asistencia/cambios-turno/plantillas', { params: { empleadoId } }),
+    getHorarios: (empleados, desde, hasta) => api.get('/asistencia/cambios-turno/horarios', { params: { empleados: empleados.join(','), desde, hasta } }),
+    solicitar: (data) => api.post('/asistencia/cambios-turno', data),
+    getMias: () => api.get('/asistencia/cambios-turno/mias'),
+    getBandeja: (params = {}) => api.get('/asistencia/cambios-turno/bandeja', { params }),
+    aprobar: (id, data = {}) => api.put(`/asistencia/cambios-turno/${id}/aprobar`, data),
+    rechazar: (id, data) => api.put(`/asistencia/cambios-turno/${id}/rechazar`, data),
+    getTodas: (params = {}) => api.get('/asistencia/financiera/cambios-turno', { params })
 };
 
 // Rol financiera (asistencia.md §32): reporte de horas extras con dinero (en vivo) y trazabilidad

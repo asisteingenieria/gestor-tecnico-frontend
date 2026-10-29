@@ -3,9 +3,10 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { novedadRrhhService, contratacionHydraService } from '../services/api';
 import { iniciales } from '../utils/formatoRRHH';
+import CampanaAlertas from './asistencia/CampanaAlertas';
 import {
     Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus, Clock, FileSpreadsheet,
-    BarChart3, LayoutDashboard, Activity, Search, Bell, ChevronDown, User, Moon, Sun, LogOut, Menu, X
+    BarChart3, LayoutDashboard, Activity, Search, Repeat, ChevronDown, User, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../assets/asiste-ui/asiste-mark-white.png';
 
@@ -28,7 +29,9 @@ const NAV_FINANCIERA = [
     // Jornada de hoy de todos en vivo (§47); el histórico es el reporte de asistencia y la trazabilidad.
     { to: '/recursos-humanos/asistencia-en-vivo', label: 'Asistencia en vivo', icon: Activity },
     // Reporte + trazabilidad en una sola pestaña: comparativo, calendario diario y detalle por empleado.
-    { to: '/recursos-humanos/asistencia-mensual', label: 'Reporte Asistencia', icon: BarChart3 }
+    { to: '/recursos-humanos/asistencia-mensual', label: 'Reporte Asistencia', icon: BarChart3 },
+    // Solicitudes de cambio de turno de los coordinadores y su respuesta, solo lectura (§50).
+    { to: '/recursos-humanos/cambios-turno', label: 'Cambios de turno', icon: Repeat }
 ];
 
 const RecursosHumanosLayout = () => {
@@ -121,9 +124,8 @@ const RecursosHumanosLayout = () => {
                     <button type="button" className="ai-icon-btn" aria-label="Buscar" title="Buscar (Ctrl K)">
                         <Search size={18} strokeWidth={1.75} />
                     </button>
-                    <button type="button" className="ai-icon-btn ai-bell" aria-label="Notificaciones">
-                        <Bell size={18} strokeWidth={1.75} />
-                    </button>
+                    {/* Campana del portal (traspasos y cambios de turno, asistencia.md §50). */}
+                    <CampanaAlertas rutaCambiosTurno={isFinanciera ? '/recursos-humanos/cambios-turno' : null} />
 
                     <div style={{ position: 'relative' }} ref={menuRef}>
                         <button

@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { asistenciaService } from '../../services/api';
+import { asistenciaService, cambioTurnoService } from '../../services/api';
 import { alCambiarContadores } from '../../utils/eventosAsistencia';
+import { escucharAsistencia } from '../../utils/socketAsistencia';
 import CampanaAlertas from './CampanaAlertas';
 import {
-    Clock, Calendar, History, BarChart3, Users, CalendarClock, CalendarRange, Clock3, FileSpreadsheet,
+    Clock, Calendar, History, BarChart3, Users, CalendarClock, CalendarRange, Clock3, FileSpreadsheet, Repeat,
     ChevronDown, Moon, Sun, LogOut, Menu, X
 } from 'lucide-react';
 import asisteMarkWhite from '../../assets/asiste-ui/asiste-mark-white.png';
@@ -32,6 +33,10 @@ const AsistenciaLayout = () => {
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [alertasEquipo, setAlertasEquipo] = useState(null);
     const [pendientesHorasExtra, setPendientesHorasExtra] = useState(null);
+    // Cambios de turno (§50): el coordinador los pide y el jefe los aprueba. Quién ve la pestaña sale de
+    // RRHH (jefe inmediato o gestor de alguien), no del rol.
+    const [permisosCambioTurno, setPermisosCambioTurno] = useState({ puede_solicitar: false, puede_aprobar: false });
+    const [pendientesCambioTurno, setPendientesCambioTurno] = useState(null);
     const [horaActual, setHoraActual] = useState(() => formatearHoraBogota(new Date()));
     const [tema, setTema] = useState(() => {
         if (typeof document === 'undefined') return 'light';
@@ -49,6 +54,7 @@ const AsistenciaLayout = () => {
         { to: `${base}/trazabilidad`, label: 'Trazabilidad', icon: History },
         { to: `${base}/estadisticas`, label: 'Estadísticas', icon: BarChart3 },
         ...(!isDirectorOperaciones ? [{ to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3 }] : []),
+        ...(!isDirectorOperaciones && permisosCambioTurno.puede_solicitar ? [{ to: `${base}/cambios-turno`, label: 'Cambios de turno', icon: Repeat }] : []),
         ...(isRecursosHumanos ? [{ to: '/recursos-humanos', label: 'Recursos Humanos', icon: Users, end: true }] : [])
     ];
 
@@ -57,6 +63,7 @@ const AsistenciaLayout = () => {
         { to: `${base}/equipo/mes`, label: 'Equipo · mes', icon: CalendarRange },
         { to: `${base}/horarios`, label: 'Horarios', icon: CalendarClock },
         { to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3, count: pendientesHorasExtra },
+        { to: `${base}/cambios-turno`, label: 'Cambios de turno', icon: Repeat, count: pendientesCambioTurno, alert: true },
         { to: `${base}/reporte-horas-extra`, label: 'Reporte horas extra', icon: FileSpreadsheet }
     ] : [];
 
@@ -78,6 +85,24 @@ const AsistenciaLayout = () => {
         cargarContadores();
         return alCambiarContadores(cargarContadores);
     }, [isDirectorOperaciones, location.pathname]);
+
+    // Permisos de cambio de turno y, para el jefe, cuántas solicitudes tiene por aprobar (en vivo).
+    useEffect(() => {
+        if (!user) return undefined;
+        const cargar = () => {
+            cambioTurnoService.getPermisos()
+                .then(({ data }) => {
+                    setPermisosCambioTurno(data);
+                    if (!data.puede_aprobar) return setPendientesCambioTurno(null);
+                    return cambioTurnoService.getBandeja({ estado: 'pendiente' }).then((r) => setPendientesCambioTurno(r.data.length));
+                })
+                .catch(() => setPendientesCambioTurno(null));
+        };
+        cargar();
+        const quitarContadores = alCambiarContadores(cargar);
+        const quitarSocket = escucharAsistencia('asistencia:notificacion', cargar);
+        return () => { quitarContadores(); quitarSocket(); };
+    }, [user, location.pathname]);
 
     useEffect(() => {
         const id = setInterval(() => setHoraActual(formatearHoraBogota(new Date())), 30000);
@@ -157,7 +182,7 @@ const AsistenciaLayout = () => {
 
                 <div className="ai-row" style={{ marginLeft: 'auto', gap: 8 }} data-topnav-actions>
                     <span className="ai-clock-chip">{horaActual}</span>
-                    <CampanaAlertas />
+                    <CampanaAlertas rutaCambiosTurno={permisosCambioTurno.puede_solicitar || permisosCambioTurno.puede_aprobar ? `${base}/cambios-turno` : null} />
 
                     <div style={{ position: 'relative' }} ref={menuRef}>
                         <button
