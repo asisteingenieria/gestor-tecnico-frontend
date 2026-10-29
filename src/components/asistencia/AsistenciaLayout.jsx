@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { asistenciaService, cambioTurnoService } from '../../services/api';
 import { alCambiarContadores } from '../../utils/eventosAsistencia';
 import { escucharAsistencia } from '../../utils/socketAsistencia';
+import { nombrePropio } from '../../utils/formatoRRHH';
 import CampanaAlertas from './CampanaAlertas';
 import {
     Clock, Calendar, History, BarChart3, Users, CalendarClock, CalendarRange, Clock3, FileSpreadsheet, Repeat,
@@ -130,7 +131,10 @@ const AsistenciaLayout = () => {
     };
 
     const nombreUsuario = user?.full_name || user?.fullName || '';
-    const rolLabel = user?.role === 'empleado' && isDirectorOperaciones ? 'Jefe de equipo' : (ROL_LABEL[user?.role] || '');
+    // Bajo el nombre va el cargo del contrato activo (login y /auth/me); sin contrato, el rol.
+    const rolLabel = user?.cargo
+        ? nombrePropio(user.cargo)
+        : (user?.role === 'empleado' && isDirectorOperaciones ? 'Jefe de equipo' : (ROL_LABEL[user?.role] || ''));
 
     const renderLink = ({ to, label, icon: Icon, end, count, alert }) => (
         <NavLink
