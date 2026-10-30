@@ -127,6 +127,8 @@ export const AuthProvider = ({ children }) => {
         // Financiera tiene todo lo de RRHH, como un admin del módulo (asistencia.md §32).
         isRecursosHumanos: user?.role === 'recursosHumanos' || user?.role === 'financiera',
         isFinanciera: user?.role === 'financiera',
+        // SST (migración 089): recibe los candidatos de Hydra y marca los exámenes médicos.
+        isSst: user?.role === 'sst',
         isEmpleado: user?.role === 'empleado',
         // Gestión de equipo: el rol director_operaciones, o un empleado cuya ficha es jefe de
         // área de alguien (esJefeEquipo del login / es_jefe_equipo de /auth/me). Ver asistencia.md §23.

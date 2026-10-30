@@ -35,7 +35,7 @@ const NAV_FINANCIERA = [
 ];
 
 const RecursosHumanosLayout = () => {
-    const { user, logout, isFinanciera } = useAuth();
+    const { user, logout, isFinanciera, isSst } = useAuth();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -46,18 +46,26 @@ const RecursosHumanosLayout = () => {
     const menuRef = useRef(null);
 
     useEffect(() => {
-        novedadRrhhService.getAll()
-            .then(({ data }) => setTotalNovedades(data.novedades?.length ?? null))
-            .catch(() => setTotalNovedades(null));
+        if (!isSst) {
+            novedadRrhhService.getAll()
+                .then(({ data }) => setTotalNovedades(data.novedades?.length ?? null))
+                .catch(() => setTotalNovedades(null));
+        }
+        // SST: lotes con exámenes médicos por resolver; RRHH: lotes sin registrar.
         contratacionHydraService.getLotes()
-            .then(({ data }) => setLotesAbiertos(data.lotes.filter(l => l.estado === 'abierto' || l.estado === 'listo').length))
+            .then(({ data }) => setLotesAbiertos(isSst
+                ? data.lotes.filter(l => l.examenes_pendientes > 0).length
+                : data.lotes.filter(l => l.estado === 'abierto' || l.estado === 'listo').length))
             .catch(() => setLotesAbiertos(null));
-    }, []);
+    }, [isSst]);
 
     const contadores = { novedades: totalNovedades, contratacion: lotesAbiertos || null };
-    const navItems = isFinanciera
-        ? [NAV_FINANCIERA[0], ...NAV_ITEMS.slice(0, -1), ...NAV_FINANCIERA.slice(1), NAV_ITEMS[NAV_ITEMS.length - 1]]
-        : NAV_ITEMS;
+    // SST (migración 089): solo Contratación Hydra (exámenes médicos) y su propia asistencia.
+    const navItems = isSst
+        ? NAV_ITEMS.filter(i => i.countKey === 'contratacion' || i.to === '/asistencia')
+        : isFinanciera
+            ? [NAV_FINANCIERA[0], ...NAV_ITEMS.slice(0, -1), ...NAV_FINANCIERA.slice(1), NAV_ITEMS[NAV_ITEMS.length - 1]]
+            : NAV_ITEMS;
 
     useEffect(() => {
         const cerrarFuera = (e) => {
@@ -139,7 +147,7 @@ const RecursosHumanosLayout = () => {
                             <span className="ai-avatar ai-avatar--brand ai-avatar--sm">{iniciales(nombreUsuario)}</span>
                             <span style={{ textAlign: 'left', lineHeight: 1.2 }}>
                                 <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#fff' }}>{nombreUsuario}</span>
-                                <span style={{ display: 'block', fontSize: 11, color: '#8fa9cc' }}>{isFinanciera ? 'Financiera' : 'Recursos Humanos'}</span>
+                                <span style={{ display: 'block', fontSize: 11, color: '#8fa9cc' }}>{isFinanciera ? 'Financiera' : isSst ? 'SST' : 'Recursos Humanos'}</span>
                             </span>
                             <ChevronDown size={16} strokeWidth={1.75} style={{ color: '#8fa9cc' }} />
                         </button>

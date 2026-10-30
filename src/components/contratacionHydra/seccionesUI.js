@@ -297,7 +297,18 @@ export const ESTADO_CANDIDATO = {
     listo: { clase: 'ai-badge--success', texto: 'Listo' },
     registrado: { clase: 'ai-badge--info', texto: 'Registrado' },
     descartado: { clase: 'ai-badge--neutral', texto: 'Descartado' },
-    cancelado_hydra: { clase: 'ai-badge--neutral', texto: 'Cancelado en Hydra' }
+    cancelado_hydra: { clase: 'ai-badge--neutral', texto: 'Cancelado en Hydra' },
+    no_apto: { clase: 'ai-badge--danger', texto: 'No apto (exámenes)' }
+};
+
+// Exámenes médicos de SST (migración 089). Solo con "aprobado" se registra.
+export const ESTADO_EXAMEN = {
+    pendiente: { clase: 'ai-badge--warning', texto: 'Examen pendiente' },
+    no_asistio: { clase: 'ai-badge--danger', texto: 'No asistió' },
+    reagendado: { clase: 'ai-badge--info', texto: 'Reagendado' },
+    asistio: { clase: 'ai-badge--info', texto: 'Asistió · sin resultado' },
+    aprobado: { clase: 'ai-badge--success', texto: 'Examen aprobado' },
+    no_aprobado: { clase: 'ai-badge--danger', texto: 'No aprobó' }
 };
 
 export const ESTADO_LOTE = {

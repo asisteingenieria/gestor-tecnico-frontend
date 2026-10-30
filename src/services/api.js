@@ -164,7 +164,17 @@ export const userCompanyService = {
     actualizarRetiro: (id, data) => api.put(`/users-company/${id}/retiro`, data),
     reactivarEmpleado: (id) => api.delete(`/users-company/${id}/retiro`),
     previewImportExcel: (formData) => api.post('/users-company/import-excel/preview', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 }),
-    commitImportExcel: (formData) => api.post('/users-company/import-excel/commit', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })
+    commitImportExcel: (formData) => api.post('/users-company/import-excel/commit', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 }),
+    // Documentación del empleado y contrato y anexos (migración 088): PDF unificados de hasta 50 MB,
+    // por eso la subida no tiene timeout y reporta el avance.
+    getDocumentos: (id) => api.get(`/users-company/${id}/documentos`),
+    subirDocumento: (id, tipo, archivo, onUploadProgress) => {
+        const formData = new FormData();
+        formData.append('archivo', archivo);
+        return api.put(`/users-company/${id}/documentos/${tipo}`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0, onUploadProgress });
+    },
+    descargarDocumento: (id, tipo) => api.get(`/users-company/${id}/documentos/${tipo}/archivo`, { responseType: 'blob', timeout: 0 }),
+    eliminarDocumento: (id, tipo) => api.delete(`/users-company/${id}/documentos/${tipo}`)
 };
 
 // === SERVICIOS DE NOVEDADES RRHH ===
@@ -233,7 +243,9 @@ export const contratacionHydraService = {
     // Documentos que envía Hydra (migración 087): firmados y soportes de antecedentes.
     descargarDocumentoCandidato: (id, documentoId) => api.get(`/contratacion-hydra/candidatos/${id}/documentos/${documentoId}/archivo`, { responseType: 'blob' }),
     getDocumentosEmpleado: (usersCompanyId) => api.get(`/contratacion-hydra/empleados/${usersCompanyId}/documentos`),
-    descargarDocumentoEmpleado: (usersCompanyId, documentoId) => api.get(`/contratacion-hydra/empleados/${usersCompanyId}/documentos/${documentoId}/archivo`, { responseType: 'blob' })
+    descargarDocumentoEmpleado: (usersCompanyId, documentoId) => api.get(`/contratacion-hydra/empleados/${usersCompanyId}/documentos/${documentoId}/archivo`, { responseType: 'blob' }),
+    // Exámenes médicos (SST, migración 089): asistio | no_asistio | aprobado | no_aprobado.
+    marcarExamen: (id, evento, nota) => api.post(`/contratacion-hydra/candidatos/${id}/examenes`, { evento, nota })
 };
 
 // === SERVICIOS DE DISEÑOS ===
