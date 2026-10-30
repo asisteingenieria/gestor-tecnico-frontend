@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Inbox, Loader2, RotateCcw, Link2, Send, ArrowRight, AlertTriangle, Plus } from 'lucide-react';
+import { Inbox, Loader2, RotateCcw, Link2, Send, ArrowRight, AlertTriangle, Plus, Stethoscope } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { contratacionHydraService } from '../../services/api';
 import { nombrePropio } from '../../utils/formatoRRHH';
 import { ESTADO_LOTE, mensajeError } from './seccionesUI';
@@ -19,21 +20,28 @@ const fmtInstante = (v) => (v ? new Date(v).toLocaleString('es-CO', { timeZone: 
  * RRHH completa, verifica y registra como empleados. Ver conexionhydra.md en el backend.
  */
 const ContratacionHydra = () => {
+    const { isSst } = useAuth();
     const [tab, setTab] = useState('lotes');
+    // SST (migración 089) solo marca exámenes médicos: no ve avisos ni equivalencias.
+    const tabs = isSst ? TABS.slice(0, 1) : TABS;
 
     return (
         <div className="ai-scope">
             <div className="ai-content">
                 <div className="ai-page-head">
                     <div>
-                        <h1 className="ai-page-title">Contratación desde Hydra</h1>
-                        <p className="ai-page-sub">Candidatos aprobados en reclutamiento: completa sus datos, verifica cada sección y regístralos como empleados</p>
+                        <h1 className="ai-page-title">{isSst ? 'Exámenes médicos de contratación' : 'Contratación desde Hydra'}</h1>
+                        <p className="ai-page-sub">
+                            {isSst
+                                ? 'Candidatos que envía Hydra a contratación: marca si asistieron a los exámenes médicos y si los aprobaron. Solo los aprobados se registran como empleados'
+                                : 'Candidatos aprobados en reclutamiento: completa sus datos, verifica cada sección y regístralos como empleados. Solo se registran los que SST aprueba en exámenes médicos'}
+                        </p>
                     </div>
                 </div>
 
                 <div className="ai-card">
                     <div className="ai-tabs">
-                        {TABS.map(({ clave, label, icono: Icono }) => (
+                        {tabs.map(({ clave, label, icono: Icono }) => (
                             <button key={clave} type="button" className={`ai-tab${tab === clave ? ' is-active' : ''}`} onClick={() => setTab(clave)} style={{ background: 'transparent', border: 0, cursor: 'pointer' }}>
                                 <Icono size={16} strokeWidth={1.75} /> {label}
                             </button>
@@ -105,6 +113,7 @@ const Lotes = () => {
                             <th>Lote</th>
                             <th>Ingreso sugerido</th>
                             <th>Avance</th>
+                            <th>Exámenes médicos</th>
                             <th>Estado</th>
                             <th>Recibido</th>
                             <th></th>
@@ -126,6 +135,14 @@ const Lotes = () => {
                                     <td>
                                         <span className="ai-mini-progress"><span style={{ width: `${pct}%` }} /></span>
                                         <span className="ai-help">{hechos}/{activos} listos{l.fuera_del_lote > 0 ? ` · ${l.fuera_del_lote} fuera` : ''}</span>
+                                    </td>
+                                    <td>
+                                        {l.examenes_pendientes > 0 ? (
+                                            <span className="ai-badge ai-badge--warning" title="Candidatos en curso sin el examen aprobado por SST">
+                                                <Stethoscope size={12} /> {l.examenes_pendientes} por resolver
+                                            </span>
+                                        ) : <span className="ai-help">Al día</span>}
+                                        {l.examenes_no_asistio > 0 && <div className="ai-help">{l.examenes_no_asistio} no asistió</div>}
                                     </td>
                                     <td><span className={`ai-badge ${estado.clase}`}><span className="ai-dot" />{estado.texto}</span></td>
                                     <td className="ai-muted">{fmtInstante(l.created_at)}</td>

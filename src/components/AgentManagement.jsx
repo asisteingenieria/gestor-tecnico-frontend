@@ -30,6 +30,10 @@ const estadoBadge = (estado) => {
     return { clase: 'ai-badge--warning', texto: primeraMayuscula(estado) };
 };
 
+// Documentación del empleado y contrato y anexos (migración 088): 2 por empleado.
+const OPCIONES_DOCUMENTOS = ['Completos', 'Pendientes'];
+const estadoDocumentos = (e) => (Number(e.documentos_cargados) >= 2 ? 'Completos' : 'Pendientes');
+
 /** Chip de filtro con popover de checkboxes (Campaña / Estado / Cargo). */
 const FiltroChip = ({ etiqueta, opciones, seleccion, onChange }) => {
     const [abierto, setAbierto] = useState(false);
@@ -157,6 +161,9 @@ const AgentManagement = () => {
     const [filtroEstados, setFiltroEstados] = useState(new Set());
     const [filtroCargos, setFiltroCargos] = useState(new Set());
     const [filtroAnalistas, setFiltroAnalistas] = useState(new Set());
+    // Documentación del empleado y contrato y anexos (migración 088)
+    const [filtroDocumentos, setFiltroDocumentos] = useState(new Set());
+    const [perfilTabInicial, setPerfilTabInicial] = useState('Información');
 
     useEffect(() => {
         fetchEmpleados();
@@ -172,7 +179,7 @@ const AgentManagement = () => {
 
     useEffect(() => {
         setPage(1);
-    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, pageSize]);
+    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, pageSize]);
 
     const fetchEmpleados = async () => {
         try {
@@ -208,11 +215,18 @@ const AgentManagement = () => {
         setShowEditForm(true);
     };
 
-    const handleFormSuccess = async () => {
+    // `creado`: el empleado recién creado. Se abre su ficha en Documentos para cargar los dos PDF.
+    const handleFormSuccess = async (creado) => {
         await fetchEmpleados();
         await fetchGastoTotal();
         setShowCreateForm(false);
         setShowEditForm(false);
+        if (creado?.id) abrirPerfil(creado.id, 'Documentos');
+    };
+
+    const abrirPerfil = (id, tabInicial = 'Información') => {
+        setPerfilTabInicial(tabInicial);
+        setPerfilEmpleadoId(id);
     };
 
     const handleConfirmarEliminar = async (id) => {
@@ -252,7 +266,8 @@ const AgentManagement = () => {
         const coincideEstado = filtroEstados.size === 0 || filtroEstados.has(estadoBadge(e.estado_contrato_nombre).texto);
         const coincideCargo = filtroCargos.size === 0 || filtroCargos.has(e.cargo_nombre);
         const coincideAnalista = filtroAnalistas.size === 0 || filtroAnalistas.has(e.analista_encargado_nombre);
-        return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista;
+        const coincideDocumentos = filtroDocumentos.size === 0 || filtroDocumentos.has(estadoDocumentos(e));
+        return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos;
     });
 
     const totalConActivos = empleados.filter(e => e.total_activos > 0).length;
@@ -268,9 +283,10 @@ const AgentManagement = () => {
         setFiltroEstados(new Set());
         setFiltroCargos(new Set());
         setFiltroAnalistas(new Set());
+        setFiltroDocumentos(new Set());
     };
 
-    const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0;
+    const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0;
 
     if (!isRecursosHumanos) {
         return (
@@ -367,6 +383,7 @@ const AgentManagement = () => {
                         <FiltroChip etiqueta="Estado" opciones={opcionesEstado} seleccion={filtroEstados} onChange={setFiltroEstados} />
                         <FiltroChip etiqueta="Cargo" opciones={opcionesCargo} seleccion={filtroCargos} onChange={setFiltroCargos} />
                         <FiltroChip etiqueta="Analista" opciones={opcionesAnalista} seleccion={filtroAnalistas} onChange={setFiltroAnalistas} />
+                        <FiltroChip etiqueta="Documentos" opciones={OPCIONES_DOCUMENTOS} seleccion={filtroDocumentos} onChange={setFiltroDocumentos} />
                     </div>
 
                     {loading ? (
@@ -410,7 +427,7 @@ const AgentManagement = () => {
                                             <span className={`ai-badge ${est.clase}`}><span className="ai-dot" />{est.texto}</span>
                                         </div>
                                         <div className="ai-row" style={{ justifyContent: 'flex-end' }}>
-                                            <button className="ai-icon-btn" aria-label="Ver perfil" onClick={() => setPerfilEmpleadoId(empleado.id)}><Eye size={16} strokeWidth={1.75} /></button>
+                                            <button className="ai-icon-btn" aria-label="Ver perfil" onClick={() => abrirPerfil(empleado.id)}><Eye size={16} strokeWidth={1.75} /></button>
                                             <button className="ai-icon-btn" aria-label="Editar empleado" onClick={() => handleEditEmpleado(empleado)}><Edit3 size={16} strokeWidth={1.75} /></button>
                                             <button className="ai-icon-btn ai-icon-btn--danger" aria-label="Eliminar empleado" onClick={() => setEmpleadoAEliminar(empleado)}><Trash2 size={16} strokeWidth={1.75} /></button>
                                         </div>
@@ -462,7 +479,7 @@ const AgentManagement = () => {
                                             <td className="ai-num">{empleado.telefono ? formatearTelefono(empleado.telefono) : '—'}</td>
                                             <td className="ai-td-actions">
                                                 <div className="ai-row-actions">
-                                                    <button className="ai-icon-btn" aria-label="Ver perfil" title="Ver perfil" onClick={() => setPerfilEmpleadoId(empleado.id)}>
+                                                    <button className="ai-icon-btn" aria-label="Ver perfil" title="Ver perfil" onClick={() => abrirPerfil(empleado.id)}>
                                                         <Eye size={16} strokeWidth={1.75} />
                                                     </button>
                                                     <button className="ai-icon-btn" aria-label="Editar empleado" title="Editar empleado" onClick={() => handleEditEmpleado(empleado)}>
@@ -500,6 +517,8 @@ const AgentManagement = () => {
                     isOpen={!!perfilEmpleadoId}
                     onClose={() => setPerfilEmpleadoId(null)}
                     empleadoId={perfilEmpleadoId}
+                    tabInicial={perfilTabInicial}
+                    onDocumentosCambio={fetchEmpleados}
                     onEditar={(empleado) => {
                         setPerfilEmpleadoId(null);
                         handleEditEmpleado(empleado);

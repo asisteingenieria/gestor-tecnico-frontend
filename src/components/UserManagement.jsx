@@ -50,7 +50,7 @@ const UserManagement = () => {
     // director_operaciones/empleado, porque el módulo de asistencia lo exige — ver
     // users_company_id en CLAUDE.md/asistencia.md. Para recursosHumanos, porque al
     // registrar un empleado nuevo ese mismo id se guarda como "analista encargado" del alta.
-    const ROLES_VINCULADOS_A_EMPLEADO = ['director_operaciones', 'empleado', 'recursosHumanos', 'financiera'];
+    const ROLES_VINCULADOS_A_EMPLEADO = ['director_operaciones', 'empleado', 'recursosHumanos', 'financiera', 'sst'];
 
     const roles = [
         { value: 'coordinador', label: 'Coordinador', color: 'bg-blue-100 text-blue-800' },
@@ -62,6 +62,7 @@ const UserManagement = () => {
         { value: 'disenador', label: 'Diseñador', color: 'bg-purple-100 text-purple-800' },
         { value: 'recursosHumanos', label: 'Recursos Humanos', color: 'bg-pink-100 text-pink-800' },
         { value: 'financiera', label: 'Financiera', color: 'bg-emerald-100 text-emerald-800' },
+        { value: 'sst', label: 'SST', color: 'bg-rose-100 text-rose-800' },
         // Ya no se crean (asistencia.md §26): los jefes gestionan su equipo con su cuenta por
         // cédula. Se deja para mostrar y editar las cuentas que ya existen.
         { value: 'director_operaciones', label: 'Director de Operaciones', color: 'bg-cyan-100 text-cyan-800', obsoleto: true },
@@ -293,7 +294,7 @@ const UserManagement = () => {
             }
 
             // Para gestores de activos y técnicos de inventario, no asignar sede ni departamento
-            if (submitData.role === 'gestorActivos' || submitData.role === 'tecnicoInventario' || submitData.role === 'disenador' || submitData.role === 'recursosHumanos' || submitData.role === 'financiera') {
+            if (submitData.role === 'gestorActivos' || submitData.role === 'tecnicoInventario' || submitData.role === 'disenador' || submitData.role === 'recursosHumanos' || submitData.role === 'financiera' || submitData.role === 'sst') {
                 submitData.sede = null;
                 submitData.departamento = null;
             }
@@ -430,6 +431,7 @@ const UserManagement = () => {
                             <option value="disenador">Diseñadores</option>
                             <option value="recursosHumanos">Recursos Humanos</option>
                             <option value="financiera">Financiera</option>
+                            <option value="sst">SST</option>
                             <option value="director_operaciones">Directores de Operaciones</option>
                             <option value="empleado">Empleados</option>
                         </select>
@@ -499,8 +501,8 @@ const UserManagement = () => {
                                                 <div className="flex items-center">
                                                     <MapPin className="h-4 w-4 mr-1" />
                                                     <span>
-                                                        {(user.role === 'gestorActivos' || user.role === 'tecnicoInventario' || user.role === 'disenador' || user.role === 'recursosHumanos' || user.role === 'financiera')
-                                                            ? (user.role === 'gestorActivos' ? 'Gestión de Activos - Sin sede específica' : user.role === 'disenador' ? 'Diseñador - Sin sede específica' : user.role === 'recursosHumanos' ? 'Recursos Humanos - Sin sede específica' : user.role === 'financiera' ? 'Financiera - Sin sede específica' : 'Técnico Inventario - Sin sede específica')
+                                                        {(user.role === 'gestorActivos' || user.role === 'tecnicoInventario' || user.role === 'disenador' || user.role === 'recursosHumanos' || user.role === 'financiera' || user.role === 'sst')
+                                                            ? (user.role === 'gestorActivos' ? 'Gestión de Activos - Sin sede específica' : user.role === 'disenador' ? 'Diseñador - Sin sede específica' : user.role === 'recursosHumanos' ? 'Recursos Humanos - Sin sede específica' : user.role === 'financiera' ? 'Financiera - Sin sede específica' : user.role === 'sst' ? 'SST - Sin sede específica' : 'Técnico Inventario - Sin sede específica')
                                                             : `${sedes.find(s => s.value === user.sede)?.label || user.sede}${user.departamento ? ` - ${departamentos.find(d => d.value === user.departamento)?.label || user.departamento}` : ''}`
                                                         }
                                                     </span>
@@ -669,7 +671,7 @@ const UserManagement = () => {
                                 )}
 
                                 {/* Sede - Solo mostrar si NO es gestorActivos */}
-                                {formData.role !== 'gestorActivos' && formData.role !== 'tecnicoInventario' && formData.role !== 'disenador' && formData.role !== 'recursosHumanos' && formData.role !== 'financiera' && (
+                                {formData.role !== 'gestorActivos' && formData.role !== 'tecnicoInventario' && formData.role !== 'disenador' && formData.role !== 'recursosHumanos' && formData.role !== 'financiera' && formData.role !== 'sst' && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Sede *
@@ -745,6 +747,16 @@ const UserManagement = () => {
                                         <p className="text-sm text-pink-700">
                                             <strong>Nota:</strong> Recursos Humanos tiene acceso exclusivo al módulo de gestión de empleados.
                                             No requiere sede ni departamento específico.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Mensaje informativo para SST (migración 089) */}
+                                {formData.role === 'sst' && (
+                                    <div className="bg-rose-50 border border-rose-200 rounded-md p-3">
+                                        <p className="text-sm text-rose-700">
+                                            <strong>Nota:</strong> SST recibe los candidatos que envía Hydra a contratación y marca si asistieron
+                                            a los exámenes médicos y si los aprobaron. RRHH solo registra a los aprobados. No requiere sede ni departamento.
                                         </p>
                                     </div>
                                 )}

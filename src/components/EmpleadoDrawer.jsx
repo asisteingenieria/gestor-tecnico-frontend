@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api, { contratacionHydraService, novedadRrhhService, traspasoService, userCompanyService } from '../services/api';
 import DocumentosHydra from './contratacionHydra/DocumentosHydra';
+import DocumentosEmpleado from './DocumentosEmpleado';
 import { formatearFecha } from '../utils/fecha';
 import { nombrePropio, iniciales, formatearTelefono, primeraMayuscula } from '../utils/formatoRRHH';
 import {
@@ -39,12 +40,13 @@ const Overline = ({ children }) => (
     <p className="ai-overline" style={{ margin: '18px 0 10px' }}>{children}</p>
 );
 
-const TABS = ['Información', 'Activos', 'Novedades', 'Historial'];
-// Solo si el empleado llegó de Hydra con documentos de contratación (migración 087).
 const TAB_DOCUMENTOS = 'Documentos';
+// Documentos: los dos PDF del empleado (migración 088) y, si llegó de Hydra, los de contratación (087).
+const TABS = ['Información', 'Activos', 'Novedades', 'Historial', TAB_DOCUMENTOS];
 
-const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTraspaso }) => {
-    const [tab, setTab] = useState('Información');
+// `tabInicial`: con qué pestaña abre (al crear un empleado se abre en Documentos para cargarlos).
+const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTraspaso, tabInicial = 'Información', onDocumentosCambio }) => {
+    const [tab, setTab] = useState(tabInicial);
     const [empleado, setEmpleado] = useState(null);
     const [catalogos, setCatalogos] = useState(null);
     const [activos, setActivos] = useState([]);
@@ -52,25 +54,27 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
     const [traspasos, setTraspasos] = useState(null);
     const [retiro, setRetiro] = useState(null);
     const [documentosHydra, setDocumentosHydra] = useState(null);
+    const [documentos, setDocumentos] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     useEffect(() => {
         if (!isOpen || !empleadoId) return;
-        setTab('Información');
+        setTab(tabInicial);
         let cancelado = false;
 
         const cargar = async () => {
             try {
                 setLoading(true);
                 setError('');
-                const [empRes, catRes, actRes, retiroRes, docsRes] = await Promise.all([
+                const [empRes, catRes, actRes, retiroRes, docsRes, documentosRes] = await Promise.all([
                     api.get(`/users-company/${empleadoId}`),
                     api.get('/users-company/catalogos'),
                     api.get(`/users-company/${empleadoId}/activos`),
                     userCompanyService.getRetiro(empleadoId).catch(() => ({ data: { retiro: null } })),
                     // Exclusivo de RRHH/financiera: para otros roles responde 403 y la pestaña no aparece.
-                    contratacionHydraService.getDocumentosEmpleado(empleadoId).catch(() => ({ data: null }))
+                    contratacionHydraService.getDocumentosEmpleado(empleadoId).catch(() => ({ data: null })),
+                    userCompanyService.getDocumentos(empleadoId).catch(() => ({ data: { documentos: null } }))
                 ]);
                 if (cancelado) return;
                 setEmpleado(empRes.data.empleado);
@@ -78,6 +82,7 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                 setActivos(actRes.data.activos || []);
                 setRetiro(retiroRes.data.retiro || null);
                 setDocumentosHydra(docsRes.data?.desde_hydra ? docsRes.data : null);
+                setDocumentos(documentosRes.data.documentos || null);
 
                 const contratoId = empRes.data.empleado?.contrato?.idcontrato;
                 if (contratoId) {
@@ -103,7 +108,7 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
 
         cargar();
         return () => { cancelado = true; };
-    }, [isOpen, empleadoId]);
+    }, [isOpen, empleadoId, tabInicial]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -128,10 +133,12 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
     const estado = empleado?.estado_contrato_nombre;
     const estadoClase = estado === 'activo' ? 'ai-badge--success' : ['retirado', 'inactivo'].includes(estado) ? 'ai-badge--danger' : 'ai-badge--warning';
     const puedeTraspasar = !!contrato?.idcontrato && !['retirado', 'inactivo'].includes(estado);
+    const documentosPendientes = (documentos || []).filter(d => !d.cargado).length;
 
     return (
         <div className="ai-overlay ai-scope" style={{ position: 'fixed', inset: 0, zIndex: 50, justifyContent: 'flex-end', padding: 0 }} onClick={onClose}>
-            <div className="ai-drawer" onClick={(e) => e.stopPropagation()}>
+            {/* Con la pestaña Documentos son 5: el ancho de 420px no alcanza (se cortaba la última). */}
+            <div className="ai-drawer" style={{ width: 'min(520px, 100vw)' }} onClick={(e) => e.stopPropagation()}>
                 <div className="ai-drawer-hero">
                     <button className="ai-icon-btn" onClick={onClose} aria-label="Cerrar"><X size={18} strokeWidth={1.75} /></button>
                     <span className="ai-avatar">{iniciales(empleado?.nombre_completo || '')}</span>
@@ -142,12 +149,17 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                     <div className="ai-row" style={{ marginTop: 10 }}>
                         {empleado?.campania_nombre && <span className="ai-chip" style={{ background: 'rgba(255,255,255,.16)', color: '#fff' }}>{empleado.campania_nombre}</span>}
                         {estado && <span className={`ai-badge ${estadoClase}`} style={{ background: '#fff' }}><span className="ai-dot" />{primeraMayuscula(estado)}</span>}
+                        {documentosPendientes > 0 && (
+                            <button type="button" className="ai-badge ai-badge--warning" style={{ background: '#fff', border: 0, cursor: 'pointer' }} onClick={() => setTab(TAB_DOCUMENTOS)}>
+                                <span className="ai-dot" />Faltan documentos ({documentosPendientes})
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 <div className="ai-tabs">
-                    {(documentosHydra ? [...TABS, TAB_DOCUMENTOS] : TABS).map(t => (
-                        <button key={t} type="button" className={`ai-tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)} style={{ background: 'transparent', border: 0, cursor: 'pointer' }}>
+                    {TABS.map(t => (
+                        <button key={t} type="button" className={`ai-tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)} style={{ background: 'transparent', border: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                             {t}
                             {t === 'Activos' && <span className="ai-count">{activos.length}</span>}
                         </button>
@@ -311,16 +323,24 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                                 ))}
                             </div>
                         )
-                    ) : tab === TAB_DOCUMENTOS && documentosHydra ? (
-                        <>
-                            <p className="ai-help" style={{ marginTop: 0 }}>
-                                Documentos que envió Hydra al pasar a contratación{documentosHydra.lote_nombre ? ` (lote "${documentosHydra.lote_nombre}")` : ''}.
-                            </p>
-                            <DocumentosHydra
-                                info={documentosHydra}
-                                descargar={(documentoId) => contratacionHydraService.descargarDocumentoEmpleado(empleadoId, documentoId)}
-                            />
-                        </>
+                    ) : tab === TAB_DOCUMENTOS ? (
+                        <div className="ai-stack" style={{ gap: 16 }}>
+                            {documentos
+                                ? <DocumentosEmpleado empleadoId={empleadoId} documentos={documentos} onCambio={(nuevos) => { setDocumentos(nuevos); onDocumentosCambio?.(); }} />
+                                : <p className="ai-muted" style={{ fontSize: 14 }}>No se pudieron cargar los documentos del empleado.</p>}
+                            {documentosHydra && (
+                                <div>
+                                    <Overline>Enviados por Hydra</Overline>
+                                    <p className="ai-help" style={{ marginTop: 0 }}>
+                                        Documentos que envió Hydra al pasar a contratación{documentosHydra.lote_nombre ? ` (lote "${documentosHydra.lote_nombre}")` : ''}.
+                                    </p>
+                                    <DocumentosHydra
+                                        info={documentosHydra}
+                                        descargar={(documentoId) => contratacionHydraService.descargarDocumentoEmpleado(empleadoId, documentoId)}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     ) : tab === 'Novedades' ? (
                         (novedades || []).length === 0 ? (
                             <p className="ai-muted" style={{ fontSize: 14 }}>Sin novedades registradas.</p>

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { FileText, FileSignature, AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
-import { abrirSoporte, tamanoLegible } from '../../utils/soportesRrhh';
+import React from 'react';
+import { FileText, FileSignature, AlertTriangle, Eye, Loader2 } from 'lucide-react';
+import { tamanoLegible } from '../../utils/soportesRrhh';
+import PrevisualizacionDocumento from '../PrevisualizacionDocumento';
+import usePrevisualizacion from '../../hooks/usePrevisualizacion';
 
 const FIRMADOS = ['hoja_vida_firmada', 'tratamiento_datos_firmado'];
 const fecha = (iso) => (iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }) : '');
@@ -11,25 +13,13 @@ const fecha = (iso) => (iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 
  * faltaba algún antecedente al enviar, se muestra cuáles y la nota que dejó.
  *
  * `info` es la respuesta del backend; `descargar(documentoId)` la llamada del servicio.
+ * "Ver" abre el documento en un modal de previsualización (PDF o imagen).
  */
 const DocumentosHydra = ({ info, descargar }) => {
-    const [abriendo, setAbriendo] = useState(null);
-    const [error, setError] = useState('');
+    const { vista, abriendo, error, abrir, cerrar } = usePrevisualizacion();
 
     if (!info) return null;
     const documentos = info.documentos ?? [];
-
-    const abrir = async (id) => {
-        setAbriendo(id);
-        setError('');
-        try {
-            await abrirSoporte(() => descargar(id));
-        } catch {
-            setError('No se pudo abrir el documento');
-        } finally {
-            setAbriendo(null);
-        }
-    };
 
     if (!info.aplica && documentos.length === 0) {
         return <p className="ai-help" style={{ margin: 0 }}>Este candidato llegó de Hydra antes de que se enviaran los documentos de contratación.</p>;
@@ -42,15 +32,15 @@ const DocumentosHydra = ({ info, descargar }) => {
             </p>
             <div className="ai-stack" style={{ gap: 8 }}>
                 {lista.map(d => (
-                    <div key={d.id} className="ai-row" style={{ justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+                    <div key={d.id} className="ai-row" style={{ justifyContent: 'space-between', gap: 12, fontSize: 13, flexWrap: 'nowrap' }}>
                         <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 600 }}>{d.nombre}</div>
                             <div style={{ color: 'var(--ink-subtle)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {d.nombre_original} · {tamanoLegible(d.tamano_bytes)} · recibido {fecha(d.recibido_en)}
                             </div>
                         </div>
-                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => abrir(d.id)} disabled={abriendo === d.id}>
-                            {abriendo === d.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />} Ver
+                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" style={{ flexShrink: 0 }} onClick={() => abrir(d.id, d, () => descargar(d.id))} disabled={abriendo === d.id}>
+                            {abriendo === d.id ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />} Ver
                         </button>
                     </div>
                 ))}
@@ -86,6 +76,8 @@ const DocumentosHydra = ({ info, descargar }) => {
 
             {grupo('Documentos firmados', FileSignature, documentos.filter(d => FIRMADOS.includes(d.tipo)))}
             {grupo('Soportes de antecedentes', FileText, documentos.filter(d => !FIRMADOS.includes(d.tipo)))}
+
+            <PrevisualizacionDocumento vista={vista} onClose={cerrar} />
         </div>
     );
 };

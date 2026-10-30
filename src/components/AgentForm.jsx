@@ -650,7 +650,7 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
             }
 
             if (response.data.success) {
-                onSuccess();
+                onSuccess(agente ? null : response.data.empleado);
                 onClose();
             }
         } catch (err) {

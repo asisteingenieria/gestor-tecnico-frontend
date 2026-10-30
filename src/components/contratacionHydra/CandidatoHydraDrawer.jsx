@@ -5,19 +5,25 @@ import { iniciales, nombrePropio, primeraMayuscula } from '../../utils/formatoRR
 import SeccionHydra from './SeccionHydra';
 import DescartarCandidatoModal from './DescartarCandidatoModal';
 import DocumentosHydra from './DocumentosHydra';
-import { SECCIONES_UI, ESTADO_CANDIDATO, mensajeError } from './seccionesUI';
+import ExamenesMedicos from './ExamenesMedicos';
+import { SECCIONES_UI, ESTADO_CANDIDATO, ESTADO_EXAMEN, mensajeError } from './seccionesUI';
 
-const TABS = ['Checklist', 'Documentos', 'Datos de Hydra'];
+const TAB_EXAMENES = 'Exámenes médicos';
+const TABS = ['Checklist', TAB_EXAMENES, 'Documentos', 'Datos de Hydra'];
+// SST (migración 089) no completa datos: sin checklist, y abre en los exámenes.
+const TABS_SST = [TAB_EXAMENES, 'Documentos', 'Datos de Hydra'];
 const EDITABLES = ['pendiente', 'listo'];
 
 /**
  * Panel lateral de un candidato que llegó de Hydra: el checklist de 7 secciones (completar
- * y verificar) y, aparte, lo que envió Hydra tal cual, para comparar.
+ * y verificar), los exámenes médicos de SST y, aparte, lo que envió Hydra tal cual, para comparar.
+ * Con `sst`, el panel es el de SST: marca exámenes y no edita datos ni descarta.
  */
-const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose, onCambio }) => {
+const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose, onCambio, sst = false }) => {
+    const tabs = sst ? TABS_SST : TABS;
     const [candidato, setCandidato] = useState(null);
     const [error, setError] = useState('');
-    const [tab, setTab] = useState(TABS[0]);
+    const [tab, setTab] = useState(tabs[0]);
     const [abierta, setAbierta] = useState(null);
     const [descartando, setDescartando] = useState(false);
 
@@ -45,7 +51,8 @@ const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose,
         onCambio();
     };
 
-    const editable = candidato && EDITABLES.includes(candidato.estado);
+    const editable = candidato && EDITABLES.includes(candidato.estado) && !sst;
+    const examen = candidato?.examen_estado ? ESTADO_EXAMEN[candidato.examen_estado] : null;
     const estado = candidato ? (ESTADO_CANDIDATO[candidato.estado] ?? ESTADO_CANDIDATO.pendiente) : null;
     // Firmados que no han llegado + antecedentes que faltaban al enviar.
     const avisosDocumentos = (candidato?.documentos?.firmados_pendientes?.length ?? 0) + (candidato?.documentos?.antecedentes_faltantes?.length ?? 0);
@@ -68,6 +75,7 @@ const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose,
                     {candidato && (
                         <div className="ai-row" style={{ marginTop: 10, gap: 8 }}>
                             <span className={`ai-badge ${estado.clase}`} style={{ background: '#fff' }}><span className="ai-dot" />{estado.texto}</span>
+                            {examen && <span className={`ai-badge ${examen.clase}`} style={{ background: '#fff' }}><span className="ai-dot" />{examen.texto}</span>}
                             <span className="ai-chip" style={{ background: 'rgba(255,255,255,.16)', color: '#fff' }}>
                                 {candidato.secciones_completas}/{candidato.total_secciones} secciones verificadas
                             </span>
@@ -76,7 +84,7 @@ const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose,
                 </div>
 
                 <div className="ai-tabs">
-                    {TABS.map(t => (
+                    {tabs.map(t => (
                         <button key={t} type="button" className={`ai-tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)} style={{ background: 'transparent', border: 0, cursor: 'pointer' }}>
                             {t}
                             {t === 'Documentos' && avisosDocumentos > 0 && (
@@ -105,7 +113,7 @@ const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose,
                         </div>
                     )}
 
-                    {candidato && !editable && (
+                    {candidato && !EDITABLES.includes(candidato.estado) && (
                         <div className="ai-help" style={{ marginBottom: 14 }}>
                             Este candidato está "{estado.texto.toLowerCase()}" y ya no se puede modificar.
                             {candidato.motivo_descarte && ` Motivo: ${candidato.motivo_descarte}`}
@@ -134,6 +142,17 @@ const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose,
                                 );
                             })}
                         </div>
+                    )}
+
+                    {candidato && tab === TAB_EXAMENES && (
+                        <ExamenesMedicos
+                            candidato={candidato}
+                            puedeMarcar={sst}
+                            onCambio={async () => {
+                                await cargar();
+                                onCambio();
+                            }}
+                        />
                     )}
 
                     {candidato && tab === 'Documentos' && (

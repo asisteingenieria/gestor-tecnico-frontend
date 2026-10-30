@@ -55,7 +55,8 @@ import AsistenciaMensualFinanciera from './components/financiera/AsistenciaMensu
 import HomeFinanciera from './components/financiera/HomeFinanciera';
 
 // Financiera entra por las mismas pantallas y layout que RRHH (asistencia.md §32).
-const esRRHH = (role) => role === 'recursosHumanos' || role === 'financiera';
+// SST usa el mismo layout que RRHH, con su propio menú (Contratación Hydra y su asistencia).
+const esRRHH = (role) => role === 'recursosHumanos' || role === 'financiera' || role === 'sst';
 
 // Componente para determinar el layout según el rol
 const LayoutWrapper = ({ children }) => {
@@ -146,6 +147,10 @@ const RedirectByRole = () => {
     return <Navigate to="/recursos-humanos/home" replace />;
   }
 
+  if (user?.role === 'sst') {
+    return <Navigate to="/recursos-humanos/contratacion-hydra" replace />;
+  }
+
   if (esRRHH(user?.role)) {
     return <Navigate to="/recursos-humanos" replace />;
   }
@@ -196,6 +201,10 @@ const DashboardRoute = () => {
 
   if (user?.role === 'financiera') {
     return <Navigate to="/recursos-humanos/home" replace />;
+  }
+
+  if (user?.role === 'sst') {
+    return <Navigate to="/recursos-humanos/contratacion-hydra" replace />;
   }
 
   if (esRRHH(user?.role)) {
@@ -374,6 +383,14 @@ const RecursosHumanosRoute = ({ children }) => {
   return children;
 };
 
+// Contratación Hydra: RRHH la completa y registra; SST marca los exámenes médicos (089).
+const ContratacionHydraRoute = ({ children }) => {
+  const { isRecursosHumanos, isSst, loading } = useAuth();
+  if (loading) return null;
+  if (!isRecursosHumanos && !isSst) return <Navigate to="/" replace />;
+  return children;
+};
+
 // Home de financiera (asistencia.md §37): también lo ve el admin, desde su propio layout.
 const HomeFinancieraRoute = ({ children }) => {
   const { isFinanciera, isAdmin, loading } = useAuth();
@@ -408,7 +425,7 @@ const FinancieraRoute = ({ children }) => {
 
 // Componente para rutas que requieren rol de empleado
 const EmpleadoRoute = ({ children }) => {
-  const { isEmpleado, isRecursosHumanos, loading } = useAuth();
+  const { isEmpleado, isRecursosHumanos, isSst, loading } = useAuth();
 
   if (loading) {
     return (
@@ -418,7 +435,7 @@ const EmpleadoRoute = ({ children }) => {
     );
   }
 
-  if (!isEmpleado && !isRecursosHumanos) {
+  if (!isEmpleado && !isRecursosHumanos && !isSst) {
     return (
       <div className="text-center py-12">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Acceso Denegado</h1>
@@ -520,8 +537,8 @@ function App() {
               <Route path="recursos-humanos/novedades" element={<RecursosHumanosRoute><NovedadesRRHH /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/traspasos" element={<RecursosHumanosRoute><Traspasos /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/vacaciones" element={<RecursosHumanosRoute><PasivoVacacional /></RecursosHumanosRoute>} />
-              <Route path="recursos-humanos/contratacion-hydra" element={<RecursosHumanosRoute><ContratacionHydra /></RecursosHumanosRoute>} />
-              <Route path="recursos-humanos/contratacion-hydra/:id" element={<RecursosHumanosRoute><LoteHydra /></RecursosHumanosRoute>} />
+              <Route path="recursos-humanos/contratacion-hydra" element={<ContratacionHydraRoute><ContratacionHydra /></ContratacionHydraRoute>} />
+              <Route path="recursos-humanos/contratacion-hydra/:id" element={<ContratacionHydraRoute><LoteHydra /></ContratacionHydraRoute>} />
               <Route path="recursos-humanos/home" element={<HomeFinancieraRoute><HomeFinanciera /></HomeFinancieraRoute>} />
               <Route path="recursos-humanos/reportes-horas-extra" element={<FinancieraRoute><ReportesHorasExtra /></FinancieraRoute>} />
               <Route path="recursos-humanos/asistencia-mensual" element={<FinancieraRoute><AsistenciaMensualFinanciera /></FinancieraRoute>} />

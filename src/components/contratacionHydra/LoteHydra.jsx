@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Loader2, UserCheck, Users, CheckCircle2, Clock, UserX, ArrowRight, AlertCircle } from 'lucide-react';
+import { ChevronRight, Loader2, UserCheck, Users, CheckCircle2, Clock, UserX, ArrowRight, AlertCircle, Stethoscope } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import api, { contratacionHydraService } from '../../services/api';
 import { iniciales, nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import CandidatoHydraDrawer from './CandidatoHydraDrawer';
 import RegistrarLoteModal from './RegistrarLoteModal';
-import { SECCIONES_UI, ESTADO_CANDIDATO, ESTADO_LOTE, mensajeError } from './seccionesUI';
+import { SECCIONES_UI, ESTADO_CANDIDATO, ESTADO_LOTE, ESTADO_EXAMEN, mensajeError } from './seccionesUI';
 
 const COLOR_SECCION = { completo: 'var(--success)', pendiente: 'var(--warning)', desactualizada: 'var(--danger)' };
 const fmtFecha = (v) => (v ? new Date(`${String(v).slice(0, 10)}T00:00:00`).toLocaleDateString('es-CO') : '—');
@@ -13,6 +14,8 @@ const fmtFecha = (v) => (v ? new Date(`${String(v).slice(0, 10)}T00:00:00`).toLo
 /** Un lote enviado por Hydra: estado de cada candidato y registro del lote completo. */
 const LoteHydra = () => {
     const { id } = useParams();
+    // SST (migración 089) marca exámenes médicos: no edita datos ni registra.
+    const { isSst } = useAuth();
     const [lote, setLote] = useState(null);
     const [candidatos, setCandidatos] = useState([]);
     const [catalogos, setCatalogos] = useState(null);
@@ -34,6 +37,8 @@ const LoteHydra = () => {
 
     useEffect(() => {
         cargarLote();
+        // SST no usa el checklist: no necesita (ni puede leer) los catálogos de RRHH.
+        if (isSst) return;
         // Catálogos de RRHH (para los selectores) y opciones de mapeo, una sola vez.
         Promise.all([api.get('/users-company/catalogos'), contratacionHydraService.getCatalogosMapeo()])
             .then(([cat, mapeo]) => {
@@ -41,11 +46,13 @@ const LoteHydra = () => {
                 setCatalogosMapeo(mapeo.data.catalogos);
             })
             .catch(() => setError('No se pudieron cargar los catálogos'));
-    }, [cargarLote]);
+    }, [cargarLote, isSst]);
 
     const cuenta = (estados) => candidatos.filter(c => estados.includes(c.estado)).length;
     const estadoLote = lote ? (ESTADO_LOTE[lote.estado] ?? ESTADO_LOTE.abierto) : null;
     const pendientes = cuenta(['pendiente']);
+    const enCurso = candidatos.filter(c => ['pendiente', 'listo'].includes(c.estado));
+    const examenesPorResolver = enCurso.filter(c => c.examen_estado !== 'aprobado').length;
 
     return (
         <div className="ai-scope">
@@ -68,12 +75,12 @@ const LoteHydra = () => {
                     {lote && (
                         <div className="ai-row" style={{ gap: 12 }}>
                             <span className={`ai-badge ${estadoLote.clase}`}><span className="ai-dot" />{estadoLote.texto}</span>
-                            {lote.estado !== 'registrado' && (
+                            {lote.estado !== 'registrado' && !isSst && (
                                 <button
                                     className="ai-btn ai-btn--primary"
                                     disabled={lote.estado !== 'listo'}
                                     onClick={() => setRegistrando(true)}
-                                    title={lote.estado !== 'listo' ? 'Todos los candidatos deben estar listos (o descartados) para registrar el lote' : undefined}
+                                    title={lote.estado !== 'listo' ? 'Todos los candidatos deben estar listos —datos verificados y examen médico aprobado— (o fuera del lote) para registrar' : undefined}
                                 >
                                     <UserCheck size={16} /> Registrar lote
                                 </button>
@@ -93,13 +100,17 @@ const LoteHydra = () => {
                         <div><Users size={20} strokeWidth={1.75} style={{ color: 'var(--primary)' }} /><div><div className="ai-kpi-label">Candidatos</div><div className="ai-kpi-value">{candidatos.length}</div></div></div>
                         <div><CheckCircle2 size={20} strokeWidth={1.75} style={{ color: 'var(--success)' }} /><div><div className="ai-kpi-label">Listos</div><div className="ai-kpi-value">{cuenta(['listo', 'registrado'])}</div></div></div>
                         <div><Clock size={20} strokeWidth={1.75} style={{ color: 'var(--warning)' }} /><div><div className="ai-kpi-label">Pendientes</div><div className="ai-kpi-value">{pendientes}</div></div></div>
-                        <div><UserX size={20} strokeWidth={1.75} style={{ color: 'var(--ink-subtle)' }} /><div><div className="ai-kpi-label">Fuera del lote</div><div className="ai-kpi-value">{cuenta(['descartado', 'cancelado_hydra'])}</div></div></div>
+                        <div><Stethoscope size={20} strokeWidth={1.75} style={{ color: 'var(--warning)' }} /><div><div className="ai-kpi-label">Exámenes por resolver</div><div className="ai-kpi-value">{examenesPorResolver}</div></div></div>
+                        <div><UserX size={20} strokeWidth={1.75} style={{ color: 'var(--ink-subtle)' }} /><div><div className="ai-kpi-label">Fuera del lote</div><div className="ai-kpi-value">{cuenta(['descartado', 'cancelado_hydra', 'no_apto'])}</div></div></div>
                     </div>
                 )}
 
                 {lote && lote.estado === 'abierto' && pendientes > 0 && (
                     <p className="ai-help" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <AlertCircle size={14} /> El lote se registra completo: falta que {pendientes} candidato(s) tengan las 7 secciones verificadas, o descartarlos.
+                        <AlertCircle size={14} />
+                        {isSst
+                            ? `Hay ${examenesPorResolver} candidato(s) con exámenes médicos por resolver. Abre cada uno para marcar asistencia y resultado.`
+                            : `El lote se registra completo: falta que ${pendientes} candidato(s) tengan las 7 secciones verificadas y el examen médico aprobado por SST, o sacarlos del lote.`}
                     </p>
                 )}
 
@@ -115,6 +126,7 @@ const LoteHydra = () => {
                                     <th>Candidato</th>
                                     <th>Cargo en Hydra</th>
                                     <th>Checklist</th>
+                                    <th>Examen médico</th>
                                     <th>Estado</th>
                                     <th></th>
                                 </tr>
@@ -122,6 +134,7 @@ const LoteHydra = () => {
                             <tbody>
                                 {candidatos.map(c => {
                                     const estado = ESTADO_CANDIDATO[c.estado] ?? ESTADO_CANDIDATO.pendiente;
+                                    const examen = c.examen_estado ? ESTADO_EXAMEN[c.examen_estado] : null;
                                     return (
                                         <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => setAbierto(c.id)}>
                                             <td>
@@ -150,6 +163,9 @@ const LoteHydra = () => {
                                                 </div>
                                             </td>
                                             <td>
+                                                {examen ? <span className={`ai-badge ${examen.clase}`}><span className="ai-dot" />{examen.texto}</span> : <span className="ai-help">No aplica</span>}
+                                            </td>
+                                            <td>
                                                 <span className={`ai-badge ${estado.clase}`}><span className="ai-dot" />{estado.texto}</span>
                                                 {c.reintegro_users_company_id && <span className="ai-badge ai-badge--danger" style={{ marginLeft: 6 }}>Reintegro</span>}
                                                 {c.users_company_id && <div className="ai-help">Empleado #{c.users_company_id}</div>}
@@ -166,9 +182,10 @@ const LoteHydra = () => {
                 </div>
             </div>
 
-            {abierto && catalogos && (
+            {abierto && (catalogos || isSst) && (
                 <CandidatoHydraDrawer
                     candidatoId={abierto}
+                    sst={isSst}
                     catalogos={catalogos}
                     catalogosMapeo={catalogosMapeo}
                     onClose={() => setAbierto(null)}
