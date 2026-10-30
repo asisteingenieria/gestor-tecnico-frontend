@@ -4,9 +4,10 @@ import { contratacionHydraService } from '../../services/api';
 import { iniciales, nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import SeccionHydra from './SeccionHydra';
 import DescartarCandidatoModal from './DescartarCandidatoModal';
+import DocumentosHydra from './DocumentosHydra';
 import { SECCIONES_UI, ESTADO_CANDIDATO, mensajeError } from './seccionesUI';
 
-const TABS = ['Checklist', 'Datos de Hydra'];
+const TABS = ['Checklist', 'Documentos', 'Datos de Hydra'];
 const EDITABLES = ['pendiente', 'listo'];
 
 /**
@@ -46,6 +47,8 @@ const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose,
 
     const editable = candidato && EDITABLES.includes(candidato.estado);
     const estado = candidato ? (ESTADO_CANDIDATO[candidato.estado] ?? ESTADO_CANDIDATO.pendiente) : null;
+    // Firmados que no han llegado + antecedentes que faltaban al enviar.
+    const avisosDocumentos = (candidato?.documentos?.firmados_pendientes?.length ?? 0) + (candidato?.documentos?.antecedentes_faltantes?.length ?? 0);
 
     return (
         <div className="ai-overlay ai-scope" style={{ position: 'fixed', inset: 0, zIndex: 50, justifyContent: 'flex-end', padding: 0 }} onClick={onClose}>
@@ -76,6 +79,9 @@ const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose,
                     {TABS.map(t => (
                         <button key={t} type="button" className={`ai-tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)} style={{ background: 'transparent', border: 0, cursor: 'pointer' }}>
                             {t}
+                            {t === 'Documentos' && avisosDocumentos > 0 && (
+                                <span className="ai-badge ai-badge--warning" style={{ marginLeft: 6, height: 18, padding: '0 6px' }}>{avisosDocumentos}</span>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -128,6 +134,13 @@ const CandidatoHydraDrawer = ({ candidatoId, catalogos, catalogosMapeo, onClose,
                                 );
                             })}
                         </div>
+                    )}
+
+                    {candidato && tab === 'Documentos' && (
+                        <DocumentosHydra
+                            info={candidato.documentos}
+                            descargar={(documentoId) => contratacionHydraService.descargarDocumentoCandidato(candidatoId, documentoId)}
+                        />
                     )}
 
                     {candidato && tab === 'Datos de Hydra' && <DatosHydra datos={candidato.datos_hydra} version={candidato.version_hydra} />}

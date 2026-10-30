@@ -229,7 +229,11 @@ export const contratacionHydraService = {
     getMapeos: () => api.get('/contratacion-hydra/mapeos'),
     guardarMapeo: (data) => api.post('/contratacion-hydra/mapeos', data),
     getEnvios: (params = {}) => api.get('/contratacion-hydra/envios', { params }),
-    reintentarEnvio: (id) => api.post(`/contratacion-hydra/envios/${id}/reintentar`)
+    reintentarEnvio: (id) => api.post(`/contratacion-hydra/envios/${id}/reintentar`),
+    // Documentos que envía Hydra (migración 087): firmados y soportes de antecedentes.
+    descargarDocumentoCandidato: (id, documentoId) => api.get(`/contratacion-hydra/candidatos/${id}/documentos/${documentoId}/archivo`, { responseType: 'blob' }),
+    getDocumentosEmpleado: (usersCompanyId) => api.get(`/contratacion-hydra/empleados/${usersCompanyId}/documentos`),
+    descargarDocumentoEmpleado: (usersCompanyId, documentoId) => api.get(`/contratacion-hydra/empleados/${usersCompanyId}/documentos/${documentoId}/archivo`, { responseType: 'blob' })
 };
 
 // === SERVICIOS DE DISEÑOS ===
