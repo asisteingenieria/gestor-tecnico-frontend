@@ -48,7 +48,7 @@ const COLUMNAS_PLANTILLA = [
     ['Estado Civil', false, 'Soltero, Casado, Unión libre…'],
     ['Numero de hijos', false, 'Número'],
     ['Contacto De Emergencia', false, 'Nombre; se guarda si trae también parentesco y teléfono'],
-    ['Parentesco', false, 'Madre, Padre, Esposo(a), Hermano(a)…'],
+    ['Parentesco', false, 'Madre, Padre, Cónyuge, Compañero(a), Hermano(a), Hijo(a), Abuelo(a), Tío(a), Primo(a), Amigo(a) u Otro'],
     ['Telefono Contacto de Emergencia', false, ''],
     ['Tipo De Cuenta', false, 'CUENTA DE AHORROS o CUENTA CORRIENTE'],
     ['Numero De Cuenta', false, ''],
