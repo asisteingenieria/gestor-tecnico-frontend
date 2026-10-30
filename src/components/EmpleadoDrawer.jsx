@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import api, { novedadRrhhService, traspasoService, userCompanyService } from '../services/api';
+import api, { contratacionHydraService, novedadRrhhService, traspasoService, userCompanyService } from '../services/api';
+import DocumentosHydra from './contratacionHydra/DocumentosHydra';
 import { formatearFecha } from '../utils/fecha';
 import { nombrePropio, iniciales, formatearTelefono, primeraMayuscula } from '../utils/formatoRRHH';
 import {
@@ -39,6 +40,8 @@ const Overline = ({ children }) => (
 );
 
 const TABS = ['Información', 'Activos', 'Novedades', 'Historial'];
+// Solo si el empleado llegó de Hydra con documentos de contratación (migración 087).
+const TAB_DOCUMENTOS = 'Documentos';
 
 const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTraspaso }) => {
     const [tab, setTab] = useState('Información');
@@ -48,6 +51,7 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
     const [novedades, setNovedades] = useState(null);
     const [traspasos, setTraspasos] = useState(null);
     const [retiro, setRetiro] = useState(null);
+    const [documentosHydra, setDocumentosHydra] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -60,17 +64,20 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
             try {
                 setLoading(true);
                 setError('');
-                const [empRes, catRes, actRes, retiroRes] = await Promise.all([
+                const [empRes, catRes, actRes, retiroRes, docsRes] = await Promise.all([
                     api.get(`/users-company/${empleadoId}`),
                     api.get('/users-company/catalogos'),
                     api.get(`/users-company/${empleadoId}/activos`),
-                    userCompanyService.getRetiro(empleadoId).catch(() => ({ data: { retiro: null } }))
+                    userCompanyService.getRetiro(empleadoId).catch(() => ({ data: { retiro: null } })),
+                    // Exclusivo de RRHH/financiera: para otros roles responde 403 y la pestaña no aparece.
+                    contratacionHydraService.getDocumentosEmpleado(empleadoId).catch(() => ({ data: null }))
                 ]);
                 if (cancelado) return;
                 setEmpleado(empRes.data.empleado);
                 setCatalogos(catRes.data.catalogos);
                 setActivos(actRes.data.activos || []);
                 setRetiro(retiroRes.data.retiro || null);
+                setDocumentosHydra(docsRes.data?.desde_hydra ? docsRes.data : null);
 
                 const contratoId = empRes.data.empleado?.contrato?.idcontrato;
                 if (contratoId) {
@@ -139,7 +146,7 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                 </div>
 
                 <div className="ai-tabs">
-                    {TABS.map(t => (
+                    {(documentosHydra ? [...TABS, TAB_DOCUMENTOS] : TABS).map(t => (
                         <button key={t} type="button" className={`ai-tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)} style={{ background: 'transparent', border: 0, cursor: 'pointer' }}>
                             {t}
                             {t === 'Activos' && <span className="ai-count">{activos.length}</span>}
@@ -304,6 +311,16 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                                 ))}
                             </div>
                         )
+                    ) : tab === TAB_DOCUMENTOS && documentosHydra ? (
+                        <>
+                            <p className="ai-help" style={{ marginTop: 0 }}>
+                                Documentos que envió Hydra al pasar a contratación{documentosHydra.lote_nombre ? ` (lote "${documentosHydra.lote_nombre}")` : ''}.
+                            </p>
+                            <DocumentosHydra
+                                info={documentosHydra}
+                                descargar={(documentoId) => contratacionHydraService.descargarDocumentoEmpleado(empleadoId, documentoId)}
+                            />
+                        </>
                     ) : tab === 'Novedades' ? (
                         (novedades || []).length === 0 ? (
                             <p className="ai-muted" style={{ fontSize: 14 }}>Sin novedades registradas.</p>
