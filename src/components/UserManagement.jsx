@@ -45,6 +45,8 @@ const UserManagement = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [empleadosDisponibles, setEmpleadosDisponibles] = useState([]);
     const [loadingEmpleados, setLoadingEmpleados] = useState(false);
+    // Texto del buscador de la ficha de RRHH (nombre o cédula).
+    const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
 
     // Roles que necesitan estar vinculados a una ficha de RRHH (users_company): para
     // director_operaciones/empleado, porque el módulo de asistencia lo exige — ver
@@ -119,6 +121,7 @@ const UserManagement = () => {
             }
 
             setEmpleadosDisponibles(empleados);
+            setBusquedaEmpleado('');
         } catch (error) {
             console.error('Error cargando empleados disponibles:', error);
             setEmpleadosDisponibles([]);
@@ -151,6 +154,21 @@ const UserManagement = () => {
             full_name: empleado ? empleado.nombre_completo : prev.full_name
         }));
     };
+
+    // Fichas que coinciden con el buscador por nombre o cédula (sin tildes ni mayúsculas; la cédula
+    // sin puntos ni espacios). La ficha ya elegida se mantiene aunque no coincida, para no
+    // dejar un valor seleccionado fuera de la lista.
+    const sinTildes = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const empleadosFiltrados = (() => {
+        const texto = sinTildes(busquedaEmpleado).trim();
+        if (!texto) return empleadosDisponibles;
+        const digitos = texto.replace(/[^0-9]/g, '');
+        return empleadosDisponibles.filter(emp =>
+            emp.id === formData.users_company_id
+            || sinTildes(emp.nombre_completo).includes(texto)
+            || (digitos && String(emp.numero_identificacion || '').replace(/[^0-9]/g, '').includes(digitos))
+        );
+    })();
 
     const handleSedeChange = (newSede) => {
         const newDepartamentos = getDepartamentosBySede(newSede);
@@ -233,6 +251,7 @@ const UserManagement = () => {
             users_company_id: null
         });
         setEmpleadosDisponibles([]);
+        setBusquedaEmpleado('');
         setShowCreateModal(true);
         setError('');
         setSuccess('');
@@ -641,6 +660,15 @@ const UserManagement = () => {
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Empleado (ficha de RRHH) *
                                         </label>
+                                        <input
+                                            type="search"
+                                            value={busquedaEmpleado}
+                                            onChange={(e) => setBusquedaEmpleado(e.target.value)}
+                                            disabled={loadingEmpleados}
+                                            placeholder="Buscar por nombre o cédula…"
+                                            aria-label="Buscar empleado por nombre o cédula"
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
                                         <select
                                             required
                                             value={formData.users_company_id || ''}
@@ -651,7 +679,7 @@ const UserManagement = () => {
                                             <option value="">
                                                 {loadingEmpleados ? 'Cargando empleados...' : 'Seleccionar empleado...'}
                                             </option>
-                                            {empleadosDisponibles.map(emp => (
+                                            {empleadosFiltrados.map(emp => (
                                                 <option key={emp.id} value={emp.id}>
                                                     {emp.nombre_completo}
                                                     {emp.numero_identificacion ? ` — ${emp.numero_identificacion}` : ''}
@@ -662,6 +690,13 @@ const UserManagement = () => {
                                         {!loadingEmpleados && empleadosDisponibles.length === 0 && (
                                             <p className="mt-1 text-xs text-red-600">
                                                 No hay fichas de RRHH sin vincular. Créalas primero en Recursos Humanos.
+                                            </p>
+                                        )}
+                                        {busquedaEmpleado.trim() && !loadingEmpleados && (
+                                            <p className={`mt-1 text-xs ${empleadosFiltrados.length === 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                                                {empleadosFiltrados.length === 0
+                                                    ? 'Ningún empleado sin cuenta coincide con la búsqueda.'
+                                                    : `${empleadosFiltrados.length} de ${empleadosDisponibles.length} empleados coinciden.`}
                                             </p>
                                         )}
                                         <p className="mt-1 text-xs text-gray-500">
