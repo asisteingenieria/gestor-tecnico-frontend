@@ -48,12 +48,13 @@ const COLUMNAS_PLANTILLA = [
     ['Estado Civil', false, 'Soltero, Casado, Unión libre…'],
     ['Numero de hijos', false, 'Número'],
     ['Contacto De Emergencia', false, 'Nombre; se guarda si trae también parentesco y teléfono'],
-    ['Parentesco', false, 'Madre, Padre, Esposo(a), Hermano(a)…'],
+    ['Parentesco', false, 'Madre, Padre, Cónyuge, Compañero(a), Hermano(a), Hijo(a), Abuelo(a), Tío(a), Primo(a), Amigo(a) u Otro'],
     ['Telefono Contacto de Emergencia', false, ''],
     ['Tipo De Cuenta', false, 'CUENTA DE AHORROS o CUENTA CORRIENTE'],
     ['Numero De Cuenta', false, ''],
     ['Banco', false, 'Ej. BANCOLOMBIA (acepta "007.BANCOLOMBIA")'],
     ['Fecha Fin Periodo De Prueba', false, 'Fecha (dd/mm/aaaa)'],
+    ['Fecha Fin Contrato', false, 'Fecha (dd/mm/aaaa). Solo si el contrato tiene fecha de fin: fijo, obra o labor, aprendizaje o prestación de servicios'],
     ['Arl', false, 'Como en el catálogo de seguridad social'],
     ['Eps', false, ''],
     ['Afp', false, ''],
@@ -79,7 +80,7 @@ const descargarPlantilla = () => {
     XLSX.utils.book_append_sheet(wb, empleados, 'Empleados');
     const instrucciones = XLSX.utils.aoa_to_sheet([
         ['Llena una fila por empleado en la hoja "Empleados". No cambies los nombres de las columnas; el orden puede variar y las que no uses pueden ir vacías.'],
-        ['Los valores de catálogo (cliente, campaña, cargo, centro de costo, EPS, AFP…) deben escribirse como están en RRHH. Si alguno no coincide, la vista previa lo avisa antes de cargar.'],
+        ['Los valores de catálogo (cliente, campaña, cargo, centro de costo, EPS, AFP…) deben escribirse como están en RRHH. Si uno está escrito un poco distinto se toma el más parecido (la vista previa lo avisa); si no coincide con ninguno, el archivo no se carga hasta corregirlo.'],
         [],
         ['Columna', 'Obligatoria', 'Cómo llenarla'],
         ...COLUMNAS_PLANTILLA.map(([nombre, obligatoria, nota]) => [nombre, obligatoria ? 'Sí' : '', nota])
@@ -160,6 +161,10 @@ const ImportEmpleadosModal = ({ isOpen, onClose, onImportado }) => {
             setResultado(data);
             setPaso(PASO.RESULTADO);
         } catch (err) {
+            // El servidor rechazó el archivo por valores que no coinciden con los catálogos.
+            if (err.response?.status === 409 && err.response.data?.no_coinciden) {
+                setPreview(prev => ({ ...prev, no_coinciden: err.response.data.no_coinciden }));
+            }
             console.error('Error al confirmar la importación:', err);
             setError(err.response?.data?.message || 'No se pudo completar la importación.');
         } finally {
@@ -169,6 +174,8 @@ const ImportEmpleadosModal = ({ isOpen, onClose, onImportado }) => {
 
     const totalCatalogosNuevos = (obj) => Object.values(obj || {}).reduce((acc, arr) => acc + arr.length, 0);
     const totalAImportar = preview ? preview.a_crear + preview.a_actualizar : 0;
+    // Valores del archivo que no coinciden con ningún catálogo: el archivo no se puede cargar.
+    const noCoinciden = preview?.no_coinciden || [];
 
     return (
         <div className="ai-overlay ai-scope" onClick={onClose}>
@@ -249,6 +256,20 @@ const ImportEmpleadosModal = ({ isOpen, onClose, onImportado }) => {
                                 </div>
                             </div>
 
+                            {noCoinciden.length > 0 && (
+                                <div className="ai-card" style={{ padding: 14, background: 'var(--danger-soft)', borderColor: 'transparent' }}>
+                                    <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: 13, color: 'var(--danger)' }}>
+                                        No coinciden con los catálogos ({noCoinciden.length}): el archivo no se puede cargar
+                                    </p>
+                                    <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--danger)' }}>
+                                        Escríbelos como están en RRHH y vuelve a subir el archivo.
+                                    </p>
+                                    <div style={{ maxHeight: 160, overflowY: 'auto', fontSize: 13, color: 'var(--danger)', display: 'grid', gap: 4 }}>
+                                        {noCoinciden.map((texto, i) => <div key={i}>{texto}</div>)}
+                                    </div>
+                                </div>
+                            )}
+
                             {totalCatalogosNuevos(preview.catalogos_nuevos) > 0 && (
                                 <div className="ai-card" style={{ padding: 14 }}>
                                     <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: 13, color: 'var(--ink)' }}>
@@ -256,7 +277,7 @@ const ImportEmpleadosModal = ({ isOpen, onClose, onImportado }) => {
                                     </p>
                                     <div style={{ maxHeight: 140, overflowY: 'auto', fontSize: 13, color: 'var(--ink-muted)' }}>
                                         {Object.entries(preview.catalogos_nuevos).map(([tabla, valores]) => (
-                                            <div key={tabla}><strong style={{ color: 'var(--ink)' }}>{tabla}</strong>: {valores.length} nuevo(s)</div>
+                                            <div key={tabla}><strong style={{ color: 'var(--ink)' }}>{tabla}</strong>: {valores.join(', ')}</div>
                                         ))}
                                     </div>
                                 </div>
@@ -359,10 +380,11 @@ const ImportEmpleadosModal = ({ isOpen, onClose, onImportado }) => {
                                 type="button"
                                 className="ai-btn ai-btn--primary"
                                 onClick={handleConfirmar}
-                                disabled={cargando || totalAImportar === 0}
+                                disabled={cargando || totalAImportar === 0 || noCoinciden.length > 0}
+                                title={noCoinciden.length > 0 ? 'Corrige en el Excel los valores que no coinciden con los catálogos' : undefined}
                             >
                                 {cargando && <Loader2 size={16} strokeWidth={1.75} className="animate-spin" />}
-                                Importar {totalAImportar} empleados
+                                {noCoinciden.length > 0 ? 'Corrige el archivo para continuar' : `Importar ${totalAImportar} empleados`}
                             </button>
                         </>
                     )}

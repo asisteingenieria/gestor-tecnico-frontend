@@ -584,15 +584,19 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
         }));
     };
 
+    // "Fin de contrato" solo aplica a tipos de contrato con fecha de finalización estipulada
+    // (Fijo, Obra o labor, Prestación de servicios, Aprendizaje) — un indefinido no la tiene.
     const tipoContratoNombre = catalogos.tipos_contrato.find(
         o => String(o.id) === String(contrato.tipo_contrato_id)
     )?.nombre || '';
+    const mostrarFinContrato = tipoContratoNombre !== '' && !tipoContratoNombre.toLowerCase().includes('indefinido');
 
     // Los campos del formulario son los de la plantilla de cargue masivo (hoja "Personal pend" del
-    // HeadCount, 2026-10-30): libreta militar, zona, tipo de vivienda, SSFF, piso, fin de contrato,
+    // HeadCount, 2026-10-30): libreta militar, zona, tipo de vivienda, SSFF, piso,
     // empresa, periodo de pago, tipo cotizante, bono cafetería, tarifa ARL y fechas de afiliación ya
     // no se muestran, pero siguen en el estado: al editar se reenvían tal cual y no se borran.
-    // Aprendizaje sigue calculando su fin de contrato a 6 meses aunque el campo no se vea.
+    // "Fin de contrato" se quitó y volvió el mismo día (§45): sin él, un contrato fijo u obra o labor
+    // quedaba sin fecha de fin. Aprendizaje la sugiere a 6 meses.
     // Al crear, todo dato que aplica a cualquier empleado es obligatorio; los que no todos tienen
     // (segundo nombre/apellido, RUT, documento secundario, jefaturas, periodo de prueba, bonos,
     // recursos, analista, observaciones) quedan opcionales. Al editar no se
@@ -845,6 +849,7 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                     <ComboboxBuscable label="Ciudad de trabajo" opciones={catalogos.ciudades} value={contrato.ciudad_id} onChange={(id) => setContrato(prev => ({ ...prev, ciudad_id: id }))} required={paso === 2} />
                                     {textField('Fecha de ingreso', 'fecha_ingreso', contrato.fecha_ingreso, handleFechaIngresoChange, { type: 'date', required: paso === 2 })}
                                     {textField('Fin periodo de prueba', 'fecha_fin_periodo_prueba', contrato.fecha_fin_periodo_prueba, onChange(setContrato), { type: 'date' })}
+                                    {mostrarFinContrato && textField('Fin de contrato', 'fecha_fin_contrato', contrato.fecha_fin_contrato, onChange(setContrato), { type: 'date', required: obligatorioPaso2 })}
                                     {/* Al crear, el backend deja el contrato en "activo" por defecto (ver
                                         `estadoContratoActivo()` en UserCompany.js) si no se manda este campo --
                                         por eso solo se expone al editar un empleado ya existente. */}
