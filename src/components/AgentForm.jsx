@@ -521,6 +521,9 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
             setSalario(prev => ({ ...prev, salario: sugerido }));
             setSalarioBloqueado(true);
         } else {
+            // Si el salario lo puso la sugerencia anterior, ya no aplica: se vacía para que no se
+            // guarde el sueldo de otra combinación. Uno escrito a mano se respeta.
+            if (salarioBloqueado) setSalario(prev => ({ ...prev, salario: '' }));
             setSalarioBloqueado(false);
         }
     };
@@ -546,6 +549,9 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
             setSalario(prev => ({ ...prev, salario: sugerido }));
             setSalarioBloqueado(true);
         } else {
+            // Si el salario lo puso la sugerencia anterior, ya no aplica: se vacía para que no se
+            // guarde el sueldo de otra combinación. Uno escrito a mano se respeta.
+            if (salarioBloqueado) setSalario(prev => ({ ...prev, salario: '' }));
             setSalarioBloqueado(false);
         }
     };
@@ -578,16 +584,18 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
         }));
     };
 
-    // "Fin de contrato" solo aplica a tipos de contrato con fecha de finalización estipulada
-    // (Fijo, Obra o labor, Prestación de servicios, Aprendizaje) — un indefinido no la tiene.
     const tipoContratoNombre = catalogos.tipos_contrato.find(
         o => String(o.id) === String(contrato.tipo_contrato_id)
     )?.nombre || '';
-    const mostrarFinContrato = tipoContratoNombre !== '' && !tipoContratoNombre.toLowerCase().includes('indefinido');
 
+    // Los campos del formulario son los de la plantilla de cargue masivo (hoja "Personal pend" del
+    // HeadCount, 2026-10-30): libreta militar, zona, tipo de vivienda, SSFF, piso, fin de contrato,
+    // empresa, periodo de pago, tipo cotizante, bono cafetería, tarifa ARL y fechas de afiliación ya
+    // no se muestran, pero siguen en el estado: al editar se reenvían tal cual y no se borran.
+    // Aprendizaje sigue calculando su fin de contrato a 6 meses aunque el campo no se vea.
     // Al crear, todo dato que aplica a cualquier empleado es obligatorio; los que no todos tienen
-    // (segundo nombre/apellido, RUT, libreta militar, documento secundario, piso, jefaturas, SSFF,
-    // periodo de prueba, bonos, fechas de afiliación, recursos) quedan opcionales. Al editar no se
+    // (segundo nombre/apellido, RUT, documento secundario, jefaturas, periodo de prueba, bonos,
+    // recursos, analista, observaciones) quedan opcionales. Al editar no se
     // exige: hay fichas importadas incompletas que no deben quedar bloqueadas.
     const obligatorioPaso1 = !agente;
     // Los del paso 2 solo cuando se ve el paso 2, para no bloquear "Siguiente" con campos ocultos.
@@ -667,7 +675,7 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
 
     if (!isOpen) return null;
 
-    const selectField = (label, name, value, handler, options, { required = false, render = (o) => o.nombre, tagSalario = false, sugerido = false } = {}) => (
+    const selectField = (label, name, value, handler, options, { required = false, render = (o) => o.nombre, tagSalario = false, sugerido = false, otros = [] } = {}) => (
         <div className={`ai-field${tagSalario ? ' ai-field--salario-source' : ''}`}>
             <label className="ai-label">
                 {label}{required && <em>*</em>}
@@ -676,7 +684,17 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
             </label>
             <select name={name} value={value} onChange={handler} required={required} className="ai-input">
                 <option value="">{required ? 'Seleccionar…' : 'Sin especificar'}</option>
-                {options.map(o => <option key={o.id} value={o.id}>{render(o)}</option>)}
+                {otros.length === 0 && options.map(o => <option key={o.id} value={o.id}>{render(o)}</option>)}
+                {otros.length > 0 && (
+                    <>
+                        <optgroup label="Sugeridos para esta campaña y cargo">
+                            {options.map(o => <option key={o.id} value={o.id}>{render(o)}</option>)}
+                        </optgroup>
+                        <optgroup label="Otros jefes">
+                            {otros.map(o => <option key={o.id} value={o.id}>{render(o)}</option>)}
+                        </optgroup>
+                    </>
+                )}
             </select>
         </div>
     );
@@ -729,6 +747,13 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
         jefesCandidatos(catalogos.directores_area, contrato.campania_id, contrato.cargo_id),
         contrato.director_area_id
     );
+    // Debajo de los sugeridos, el resto de quienes ya son jefe o director de alguien (44 personas):
+    // un equipo nuevo o un cambio de jefe no siempre está en la cadena de mando de la campaña.
+    const empleadosOpciones = catalogos.empleados.map(e => ({ id: e.id, nombre: e.nombre_completo }));
+    const todosLosJefes = [...catalogos.jefes_inmediatos, ...catalogos.jefes_area, ...catalogos.directores_area]
+        .filter((j, i, lista) => lista.findIndex(x => x.id === j.id) === i && (!agente || j.id !== agente.id))
+        .sort((a, b) => a.nombre_completo.localeCompare(b.nombre_completo));
+    const otrosJefes = (opciones) => todosLosJefes.filter(j => !opciones.some(o => o.id === j.id));
     const esSugerido = (rol) => Boolean(contrato[rol]) && String(contrato[rol]) === jefaturaSugerida[rol];
 
     return (
@@ -775,7 +800,6 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                     {mostrarDocumentoSecundario && selectField('Tipo de documento secundario', 'tipo_identificacion_secundaria_id', personal.tipo_identificacion_secundaria_id, onChange(setPersonal), catalogos.tipos_identificacion, { render: o => `${o.nombre} (${o.codigo})` })}
                                     {mostrarDocumentoSecundario && textField('Identificación secundaria', 'numero_identificacion_secundaria', personal.numero_identificacion_secundaria, onChange(setPersonal), { placeholder: 'Ej. PPT, CE' })}
                                     {textField('RUT', 'rut', personal.rut, onChange(setPersonal), { placeholder: 'Número de RUT' })}
-                                    {textField('Libreta militar No.', 'libreta_militar_numero', personal.libreta_militar_numero, onChange(setPersonal), { placeholder: 'Número de libreta militar' })}
                                 </div>
 
                                 <p className="ai-overline" style={{ margin: '18px 0 10px' }}>Datos personales</p>
@@ -803,8 +827,6 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                     {textField('Dirección', 'direccion', direccion.direccion, onChange(setDireccion), { placeholder: 'Ej. Calle 45 # 12-30, Bogotá', span2: true, required: obligatorioPaso1 })}
                                     {textField('Barrio', 'barrio', direccion.barrio, onChange(setDireccion), { required: obligatorioPaso1 })}
                                     <ComboboxBuscable label="Ciudad de residencia" opciones={catalogos.ciudades} value={direccion.ciudad_id} onChange={(id) => setDireccion(prev => ({ ...prev, ciudad_id: id }))} required={obligatorioPaso1} />
-                                    {selectField('Zona', 'zona_direccion_id', direccion.zona_direccion_id, onChange(setDireccion), catalogos.zonas_direccion, { required: obligatorioPaso1 })}
-                                    {selectField('Tipo de vivienda', 'tipo_vivienda_id', direccion.tipo_vivienda_id, onChange(setDireccion), catalogos.tipos_vivienda, { required: obligatorioPaso1 })}
                                 </div>
                             </div>
 
@@ -817,25 +839,19 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                     {selectField('Área', 'area_id', contrato.area_id, onChange(setContrato), catalogos.areas, { required: paso === 2 })}
                                     {selectField('Centro de costo', 'centro_costo_id', contrato.centro_costo_id, onChange(setContrato), catalogos.centros_costo, { required: paso === 2, render: o => `${o.codigo} — ${o.nombre}` })}
                                     {selectField('Cargo', 'cargo_id', contrato.cargo_id, handleCargoChange, cargosFiltrados, { required: paso === 2, tagSalario: true })}
-                                    {textField('Cargo en SSFF', 'cargo_ssff', contrato.cargo_ssff, onChange(setContrato), { placeholder: 'Cargo tal como aparece en SuccessFactors' })}
                                     {selectField('Tipo de contrato', 'tipo_contrato_id', contrato.tipo_contrato_id, handleTipoContratoChange, catalogos.tipos_contrato, { required: paso === 2 })}
                                     {selectField('Modalidad', 'modalidad_id', contrato.modalidad_id, onChange(setContrato), catalogos.modalidades, { required: paso === 2 })}
                                     {selectField('Oleada', 'oleada_id', contrato.oleada_id, onChange(setContrato), catalogos.oleadas, { required: paso === 2 })}
                                     <ComboboxBuscable label="Ciudad de trabajo" opciones={catalogos.ciudades} value={contrato.ciudad_id} onChange={(id) => setContrato(prev => ({ ...prev, ciudad_id: id }))} required={paso === 2} />
-                                    {textField('Piso', 'piso', contrato.piso, onChange(setContrato), { placeholder: 'Ej. 4' })}
                                     {textField('Fecha de ingreso', 'fecha_ingreso', contrato.fecha_ingreso, handleFechaIngresoChange, { type: 'date', required: paso === 2 })}
                                     {textField('Fin periodo de prueba', 'fecha_fin_periodo_prueba', contrato.fecha_fin_periodo_prueba, onChange(setContrato), { type: 'date' })}
-                                    {mostrarFinContrato && textField('Fin de contrato', 'fecha_fin_contrato', contrato.fecha_fin_contrato, onChange(setContrato), { type: 'date', required: obligatorioPaso2 })}
                                     {/* Al crear, el backend deja el contrato en "activo" por defecto (ver
                                         `estadoContratoActivo()` en UserCompany.js) si no se manda este campo --
                                         por eso solo se expone al editar un empleado ya existente. */}
                                     {agente && selectField('Estado del contrato', 'estado_contrato_id', contrato.estado_contrato_id, onChange(setContrato), catalogos.estados_contrato)}
-                                    {selectField('Jefe inmediato', 'jefe_inmediato_id', contrato.jefe_inmediato_id, onChange(setContrato), jefesInmediatosOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('jefe_inmediato_id') })}
-                                    {selectField('Jefe de área', 'jefe_area_id', contrato.jefe_area_id, onChange(setContrato), jefesAreaOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('jefe_area_id') })}
-                                    {selectField('Director de área', 'director_area_id', contrato.director_area_id, onChange(setContrato), directoresAreaOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('director_area_id') })}
-                                    {selectField('Empresa', 'empresa_id', contrato.empresa_id, onChange(setContrato), catalogos.empresas, { required: obligatorioPaso2 })}
-                                    {selectField('Periodo de pago', 'periodo_pago_id', contrato.periodo_pago_id, onChange(setContrato), catalogos.periodos_pago, { required: obligatorioPaso2 })}
-                                    {selectField('Tipo cotizante', 'tipo_cotizante_id', contrato.tipo_cotizante_id, onChange(setContrato), catalogos.tipos_cotizante, { required: obligatorioPaso2 })}
+                                    {selectField('Jefe inmediato', 'jefe_inmediato_id', contrato.jefe_inmediato_id, onChange(setContrato), jefesInmediatosOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('jefe_inmediato_id'), otros: otrosJefes(jefesInmediatosOpciones) })}
+                                    {selectField('Jefe de área', 'jefe_area_id', contrato.jefe_area_id, onChange(setContrato), jefesAreaOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('jefe_area_id'), otros: otrosJefes(jefesAreaOpciones) })}
+                                    {selectField('Director de área', 'director_area_id', contrato.director_area_id, onChange(setContrato), directoresAreaOpciones, { render: o => o.nombre_completo, sugerido: esSugerido('director_area_id'), otros: otrosJefes(directoresAreaOpciones) })}
                                     <div className="ai-field">
                                         <label className="ai-label">Dotación</label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, height: 38 }}>
@@ -883,7 +899,6 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                         />
                                     </div>
                                     {textField('Bono no prestacional', 'bono_no_prestacional', salario.bono_no_prestacional, onChange(setSalario), { type: 'number', min: 0, step: '0.01', placeholder: '0.00' })}
-                                    {textField('Bono cafetería', 'bono_cafeteria', salario.bono_cafeteria, onChange(setSalario), { type: 'number', min: 0, step: '0.01', placeholder: '0.00' })}
                                 </div>
 
                                 <p className="ai-overline" style={{ margin: '18px 0 10px' }}>Seguridad social</p>
@@ -891,15 +906,10 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                     {/* Solo entidades vigentes (hoja "EPS AFP CESANTIAS", migración 068),
                                         más la ya guardada del empleado aunque no lo sea. */}
                                     {selectField('EPS', 'eps_id', segSocial.eps_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_eps, segSocial.eps_id), { required: obligatorioPaso2 })}
-                                    {textField('Fecha afiliación EPS', 'eps_fecha_afiliacion', segSocial.eps_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
                                     {selectField('ARL', 'arl_id', segSocial.arl_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_arl, segSocial.arl_id), { required: obligatorioPaso2 })}
-                                    {textField('Fecha afiliación ARL', 'arl_fecha_afiliacion', segSocial.arl_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
-                                    {selectField('Tarifa ARL (%)', 'tarifa_arl', segSocial.tarifa_arl, onChange(setSegSocial), TARIFAS_ARL, { required: obligatorioPaso2 })}
                                     {selectField('Fondo de pensiones (AFP)', 'afp_id', segSocial.afp_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_afp, segSocial.afp_id), { required: obligatorioPaso2 && !sinPrestaciones })}
-                                    {textField('Fecha afiliación AFP', 'afp_fecha_afiliacion', segSocial.afp_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
                                     {selectField('Fondo de cesantías', 'cesantias_id', segSocial.cesantias_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_cesantias, segSocial.cesantias_id), { required: obligatorioPaso2 && !sinPrestaciones })}
                                     {selectField('Caja de compensación', 'caja_id', segSocial.caja_id, onChange(setSegSocial), entidadesVigentes(catalogos.entidades_caja, segSocial.caja_id), { required: obligatorioPaso2 && !sinPrestaciones })}
-                                    {textField('Fecha afiliación caja', 'caja_fecha_afiliacion', segSocial.caja_fecha_afiliacion, onChange(setSegSocial), { type: 'date' })}
                                 </div>
 
                                 <p className="ai-overline" style={{ margin: '18px 0 10px' }}>Cuenta bancaria</p>
@@ -946,7 +956,27 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
 
                                 <p className="ai-overline" style={{ margin: '18px 0 10px' }}>Otros</p>
                                 <div className="ai-form-grid">
-                                    {textField('Usuario SSFF', 'usuario_ssff', personal.usuario_ssff, onChange(setPersonal), { placeholder: 'Usuario en SuccessFactors' })}
+                                    {/* Al crear, el backend asigna como analista a quien registra (su login, §18 de
+                                        modulo recursoshumanos.md) e ignora lo que traiga el formulario; al editar sí se cambia. */}
+                                    {agente ? (
+                                        <ComboboxBuscable label="Analista encargado" opciones={empleadosOpciones} value={contrato.analista_encargado_id} onChange={(id) => setContrato(prev => ({ ...prev, analista_encargado_id: id }))} unidad="empleados" />
+                                    ) : (
+                                        <div className="ai-field">
+                                            <label className="ai-label">Analista encargado</label>
+                                            <p style={{ margin: 0, fontSize: 14, lineHeight: '38px' }}>Se asigna a quien registra al empleado</p>
+                                        </div>
+                                    )}
+                                    <div className="ai-field span-2">
+                                        <label className="ai-label">Observaciones</label>
+                                        <textarea
+                                            name="observaciones"
+                                            value={contrato.observaciones}
+                                            onChange={onChange(setContrato)}
+                                            rows={3}
+                                            className="ai-input"
+                                            style={{ height: 'auto', paddingTop: 8, resize: 'vertical' }}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -7,38 +7,85 @@ import {
 
 const PASO = { SELECCION: 'seleccion', PREVIEW: 'preview', RESULTADO: 'resultado' };
 
-// Mismo orden posicional que espera utils/importEmpleadosExcel.js en el backend (COL.*),
-// tal como viene en la hoja "TOTAL PERSONAL" real. Ver asistencia.md / RRHH bulk import.
-const ENCABEZADOS_PLANTILLA = [
-    'Estado', 'Cliente', 'Tipo De Identificación', 'Identificación', 'Tipo De Identificación', 'Identificación',
-    'Tipo De Identificación', 'Identificación', 'Fecha De Expedición', 'Lugar Expedicion Identificación',
-    'Primer Nombre', 'Segundo Nombre', 'Primer Apellido', 'Segundo Apellido', 'Nombre Propio', 'Genero', 'Rh',
-    'Tipo De Contrato', 'Ciudad Donde Labora', 'Oleada', 'Fecha De Ingreso', 'Area', 'Campaña',
-    'Nombre_Centro_Costo', 'Codigo_Centro_Costo', 'Cargo en SSFF', 'Usuario Ssff', 'Cargo', 'Salario',
-    'Bono No Prestacional', 'Bono Cafeteria', 'Director de Área', 'Jefe de Área', 'Jefe Inmediato',
-    'Fecha De Nacimiento', 'Ciudad De Nacimiento', 'Tipo De Dirección', 'Dirección', 'Barrio', 'Telefono',
-    'E-Mail', 'Estado Civil', 'Numero de hijos', 'Contacto De Emergencia', 'Parentesco',
-    'Telefono Contacto de Emergencia', 'Tipo De Cuenta', 'Numero De Cuenta', 'Numero de cuenta Correcta',
-    'Fecha Fin Periodo De Prueba', 'Fecha Fin Contrato', 'Arl', 'Fecha De Afiliación Arl', 'TarifaArl', 'Eps',
-    'Fecha Afiliación Eps', 'Fecha de Traslado', 'Traslado EPS', 'Afp', 'Fecha D eAfiliacion Afp',
-    'FechadeTraslado', 'TrasladoAFP', 'Fondo Cesantias', 'Fecha Afiliacion Fondo De Cesantias',
-    'Fecha de Traslado', 'Traslado Cesantias', 'Caja De Compensación', 'Fecha De Afiliación A Caja',
-    'Vacuna Covid19 Tipo De Vacuna', 'Primera Dosis', 'Segunda Dosis', 'Estado', 'Modalidad', 'Fecha De Retiro',
-    'Fecha Ultima Conexión', 'Tipo De Retiro', 'Motivo De Retiro', 'Justificacion', 'Entrega De Equipo',
-    'Serial Diadema', 'Locker', 'RUT', 'Piso', 'Carnet', 'Observaciones',
-    'Fecha Entrega Certificación Laboral Y Cesantias', 'Analista Encargado', 'DOTACIÓN', 'TALLA CAMISA',
-    'TALLA PANTALON', 'TALLA CALZADO',
-    // Campos nuevos (migración 050 / Excel de nómina) — se detectan por nombre de
-    // columna en cualquier posición, no por índice fijo como el resto de esta lista.
-    // Ver utils/importEmpleadosExcel.js::CAMPOS_NUEVOS_POR_NOMBRE en el backend.
-    'Empresa', 'Clase', 'Periodo Pago', 'Clasificación Dian', 'Tipo Sena', 'Tipo Cotizante',
-    'Subtipo De Cotizante', 'Declarante', 'Libreta Militar No.'
+// Plantilla de cargue masivo (2026-10-30): los campos de la hoja "Personal pend" del HeadCount, que
+// es como RRHH arma hoy los ingresos, más Tipo de contrato y Ciudad donde labora, que el import exige.
+// El backend la lee por NOMBRE de columna (utils/importEmpleadosExcel.js::COLUMNAS_POR_NOMBRE): el
+// orden no importa, pero los nombres sí. Sigue aceptando el Excel viejo de "TOTAL PERSONAL".
+const COLUMNAS_PLANTILLA = [
+    ['Cliente', true, 'Ej. CLARO. Junto con la campaña define el cliente del contrato'],
+    ['Tipo De Identificación', true, 'CC, CE, TI, PA, PPT…'],
+    ['Número De Identificación', true, 'Solo números, sin puntos'],
+    ['Tipo De Identificación Secundaria', false, 'Solo si tiene una segunda identificación'],
+    ['Número De Identificación Secundaria', false, ''],
+    ['Fecha De Expedición', false, 'Fecha (dd/mm/aaaa)'],
+    ['Lugar Expedicion Identificación', false, 'Ciudad'],
+    ['Primer Nombre', true, ''],
+    ['Segundo Nombre', false, ''],
+    ['Primer Apellido', true, ''],
+    ['Segundo Apellido', false, ''],
+    ['Genero', false, 'M o F'],
+    ['Rh', false, 'O+, A-, …'],
+    ['Tipo De Contrato', true, 'Ej. CTI (indefinido), Obra o labor, Aprendizaje…'],
+    ['Ciudad Donde Labora', true, 'Ej. BOGOTA D.C'],
+    ['Oleada', true, 'Ej. PLUS'],
+    ['Fecha De Ingreso', true, 'Fecha (dd/mm/aaaa)'],
+    ['Area', true, 'OPERATIVA o ADMINISTRATIVA'],
+    ['Campaña', true, 'Como está en el catálogo de RRHH'],
+    ['Nombre_Centro_Costo', true, 'Ej. CBAT INBOUND'],
+    ['Codigo_Centro_Costo', false, 'Ayuda a ubicar el centro de costo'],
+    ['Cargo', true, 'Como está en el catálogo de RRHH'],
+    ['Salario', true, 'Número mayor a cero, sin puntos ni signo $'],
+    ['Bono No Prestacional', false, 'Número; 0 si no tiene'],
+    ['Director de Área', false, 'Nombre completo como en su ficha'],
+    ['Jefe de Área', false, 'Nombre completo como en su ficha'],
+    ['Jefe Inmediato', false, 'Nombre completo como en su ficha'],
+    ['Fecha De Nacimiento', false, 'Fecha (dd/mm/aaaa)'],
+    ['Ciudad De Nacimiento', false, ''],
+    ['Dirección', false, ''],
+    ['Barrio', false, ''],
+    ['Telefono', false, ''],
+    ['E-Mail', false, ''],
+    ['Estado Civil', false, 'Soltero, Casado, Unión libre…'],
+    ['Numero de hijos', false, 'Número'],
+    ['Contacto De Emergencia', false, 'Nombre; se guarda si trae también parentesco y teléfono'],
+    ['Parentesco', false, 'Madre, Padre, Esposo(a), Hermano(a)…'],
+    ['Telefono Contacto de Emergencia', false, ''],
+    ['Tipo De Cuenta', false, 'CUENTA DE AHORROS o CUENTA CORRIENTE'],
+    ['Numero De Cuenta', false, ''],
+    ['Banco', false, 'Ej. BANCOLOMBIA (acepta "007.BANCOLOMBIA")'],
+    ['Fecha Fin Periodo De Prueba', false, 'Fecha (dd/mm/aaaa)'],
+    ['Arl', false, 'Como en el catálogo de seguridad social'],
+    ['Eps', false, ''],
+    ['Afp', false, ''],
+    ['Fondo Cesantias', false, ''],
+    ['Caja De Compensación', false, ''],
+    ['Modalidad', true, 'PRESENCIAL o TRABAJO EN CASA'],
+    ['Serial Diadema', false, ''],
+    ['Locker', false, ''],
+    ['RUT', false, ''],
+    ['Carnet', false, 'ENTREGADO o PENDIENTE'],
+    ['Observaciones', false, ''],
+    ['Analista Encargado', false, 'Nombre completo como en su ficha'],
+    ['Dotación', false, 'SI o NO'],
+    ['Talla Camisa', false, ''],
+    ['Talla Pantalon', false, ''],
+    ['Talla Calzado', false, '']
 ];
 
 const descargarPlantilla = () => {
-    const ws = XLSX.utils.aoa_to_sheet([ENCABEZADOS_PLANTILLA]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'TOTAL PERSONAL');
+    const empleados = XLSX.utils.aoa_to_sheet([COLUMNAS_PLANTILLA.map(([nombre]) => nombre)]);
+    empleados['!cols'] = COLUMNAS_PLANTILLA.map(([nombre]) => ({ wch: Math.max(14, nombre.length + 2) }));
+    XLSX.utils.book_append_sheet(wb, empleados, 'Empleados');
+    const instrucciones = XLSX.utils.aoa_to_sheet([
+        ['Llena una fila por empleado en la hoja "Empleados". No cambies los nombres de las columnas; el orden puede variar y las que no uses pueden ir vacías.'],
+        ['Los valores de catálogo (cliente, campaña, cargo, centro de costo, EPS, AFP…) deben escribirse como están en RRHH. Si alguno no coincide, la vista previa lo avisa antes de cargar.'],
+        [],
+        ['Columna', 'Obligatoria', 'Cómo llenarla'],
+        ...COLUMNAS_PLANTILLA.map(([nombre, obligatoria, nota]) => [nombre, obligatoria ? 'Sí' : '', nota])
+    ]);
+    instrucciones['!cols'] = [{ wch: 36 }, { wch: 12 }, { wch: 70 }];
+    XLSX.utils.book_append_sheet(wb, instrucciones, 'Instrucciones');
     XLSX.writeFile(wb, 'plantilla_empleados.xlsx');
 };
 
