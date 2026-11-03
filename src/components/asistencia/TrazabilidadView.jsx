@@ -2,6 +2,7 @@ import React from 'react';
 import { Loader2, Clock } from 'lucide-react';
 import { formatearHora12, formatearDuracion, minutosDesdeMedianoche, minutosBogotaDe } from '../../utils/tiempoAsistencia';
 import { BadgeIngreso, RegistrosAsislock } from './IngresoAsislock';
+import MarcacionesMolinete from './MarcacionesMolinete';
 
 const ETIQUETAS_EVENTO = {
     entrada: 'Entrada',
@@ -20,7 +21,7 @@ const ETIQUETAS_EVENTO = {
     fin_desconexion: 'Reconexión (login AsisLock)'
 };
 
-const ORIGEN_LABEL = { empleado: 'El empleado', director: 'El director', sistema: 'Cierre automático', asislock: 'AsisLock' };
+const ORIGEN_LABEL = { empleado: 'El empleado', director: 'El director', sistema: 'Cierre automático', asislock: 'AsisLock', molinete: 'Molinete' };
 
 const ESTADO_BADGE = {
     pendiente: { label: 'Sin iniciar', clase: 'ai-badge--neutral' },
@@ -194,6 +195,14 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                         </span>
                     </div>
                 )}
+                {datos.molinete?.resumen && (
+                    <div>
+                        <span>
+                            <span className="ai-kpi-label">Cruces del molinete</span>
+                            <div className="ai-kpi-value">{datos.molinete.resumen.cruces_intermedios}</div>
+                        </span>
+                    </div>
+                )}
             </div>
 
             {jornada.alertas?.length > 0 && (
@@ -316,6 +325,7 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
             </div>
 
             <RegistrosAsislock registros={asislock?.registros} />
+            <MarcacionesMolinete molinete={datos.molinete} />
         </>
     );
 };
