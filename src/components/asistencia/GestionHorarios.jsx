@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, CalendarClock, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Search } from 'lucide-react';
+import { Loader2, CalendarClock, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Search, FileSpreadsheet } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
+import CargarMallaModal from './CargarMallaModal';
 import { nombrePropio } from '../../utils/formatoRRHH';
 
 const DIAS_SEMANA = [
@@ -80,6 +81,7 @@ const GestionHorarios = () => {
     const [formPlantilla, setFormPlantilla] = useState(PLANTILLA_VACIA);
     const [guardandoPlantilla, setGuardandoPlantilla] = useState(false);
 
+    const [modalMalla, setModalMalla] = useState(false);
     const [modalAsignar, setModalAsignar] = useState(false);
     const [formAsignacion, setFormAsignacion] = useState(ASIGNACION_VACIA);
     const [buscarEmpleado, setBuscarEmpleado] = useState('');
@@ -360,11 +362,30 @@ const GestionHorarios = () => {
                     <button type="button" className="ai-btn ai-btn--secondary" onClick={abrirNuevaPlantilla}>
                         <Plus size={16} strokeWidth={1.75} /> Nueva plantilla
                     </button>
+                    <button type="button" className="ai-btn ai-btn--secondary" onClick={() => setModalMalla(true)}>
+                        <FileSpreadsheet size={16} strokeWidth={1.75} /> Cargar malla (Excel)
+                    </button>
                     <button type="button" className="ai-btn ai-btn--primary" onClick={abrirAsignar}>
                         <CalendarClock size={16} strokeWidth={1.75} /> Asignar horario
                     </button>
                 </div>
             </div>
+
+            {modalMalla && (
+                <CargarMallaModal
+                    onClose={() => setModalMalla(false)}
+                    onAplicada={async (resultado) => {
+                        setModalMalla(false);
+                        const creadas = resultado.plantillas_creadas?.length ?? 0;
+                        setMensaje({
+                            tipo: 'ok',
+                            texto: `Malla aplicada: ${resultado.horarios_aplicados} horarios asignados${creadas ? ` y ${creadas} plantillas nuevas` : ''}`
+                        });
+                        const [rPlantillas] = await Promise.all([asistenciaService.getPlantillas(), cargarSemana(semanaInicio)]);
+                        setPlantillas(rPlantillas.data);
+                    }}
+                />
+            )}
 
             {mensaje && (
                 <p style={{ color: mensaje.tipo === 'ok' ? 'var(--success)' : 'var(--danger)', fontSize: 13 }}>{mensaje.texto}</p>
