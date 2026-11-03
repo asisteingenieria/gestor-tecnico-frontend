@@ -308,6 +308,17 @@ export const asistenciaService = {
     asignarHorarios: (data) => api.post('/asistencia/horarios', data),
     actualizarHorario: (id, data) => api.put(`/asistencia/horarios/${id}`, data),
     eliminarHorario: (id) => api.delete(`/asistencia/horarios/${id}`),
+    // Malla de horarios en Excel (backend asistencia.md §55): misma subida para la vista previa y para aplicar.
+    previsualizarMalla: (archivo) => {
+        const formData = new FormData();
+        formData.append('archivo', archivo);
+        return api.post('/asistencia/horarios/malla/previsualizar', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 });
+    },
+    aplicarMalla: (archivo) => {
+        const formData = new FormData();
+        formData.append('archivo', archivo);
+        return api.post('/asistencia/horarios/malla/aplicar', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 });
+    },
 
     // Horas extra (§51): el jefe las solicita por su equipo y las aprueba su director.
     solicitarHoraExtra: (data) => api.post('/asistencia/horas-extra/solicitar', data),
