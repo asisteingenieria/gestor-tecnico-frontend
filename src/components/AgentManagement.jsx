@@ -36,6 +36,21 @@ const estadoBadge = (estado) => {
 const OPCIONES_DOCUMENTOS = ['Completos', 'Pendientes'];
 const estadoDocumentos = (e) => (Number(e.documentos_cargados) >= 2 ? 'Completos' : 'Pendientes');
 
+// 'YYYY-MM-DD' de una fecha (DATE o timestamp ISO). En UTC, igual que formatearFecha, para que
+// el valor del filtro coincida con el día que muestra la tabla.
+const aYMD = (v) => {
+    if (!v) return null;
+    if (typeof v === 'string') return v.slice(0, 10);
+    const d = new Date(v);
+    return isNaN(d) ? null : d.toISOString().slice(0, 10);
+};
+// Fechas distintas presentes en la lista para un campo, de la más reciente a la más antigua.
+const fechasUnicas = (lista, campo) => {
+    const set = new Set();
+    lista.forEach(e => { const d = aYMD(e[campo]); if (d) set.add(d); });
+    return [...set].sort((a, b) => b.localeCompare(a));
+};
+
 /** Chip de filtro con popover de checkboxes (Campaña / Estado / Cargo). */
 const FiltroChip = ({ etiqueta, opciones, seleccion, onChange }) => {
     const [abierto, setAbierto] = useState(false);
@@ -168,13 +183,11 @@ const AgentManagement = ({ soloLectura = false }) => {
     const [filtroAnalistas, setFiltroAnalistas] = useState(new Set());
     // Documentación del empleado y contrato y anexos (migración 088)
     const [filtroDocumentos, setFiltroDocumentos] = useState(new Set());
-    // Filtros de fecha (solo en la vista del admin): rango de fecha de ingreso y de registro.
-    const [fIngresoDesde, setFIngresoDesde] = useState('');
-    const [fIngresoHasta, setFIngresoHasta] = useState('');
-    const [fRegistroDesde, setFRegistroDesde] = useState('');
-    const [fRegistroHasta, setFRegistroHasta] = useState('');
-    const [fRetiroDesde, setFRetiroDesde] = useState('');
-    const [fRetiroHasta, setFRetiroHasta] = useState('');
+    // Filtros de fecha (solo en la vista del admin): un desplegable por fecha exacta de registro,
+    // de ingreso y de retiro. '' = todas; un valor 'YYYY-MM-DD' filtra a esa fecha.
+    const [fIngreso, setFIngreso] = useState('');
+    const [fRegistro, setFRegistro] = useState('');
+    const [fRetiro, setFRetiro] = useState('');
     const [perfilTabInicial, setPerfilTabInicial] = useState('Información');
 
     useEffect(() => {
@@ -191,7 +204,7 @@ const AgentManagement = ({ soloLectura = false }) => {
 
     useEffect(() => {
         setPage(1);
-    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, fIngresoDesde, fIngresoHasta, fRegistroDesde, fRegistroHasta, fRetiroDesde, fRetiroHasta, pageSize]);
+    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, fIngreso, fRegistro, fRetiro, pageSize]);
 
     // `silencioso`: recarga en segundo plano (socket / intervalo / botón) sin mostrar el
     // esqueleto de carga, para no parpadear la tabla que ya está en pantalla.
@@ -282,22 +295,9 @@ const AgentManagement = ({ soloLectura = false }) => {
         () => [...new Set(empleados.map(e => e.analista_encargado_nombre).filter(Boolean))].sort(),
         [empleados]
     );
-
-    // 'YYYY-MM-DD' de una fecha (DATE o timestamp ISO), para comparar rangos como texto.
-    const aYMD = (v) => {
-        if (!v) return null;
-        if (typeof v === 'string') return v.slice(0, 10);
-        const d = new Date(v);
-        return isNaN(d) ? null : d.toISOString().slice(0, 10);
-    };
-    const enRango = (valor, desde, hasta) => {
-        if (!desde && !hasta) return true;
-        const ymd = aYMD(valor);
-        if (!ymd) return false;
-        if (desde && ymd < desde) return false;
-        if (hasta && ymd > hasta) return false;
-        return true;
-    };
+    const opcionesFechaRegistro = useMemo(() => fechasUnicas(empleados, 'created_at'), [empleados]);
+    const opcionesFechaIngreso = useMemo(() => fechasUnicas(empleados, 'fecha_ingreso'), [empleados]);
+    const opcionesFechaRetiro = useMemo(() => fechasUnicas(empleados, 'fecha_retiro'), [empleados]);
 
     const filteredEmpleados = empleados.filter(e => {
         // En la vista del admin se oculta la ficha placeholder de German (dueño, cédula ficticia).
@@ -310,9 +310,9 @@ const AgentManagement = ({ soloLectura = false }) => {
         const coincideCargo = filtroCargos.size === 0 || filtroCargos.has(e.cargo_nombre);
         const coincideAnalista = filtroAnalistas.size === 0 || filtroAnalistas.has(e.analista_encargado_nombre);
         const coincideDocumentos = filtroDocumentos.size === 0 || filtroDocumentos.has(estadoDocumentos(e));
-        const coincideIngreso = !soloLectura || enRango(e.fecha_ingreso, fIngresoDesde, fIngresoHasta);
-        const coincideRegistro = !soloLectura || enRango(e.created_at, fRegistroDesde, fRegistroHasta);
-        const coincideRetiro = !soloLectura || enRango(e.fecha_retiro, fRetiroDesde, fRetiroHasta);
+        const coincideIngreso = !soloLectura || !fIngreso || aYMD(e.fecha_ingreso) === fIngreso;
+        const coincideRegistro = !soloLectura || !fRegistro || aYMD(e.created_at) === fRegistro;
+        const coincideRetiro = !soloLectura || !fRetiro || aYMD(e.fecha_retiro) === fRetiro;
         return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos && coincideIngreso && coincideRegistro && coincideRetiro;
     });
 
@@ -337,12 +337,10 @@ const AgentManagement = ({ soloLectura = false }) => {
         setFiltroCargos(new Set());
         setFiltroAnalistas(new Set());
         setFiltroDocumentos(new Set());
-        setFIngresoDesde(''); setFIngresoHasta('');
-        setFRegistroDesde(''); setFRegistroHasta('');
-        setFRetiroDesde(''); setFRetiroHasta('');
+        setFIngreso(''); setFRegistro(''); setFRetiro('');
     };
 
-    const hayFiltrosFecha = fIngresoDesde || fIngresoHasta || fRegistroDesde || fRegistroHasta || fRetiroDesde || fRetiroHasta;
+    const hayFiltrosFecha = fIngreso || fRegistro || fRetiro;
     const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0 || hayFiltrosFecha;
 
     if (!isRecursosHumanos && !(soloLectura && isAdmin)) {
@@ -459,38 +457,29 @@ const AgentManagement = ({ soloLectura = false }) => {
 
                     {soloLectura && (
                         <div className="ai-row" style={{ gap: 18, flexWrap: 'wrap', padding: '0 16px 12px', alignItems: 'flex-end' }}>
-                            <div className="ai-row" style={{ gap: 8, alignItems: 'flex-end' }}>
-                                <div>
-                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Ingreso desde</label>
-                                    <input type="date" className="ai-input" value={fIngresoDesde} max={fIngresoHasta || undefined} onChange={(e) => setFIngresoDesde(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Ingreso hasta</label>
-                                    <input type="date" className="ai-input" value={fIngresoHasta} min={fIngresoDesde || undefined} onChange={(e) => setFIngresoHasta(e.target.value)} />
-                                </div>
+                            <div>
+                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Fecha de registro</label>
+                                <select className="ai-input" value={fRegistro} onChange={(e) => setFRegistro(e.target.value)}>
+                                    <option value="">Todas</option>
+                                    {opcionesFechaRegistro.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
+                                </select>
                             </div>
-                            <div className="ai-row" style={{ gap: 8, alignItems: 'flex-end' }}>
-                                <div>
-                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Registro desde</label>
-                                    <input type="date" className="ai-input" value={fRegistroDesde} max={fRegistroHasta || undefined} onChange={(e) => setFRegistroDesde(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Registro hasta</label>
-                                    <input type="date" className="ai-input" value={fRegistroHasta} min={fRegistroDesde || undefined} onChange={(e) => setFRegistroHasta(e.target.value)} />
-                                </div>
+                            <div>
+                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Fecha de ingreso</label>
+                                <select className="ai-input" value={fIngreso} onChange={(e) => setFIngreso(e.target.value)}>
+                                    <option value="">Todas</option>
+                                    {opcionesFechaIngreso.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
+                                </select>
                             </div>
-                            <div className="ai-row" style={{ gap: 8, alignItems: 'flex-end' }}>
-                                <div>
-                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Retiro desde</label>
-                                    <input type="date" className="ai-input" value={fRetiroDesde} max={fRetiroHasta || undefined} onChange={(e) => setFRetiroDesde(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Retiro hasta</label>
-                                    <input type="date" className="ai-input" value={fRetiroHasta} min={fRetiroDesde || undefined} onChange={(e) => setFRetiroHasta(e.target.value)} />
-                                </div>
+                            <div>
+                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Fecha de retiro</label>
+                                <select className="ai-input" value={fRetiro} onChange={(e) => setFRetiro(e.target.value)}>
+                                    <option value="">Todas</option>
+                                    {opcionesFechaRetiro.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
+                                </select>
                             </div>
                             {hayFiltrosFecha && (
-                                <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => { setFIngresoDesde(''); setFIngresoHasta(''); setFRegistroDesde(''); setFRegistroHasta(''); setFRetiroDesde(''); setFRetiroHasta(''); }}>
+                                <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => { setFIngreso(''); setFRegistro(''); setFRetiro(''); }}>
                                     Limpiar fechas
                                 </button>
                             )}
