@@ -171,6 +171,8 @@ const AgentManagement = ({ soloLectura = false }) => {
     const [fIngresoHasta, setFIngresoHasta] = useState('');
     const [fRegistroDesde, setFRegistroDesde] = useState('');
     const [fRegistroHasta, setFRegistroHasta] = useState('');
+    const [fRetiroDesde, setFRetiroDesde] = useState('');
+    const [fRetiroHasta, setFRetiroHasta] = useState('');
     const [perfilTabInicial, setPerfilTabInicial] = useState('Información');
 
     useEffect(() => {
@@ -187,7 +189,7 @@ const AgentManagement = ({ soloLectura = false }) => {
 
     useEffect(() => {
         setPage(1);
-    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, fIngresoDesde, fIngresoHasta, fRegistroDesde, fRegistroHasta, pageSize]);
+    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, fIngresoDesde, fIngresoHasta, fRegistroDesde, fRegistroHasta, fRetiroDesde, fRetiroHasta, pageSize]);
 
     const fetchEmpleados = async () => {
         try {
@@ -295,7 +297,8 @@ const AgentManagement = ({ soloLectura = false }) => {
         const coincideDocumentos = filtroDocumentos.size === 0 || filtroDocumentos.has(estadoDocumentos(e));
         const coincideIngreso = !soloLectura || enRango(e.fecha_ingreso, fIngresoDesde, fIngresoHasta);
         const coincideRegistro = !soloLectura || enRango(e.created_at, fRegistroDesde, fRegistroHasta);
-        return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos && coincideIngreso && coincideRegistro;
+        const coincideRetiro = !soloLectura || enRango(e.fecha_retiro, fRetiroDesde, fRetiroHasta);
+        return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos && coincideIngreso && coincideRegistro && coincideRetiro;
     });
 
     const totalConActivos = empleados.filter(e => e.total_activos > 0).length;
@@ -321,9 +324,10 @@ const AgentManagement = ({ soloLectura = false }) => {
         setFiltroDocumentos(new Set());
         setFIngresoDesde(''); setFIngresoHasta('');
         setFRegistroDesde(''); setFRegistroHasta('');
+        setFRetiroDesde(''); setFRetiroHasta('');
     };
 
-    const hayFiltrosFecha = fIngresoDesde || fIngresoHasta || fRegistroDesde || fRegistroHasta;
+    const hayFiltrosFecha = fIngresoDesde || fIngresoHasta || fRegistroDesde || fRegistroHasta || fRetiroDesde || fRetiroHasta;
     const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0 || hayFiltrosFecha;
 
     if (!isRecursosHumanos && !(soloLectura && isAdmin)) {
@@ -450,8 +454,18 @@ const AgentManagement = ({ soloLectura = false }) => {
                                     <input type="date" className="ai-input" value={fRegistroHasta} min={fRegistroDesde || undefined} onChange={(e) => setFRegistroHasta(e.target.value)} />
                                 </div>
                             </div>
+                            <div className="ai-row" style={{ gap: 8, alignItems: 'flex-end' }}>
+                                <div>
+                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Retiro desde</label>
+                                    <input type="date" className="ai-input" value={fRetiroDesde} max={fRetiroHasta || undefined} onChange={(e) => setFRetiroDesde(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Retiro hasta</label>
+                                    <input type="date" className="ai-input" value={fRetiroHasta} min={fRetiroDesde || undefined} onChange={(e) => setFRetiroHasta(e.target.value)} />
+                                </div>
+                            </div>
                             {hayFiltrosFecha && (
-                                <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => { setFIngresoDesde(''); setFIngresoHasta(''); setFRegistroDesde(''); setFRegistroHasta(''); }}>
+                                <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => { setFIngresoDesde(''); setFIngresoHasta(''); setFRegistroDesde(''); setFRegistroHasta(''); setFRetiroDesde(''); setFRetiroHasta(''); }}>
                                     Limpiar fechas
                                 </button>
                             )}
@@ -522,6 +536,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                                     <th>Cargo</th>
                                     <th>Estado</th>
                                     <th>{soloLectura ? 'Fecha de ingreso' : 'Teléfono'}</th>
+                                    {soloLectura && <th>Fecha de retiro</th>}
                                     <th className="ai-td-actions">Acciones</th>
                                 </tr>
                             </thead>
@@ -557,6 +572,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                                             <td>{empleado.cargo_nombre ? primeraMayuscula(empleado.cargo_nombre) : '—'}</td>
                                             <td><span className={`ai-badge ${est.clase}`}><span className="ai-dot" />{est.texto}</span></td>
                                             <td className="ai-num">{soloLectura ? (formatearFecha(empleado.fecha_ingreso) || '—') : (empleado.telefono ? formatearTelefono(empleado.telefono) : '—')}</td>
+                                            {soloLectura && <td className="ai-num">{formatearFecha(empleado.fecha_retiro) || '—'}</td>}
                                             <td className="ai-td-actions">
                                                 <div className="ai-row-actions">
                                                     <button className="ai-icon-btn" aria-label="Ver perfil" title="Ver perfil" onClick={() => abrirPerfil(empleado.id)}>
