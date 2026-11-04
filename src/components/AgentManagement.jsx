@@ -10,11 +10,13 @@ import ConfirmarEliminarModal from './ConfirmarEliminarModal';
 import ImportEmpleadosModal from './ImportEmpleadosModal';
 import Pagination from './Pagination';
 import { nombrePropio, iniciales, claseCampania, formatearTelefono, primeraMayuscula } from '../utils/formatoRRHH';
+import { formatearFecha } from '../utils/fecha';
 import {
     Users, Plus, Search, Edit3, Trash2, Eye,
     Package, AlertCircle, UserCheck, Wallet,
-    Upload, Filter, ChevronDown, LayoutGrid, List
+    Upload, Filter, ChevronDown, LayoutGrid, List, RefreshCw
 } from 'lucide-react';
+import { escucharAsistencia } from '../utils/socketAsistencia';
 
 const PAGE_SIZES = [20, 25, 50];
 
@@ -33,6 +35,21 @@ const estadoBadge = (estado) => {
 // Documentación del empleado y contrato y anexos (migración 088): 2 por empleado.
 const OPCIONES_DOCUMENTOS = ['Completos', 'Pendientes'];
 const estadoDocumentos = (e) => (Number(e.documentos_cargados) >= 2 ? 'Completos' : 'Pendientes');
+
+// 'YYYY-MM-DD' de una fecha (DATE o timestamp ISO). En UTC, igual que formatearFecha, para que
+// el valor del filtro coincida con el día que muestra la tabla.
+const aYMD = (v) => {
+    if (!v) return null;
+    if (typeof v === 'string') return v.slice(0, 10);
+    const d = new Date(v);
+    return isNaN(d) ? null : d.toISOString().slice(0, 10);
+};
+// Fechas distintas presentes en la lista para un campo, de la más reciente a la más antigua.
+const fechasUnicas = (lista, campo) => {
+    const set = new Set();
+    lista.forEach(e => { const d = aYMD(e[campo]); if (d) set.add(d); });
+    return [...set].sort((a, b) => b.localeCompare(a));
+};
 
 /** Chip de filtro con popover de checkboxes (Campaña / Estado / Cargo). */
 const FiltroChip = ({ etiqueta, opciones, seleccion, onChange }) => {
@@ -145,6 +162,7 @@ const AgentManagement = ({ soloLectura = false }) => {
     const [empleados, setEmpleados] = useState([]);
     const [gastoTotal, setGastoTotal] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [refrescando, setRefrescando] = useState(false);
     const [error, setError] = useState('');
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showEditForm, setShowEditForm] = useState(false);
@@ -165,6 +183,11 @@ const AgentManagement = ({ soloLectura = false }) => {
     const [filtroAnalistas, setFiltroAnalistas] = useState(new Set());
     // Documentación del empleado y contrato y anexos (migración 088)
     const [filtroDocumentos, setFiltroDocumentos] = useState(new Set());
+    // Filtros de fecha (solo en la vista del admin): un desplegable por fecha exacta de registro,
+    // de ingreso y de retiro. '' = todas; un valor 'YYYY-MM-DD' filtra a esa fecha.
+    const [fIngreso, setFIngreso] = useState('');
+    const [fRegistro, setFRegistro] = useState('');
+    const [fRetiro, setFRetiro] = useState('');
     const [perfilTabInicial, setPerfilTabInicial] = useState('Información');
 
     useEffect(() => {
@@ -181,24 +204,37 @@ const AgentManagement = ({ soloLectura = false }) => {
 
     useEffect(() => {
         setPage(1);
-    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, pageSize]);
+    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, fIngreso, fRegistro, fRetiro, pageSize]);
 
-    const fetchEmpleados = async () => {
+    // `silencioso`: recarga en segundo plano (socket / intervalo / botón) sin mostrar el
+    // esqueleto de carga, para no parpadear la tabla que ya está en pantalla.
+    const fetchEmpleados = async ({ silencioso = false } = {}) => {
         try {
-            setLoading(true);
+            if (silencioso) setRefrescando(true); else setLoading(true);
             const response = await api.get('/users-company');
             setEmpleados(response.data.empleados);
             setError('');
         } catch (err) {
             console.error('Error al cargar empleados:', err);
-            setError('Error al cargar los empleados');
+            if (!silencioso) setError('Error al cargar los empleados');
         } finally {
-            setLoading(false);
+            if (silencioso) setRefrescando(false); else setLoading(false);
         }
     };
 
+    // Vista del admin (solo lectura): se mantiene al día sola. Recarga en vivo cuando RRHH
+    // registra, edita, retira, elimina o carga empleados por Excel (evento de socket
+    // 'empleados:actualizados'), y además cada 30 s como respaldo si el socket no está conectado.
+    useEffect(() => {
+        if (!soloLectura) return;
+        const dejarDeEscuchar = escucharAsistencia('empleados:actualizados', () => fetchEmpleados({ silencioso: true }));
+        const intervalo = setInterval(() => fetchEmpleados({ silencioso: true }), 30000);
+        return () => { dejarDeEscuchar(); clearInterval(intervalo); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [soloLectura]);
+
     const fetchGastoTotal = async () => {
-        if (!puedeVerGasto) return;
+        if (!puedeVerGasto || soloLectura) return;
         try {
             const response = await api.get('/users-company/gasto-total');
             setGastoTotal(response.data.gasto);
@@ -259,8 +295,13 @@ const AgentManagement = ({ soloLectura = false }) => {
         () => [...new Set(empleados.map(e => e.analista_encargado_nombre).filter(Boolean))].sort(),
         [empleados]
     );
+    const opcionesFechaRegistro = useMemo(() => fechasUnicas(empleados, 'created_at'), [empleados]);
+    const opcionesFechaIngreso = useMemo(() => fechasUnicas(empleados, 'fecha_ingreso'), [empleados]);
+    const opcionesFechaRetiro = useMemo(() => fechasUnicas(empleados, 'fecha_retiro'), [empleados]);
 
     const filteredEmpleados = empleados.filter(e => {
+        // En la vista del admin se oculta la ficha placeholder de German (dueño, cédula ficticia).
+        if (soloLectura && e.numero_identificacion === '0123456789') return false;
         const coincideTexto = !searchTerm || [
             e.nombre_completo, e.numero_identificacion, e.email, e.telefono, e.campania_nombre, e.cargo_nombre
         ].some(v => (v || '').toLowerCase().includes(searchTerm.toLowerCase()));
@@ -269,15 +310,25 @@ const AgentManagement = ({ soloLectura = false }) => {
         const coincideCargo = filtroCargos.size === 0 || filtroCargos.has(e.cargo_nombre);
         const coincideAnalista = filtroAnalistas.size === 0 || filtroAnalistas.has(e.analista_encargado_nombre);
         const coincideDocumentos = filtroDocumentos.size === 0 || filtroDocumentos.has(estadoDocumentos(e));
-        return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos;
+        const coincideIngreso = !soloLectura || !fIngreso || aYMD(e.fecha_ingreso) === fIngreso;
+        const coincideRegistro = !soloLectura || !fRegistro || aYMD(e.created_at) === fRegistro;
+        const coincideRetiro = !soloLectura || !fRetiro || aYMD(e.fecha_retiro) === fRetiro;
+        return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos && coincideIngreso && coincideRegistro && coincideRetiro;
     });
 
     const totalConActivos = empleados.filter(e => e.total_activos > 0).length;
     const totalActivos = empleados.reduce((sum, e) => sum + (e.total_activos || 0), 0);
 
-    const totalPages = Math.max(1, Math.ceil(filteredEmpleados.length / pageSize));
+    // En la vista del admin (solo lectura) se ordena por fecha de registro en el sistema
+    // (users_company.created_at), del más reciente al más antiguo, en vez del orden alfabético
+    // que trae el backend para RRHH.
+    const empleadosOrdenados = soloLectura
+        ? [...filteredEmpleados].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+        : filteredEmpleados;
+
+    const totalPages = Math.max(1, Math.ceil(empleadosOrdenados.length / pageSize));
     const paginaSegura = Math.min(page, totalPages);
-    const paginatedEmpleados = filteredEmpleados.slice((paginaSegura - 1) * pageSize, paginaSegura * pageSize);
+    const paginatedEmpleados = empleadosOrdenados.slice((paginaSegura - 1) * pageSize, paginaSegura * pageSize);
 
     const limpiarFiltros = () => {
         setSearchInput('');
@@ -286,9 +337,11 @@ const AgentManagement = ({ soloLectura = false }) => {
         setFiltroCargos(new Set());
         setFiltroAnalistas(new Set());
         setFiltroDocumentos(new Set());
+        setFIngreso(''); setFRegistro(''); setFRetiro('');
     };
 
-    const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0;
+    const hayFiltrosFecha = fIngreso || fRegistro || fRetiro;
+    const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0 || hayFiltrosFecha;
 
     if (!isRecursosHumanos && !(soloLectura && isAdmin)) {
         return (
@@ -319,6 +372,12 @@ const AgentManagement = ({ soloLectura = false }) => {
                                 <LayoutGrid size={14} strokeWidth={1.75} /> Tarjetas
                             </span>
                         </div>
+                        {soloLectura && (
+                            <button onClick={() => fetchEmpleados({ silencioso: true })} className="ai-btn ai-btn--secondary" disabled={refrescando} title="Actualizar la lista">
+                                <RefreshCw size={16} strokeWidth={1.75} className={refrescando ? 'animate-spin' : undefined} />
+                                {refrescando ? 'Actualizando…' : 'Actualizar'}
+                            </button>
+                        )}
                         {!soloLectura && (
                             <>
                                 <button onClick={() => setShowImportModal(true)} className="ai-btn ai-btn--secondary">
@@ -334,7 +393,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                     </div>
                 </div>
 
-                <div className="ai-kpi-strip" style={puedeVerGasto ? undefined : { gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                <div className="ai-kpi-strip" style={soloLectura ? { gridTemplateColumns: 'repeat(1, 1fr)' } : (puedeVerGasto ? undefined : { gridTemplateColumns: 'repeat(3, 1fr)' })}>
                     <div>
                         <span className="ai-kpi-icon"><Users size={18} strokeWidth={1.75} /></span>
                         <div>
@@ -342,21 +401,25 @@ const AgentManagement = ({ soloLectura = false }) => {
                             <p className="ai-kpi-value ai-num">{empleados.length}</p>
                         </div>
                     </div>
-                    <div>
-                        <span className="ai-kpi-icon"><UserCheck size={18} strokeWidth={1.75} /></span>
+                    {!soloLectura && (
                         <div>
-                            <p className="ai-kpi-label">Con activos asignados</p>
-                            <p className="ai-kpi-value ai-num">{totalConActivos}</p>
+                            <span className="ai-kpi-icon"><UserCheck size={18} strokeWidth={1.75} /></span>
+                            <div>
+                                <p className="ai-kpi-label">Con activos asignados</p>
+                                <p className="ai-kpi-value ai-num">{totalConActivos}</p>
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <span className="ai-kpi-icon"><Package size={18} strokeWidth={1.75} /></span>
+                    )}
+                    {!soloLectura && (
                         <div>
-                            <p className="ai-kpi-label">Total activos asignados</p>
-                            <p className="ai-kpi-value ai-num">{totalActivos}</p>
+                            <span className="ai-kpi-icon"><Package size={18} strokeWidth={1.75} /></span>
+                            <div>
+                                <p className="ai-kpi-label">Total activos asignados</p>
+                                <p className="ai-kpi-value ai-num">{totalActivos}</p>
+                            </div>
                         </div>
-                    </div>
-                    {puedeVerGasto && (
+                    )}
+                    {!soloLectura && puedeVerGasto && (
                         <div>
                             <span className="ai-kpi-icon"><Wallet size={18} strokeWidth={1.75} /></span>
                             <div>
@@ -391,6 +454,37 @@ const AgentManagement = ({ soloLectura = false }) => {
                         <FiltroChip etiqueta="Analista" opciones={opcionesAnalista} seleccion={filtroAnalistas} onChange={setFiltroAnalistas} />
                         <FiltroChip etiqueta="Documentos" opciones={OPCIONES_DOCUMENTOS} seleccion={filtroDocumentos} onChange={setFiltroDocumentos} />
                     </div>
+
+                    {soloLectura && (
+                        <div className="ai-row" style={{ gap: 18, flexWrap: 'wrap', padding: '0 16px 12px', alignItems: 'flex-end' }}>
+                            <div>
+                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Fecha de registro</label>
+                                <select className="ai-input" value={fRegistro} onChange={(e) => setFRegistro(e.target.value)}>
+                                    <option value="">Todas</option>
+                                    {opcionesFechaRegistro.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Fecha de ingreso</label>
+                                <select className="ai-input" value={fIngreso} onChange={(e) => setFIngreso(e.target.value)}>
+                                    <option value="">Todas</option>
+                                    {opcionesFechaIngreso.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Fecha de retiro</label>
+                                <select className="ai-input" value={fRetiro} onChange={(e) => setFRetiro(e.target.value)}>
+                                    <option value="">Todas</option>
+                                    {opcionesFechaRetiro.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
+                                </select>
+                            </div>
+                            {hayFiltrosFecha && (
+                                <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => { setFIngreso(''); setFRegistro(''); setFRetiro(''); }}>
+                                    Limpiar fechas
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     {loading ? (
                         <div>
@@ -449,12 +543,14 @@ const AgentManagement = ({ soloLectura = false }) => {
                         <table className="ai-table ai-table--dense">
                             <thead>
                                 <tr>
+                                    {soloLectura && <th>Fecha de registro</th>}
                                     <th>Empleado</th>
                                     <th>Identificación</th>
                                     <th>Campaña</th>
                                     <th>Cargo</th>
                                     <th>Estado</th>
-                                    <th>Teléfono</th>
+                                    <th>{soloLectura ? 'Fecha de ingreso' : 'Teléfono'}</th>
+                                    {soloLectura && <th>Fecha de retiro</th>}
                                     <th className="ai-td-actions">Acciones</th>
                                 </tr>
                             </thead>
@@ -464,6 +560,9 @@ const AgentManagement = ({ soloLectura = false }) => {
                                     const chipCampania = claseCampania(empleado.campania_nombre);
                                     return (
                                         <tr key={empleado.id}>
+                                            {soloLectura && (
+                                                <td className="ai-num">{formatearFecha(empleado.created_at) || '—'}</td>
+                                            )}
                                             <td>
                                                 <div className="ai-person">
                                                     <span className="ai-avatar">{iniciales(empleado.nombre_completo)}</span>
@@ -486,7 +585,8 @@ const AgentManagement = ({ soloLectura = false }) => {
                                             </td>
                                             <td>{empleado.cargo_nombre ? primeraMayuscula(empleado.cargo_nombre) : '—'}</td>
                                             <td><span className={`ai-badge ${est.clase}`}><span className="ai-dot" />{est.texto}</span></td>
-                                            <td className="ai-num">{empleado.telefono ? formatearTelefono(empleado.telefono) : '—'}</td>
+                                            <td className="ai-num">{soloLectura ? (formatearFecha(empleado.fecha_ingreso) || '—') : (empleado.telefono ? formatearTelefono(empleado.telefono) : '—')}</td>
+                                            {soloLectura && <td className="ai-num">{formatearFecha(empleado.fecha_retiro) || '—'}</td>}
                                             <td className="ai-td-actions">
                                                 <div className="ai-row-actions">
                                                     <button className="ai-icon-btn" aria-label="Ver perfil" title="Ver perfil" onClick={() => abrirPerfil(empleado.id)}>
