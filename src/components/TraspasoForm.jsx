@@ -4,7 +4,7 @@ import { traspasoService } from '../services/api';
 import ComboboxBuscable from './ComboboxBuscable';
 import SoportesDocumentales from './SoportesDocumentales';
 import { errorArchivoSoporte, abrirSoporte, subirSoportesPendientes } from '../utils/soportesRrhh';
-import { jefesCandidatos, conValorActual } from '../utils/catalogosRRHH';
+import { jefesCandidatos, conValorActual, entidadesVigentes } from '../utils/catalogosRRHH';
 import {
     CAMPOS_NUEVOS_POR_TIPO, OBLIGATORIOS_POR_TIPO, CAMPOS_ACTUALES, etiquetaCampo,
     TIPOS_CON_EVALUACION, DIAS_AVISO_RETORNO, restarDias
@@ -272,7 +272,7 @@ const TraspasoForm = ({ isOpen, onClose, traspaso = null, onSuccess, empleadoIni
         let lista = null;
         if (/^area/.test(nombre)) lista = catalogos.areas;
         else if (/^campania/.test(nombre)) lista = catalogos.campanias;
-        else if (/^centro_costo/.test(nombre)) lista = catalogos.centros_costo.map(c => ({ ...c, nombre: c.codigo ? `${c.codigo} — ${c.nombre}` : c.nombre }));
+        else if (/^centro_costo/.test(nombre)) lista = (esNuevo ? entidadesVigentes(catalogos.centros_costo, estado[nombre]) : catalogos.centros_costo).map(c => ({ ...c, nombre: c.codigo ? `${c.codigo} — ${c.nombre}` : c.nombre }));
         else if (/^cargo_(nuevo|anterior)_id$/.test(nombre)) lista = catalogos.cargos;
         else if (/^modalidad/.test(nombre)) lista = catalogos.modalidades;
         else if (nombre === 'tipo_contrato_anterior_id') lista = catalogos.tipos_contrato;
