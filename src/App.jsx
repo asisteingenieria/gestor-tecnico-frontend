@@ -526,6 +526,8 @@ function App() {
               <Route path="analytics" element={<AdminRoute><Analytics /></AdminRoute>} />
               <Route path="tecnicos" element={<AdminRoute><Tecnicos /></AdminRoute>} />
               <Route path="asset-history" element={<AdminRoute><AssetComponentHistory /></AdminRoute>} />
+              {/* Consulta de empleados de RRHH para el admin (solo lectura: ficha + documentos). */}
+              <Route path="empleados-consulta" element={<AdminRoute><AgentManagement soloLectura /></AdminRoute>} />
 
               {/* Rutas de gestión de activos */}
               <Route path="activos" element={<GestorActivosRoute><AssetManagement /></GestorActivosRoute>} />

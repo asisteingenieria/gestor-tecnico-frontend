@@ -15,7 +15,7 @@ const fecha = (iso) => (iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 
  * `documentos` es la lista del backend (los dos tipos, con `cargado`); `onCambio(documentos)`
  * recibe la lista nueva después de subir o eliminar.
  */
-const DocumentosEmpleado = ({ empleadoId, documentos, onCambio }) => {
+const DocumentosEmpleado = ({ empleadoId, documentos, onCambio, soloLectura = false }) => {
     const { vista, abriendo, error: errorVista, abrir, cerrar } = usePrevisualizacion();
     const [subiendo, setSubiendo] = useState(null); // { tipo, progreso }
     const [confirmarEliminar, setConfirmarEliminar] = useState(null);
@@ -118,13 +118,18 @@ const DocumentosEmpleado = ({ empleadoId, documentos, onCambio }) => {
                                             {abriendo === d.tipo ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />} Ver
                                         </button>
                                     )}
-                                    <button type="button" className={`ai-btn ai-btn--sm ${d.cargado ? 'ai-btn--ghost' : 'ai-btn--primary'}`} disabled={ocupado} onClick={() => elegirArchivo(d.tipo)}>
-                                        {d.cargado ? <><RefreshCw size={14} /> Reemplazar</> : <><Upload size={14} /> Subir PDF</>}
-                                    </button>
-                                    {d.cargado && (
+                                    {!soloLectura && (
+                                        <button type="button" className={`ai-btn ai-btn--sm ${d.cargado ? 'ai-btn--ghost' : 'ai-btn--primary'}`} disabled={ocupado} onClick={() => elegirArchivo(d.tipo)}>
+                                            {d.cargado ? <><RefreshCw size={14} /> Reemplazar</> : <><Upload size={14} /> Subir PDF</>}
+                                        </button>
+                                    )}
+                                    {!soloLectura && d.cargado && (
                                         <button type="button" className="ai-icon-btn ai-icon-btn--danger" aria-label={`Eliminar ${d.nombre}`} title="Eliminar" disabled={ocupado} onClick={() => setConfirmarEliminar(d.tipo)}>
                                             <Trash2 size={15} strokeWidth={1.75} />
                                         </button>
+                                    )}
+                                    {!d.cargado && soloLectura && (
+                                        <span className="ai-help" style={{ fontSize: 12 }}>Sin cargar</span>
                                     )}
                                     <input
                                         ref={(el) => { inputs.current[d.tipo] = el; }}

@@ -140,6 +140,7 @@ const Layout = () => {
         { name: 'Técnicos', href: '/tecnicos', icon: Trophy, roles: ['admin'] },
         { name: 'Analíticas', href: '/analytics', icon: BarChart3, roles: ['admin'] },
         { name: 'Tablero financiero', href: '/recursos-humanos/home', icon: LayoutDashboard, roles: ['admin'] },
+        { name: 'Empleados RRHH', href: '/empleados-consulta', icon: User, roles: ['admin'] },
         { name: 'Historial Componentes', href: '/asset-history', icon: History, roles: ['admin'] },
     ];
 
