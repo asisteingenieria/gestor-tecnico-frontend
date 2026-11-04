@@ -206,7 +206,7 @@ const AgentManagement = ({ soloLectura = false }) => {
     };
 
     const fetchGastoTotal = async () => {
-        if (!puedeVerGasto) return;
+        if (!puedeVerGasto || soloLectura) return;
         try {
             const response = await api.get('/users-company/gasto-total');
             setGastoTotal(response.data.gasto);
@@ -374,7 +374,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                     </div>
                 </div>
 
-                <div className="ai-kpi-strip" style={puedeVerGasto ? undefined : { gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                <div className="ai-kpi-strip" style={soloLectura ? { gridTemplateColumns: 'repeat(1, 1fr)' } : (puedeVerGasto ? undefined : { gridTemplateColumns: 'repeat(3, 1fr)' })}>
                     <div>
                         <span className="ai-kpi-icon"><Users size={18} strokeWidth={1.75} /></span>
                         <div>
@@ -382,21 +382,25 @@ const AgentManagement = ({ soloLectura = false }) => {
                             <p className="ai-kpi-value ai-num">{empleados.length}</p>
                         </div>
                     </div>
-                    <div>
-                        <span className="ai-kpi-icon"><UserCheck size={18} strokeWidth={1.75} /></span>
+                    {!soloLectura && (
                         <div>
-                            <p className="ai-kpi-label">Con activos asignados</p>
-                            <p className="ai-kpi-value ai-num">{totalConActivos}</p>
+                            <span className="ai-kpi-icon"><UserCheck size={18} strokeWidth={1.75} /></span>
+                            <div>
+                                <p className="ai-kpi-label">Con activos asignados</p>
+                                <p className="ai-kpi-value ai-num">{totalConActivos}</p>
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <span className="ai-kpi-icon"><Package size={18} strokeWidth={1.75} /></span>
+                    )}
+                    {!soloLectura && (
                         <div>
-                            <p className="ai-kpi-label">Total activos asignados</p>
-                            <p className="ai-kpi-value ai-num">{totalActivos}</p>
+                            <span className="ai-kpi-icon"><Package size={18} strokeWidth={1.75} /></span>
+                            <div>
+                                <p className="ai-kpi-label">Total activos asignados</p>
+                                <p className="ai-kpi-value ai-num">{totalActivos}</p>
+                            </div>
                         </div>
-                    </div>
-                    {puedeVerGasto && (
+                    )}
+                    {!soloLectura && puedeVerGasto && (
                         <div>
                             <span className="ai-kpi-icon"><Wallet size={18} strokeWidth={1.75} /></span>
                             <div>
