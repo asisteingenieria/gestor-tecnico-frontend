@@ -10,6 +10,7 @@ import ConfirmarEliminarModal from './ConfirmarEliminarModal';
 import ImportEmpleadosModal from './ImportEmpleadosModal';
 import Pagination from './Pagination';
 import { nombrePropio, iniciales, claseCampania, formatearTelefono, primeraMayuscula } from '../utils/formatoRRHH';
+import { formatearFecha } from '../utils/fecha';
 import {
     Users, Plus, Search, Edit3, Trash2, Eye,
     Package, AlertCircle, UserCheck, Wallet,
@@ -275,9 +276,16 @@ const AgentManagement = ({ soloLectura = false }) => {
     const totalConActivos = empleados.filter(e => e.total_activos > 0).length;
     const totalActivos = empleados.reduce((sum, e) => sum + (e.total_activos || 0), 0);
 
-    const totalPages = Math.max(1, Math.ceil(filteredEmpleados.length / pageSize));
+    // En la vista del admin (solo lectura) se ordena por fecha de registro en el sistema
+    // (users_company.created_at), del más reciente al más antiguo, en vez del orden alfabético
+    // que trae el backend para RRHH.
+    const empleadosOrdenados = soloLectura
+        ? [...filteredEmpleados].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+        : filteredEmpleados;
+
+    const totalPages = Math.max(1, Math.ceil(empleadosOrdenados.length / pageSize));
     const paginaSegura = Math.min(page, totalPages);
-    const paginatedEmpleados = filteredEmpleados.slice((paginaSegura - 1) * pageSize, paginaSegura * pageSize);
+    const paginatedEmpleados = empleadosOrdenados.slice((paginaSegura - 1) * pageSize, paginaSegura * pageSize);
 
     const limpiarFiltros = () => {
         setSearchInput('');
@@ -449,12 +457,13 @@ const AgentManagement = ({ soloLectura = false }) => {
                         <table className="ai-table ai-table--dense">
                             <thead>
                                 <tr>
+                                    {soloLectura && <th>Fecha de registro</th>}
                                     <th>Empleado</th>
                                     <th>Identificación</th>
                                     <th>Campaña</th>
                                     <th>Cargo</th>
                                     <th>Estado</th>
-                                    <th>Teléfono</th>
+                                    <th>{soloLectura ? 'Fecha de ingreso' : 'Teléfono'}</th>
                                     <th className="ai-td-actions">Acciones</th>
                                 </tr>
                             </thead>
@@ -464,6 +473,9 @@ const AgentManagement = ({ soloLectura = false }) => {
                                     const chipCampania = claseCampania(empleado.campania_nombre);
                                     return (
                                         <tr key={empleado.id}>
+                                            {soloLectura && (
+                                                <td className="ai-num">{formatearFecha(empleado.created_at) || '—'}</td>
+                                            )}
                                             <td>
                                                 <div className="ai-person">
                                                     <span className="ai-avatar">{iniciales(empleado.nombre_completo)}</span>
@@ -486,7 +498,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                                             </td>
                                             <td>{empleado.cargo_nombre ? primeraMayuscula(empleado.cargo_nombre) : '—'}</td>
                                             <td><span className={`ai-badge ${est.clase}`}><span className="ai-dot" />{est.texto}</span></td>
-                                            <td className="ai-num">{empleado.telefono ? formatearTelefono(empleado.telefono) : '—'}</td>
+                                            <td className="ai-num">{soloLectura ? (formatearFecha(empleado.fecha_ingreso) || '—') : (empleado.telefono ? formatearTelefono(empleado.telefono) : '—')}</td>
                                             <td className="ai-td-actions">
                                                 <div className="ai-row-actions">
                                                     <button className="ai-icon-btn" aria-label="Ver perfil" title="Ver perfil" onClick={() => abrirPerfil(empleado.id)}>
