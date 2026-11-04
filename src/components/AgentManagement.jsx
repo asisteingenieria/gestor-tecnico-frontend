@@ -14,8 +14,9 @@ import { formatearFecha } from '../utils/fecha';
 import {
     Users, Plus, Search, Edit3, Trash2, Eye,
     Package, AlertCircle, UserCheck, Wallet,
-    Upload, Filter, ChevronDown, LayoutGrid, List
+    Upload, Filter, ChevronDown, LayoutGrid, List, RefreshCw
 } from 'lucide-react';
+import { escucharAsistencia } from '../utils/socketAsistencia';
 
 const PAGE_SIZES = [20, 25, 50];
 
@@ -146,6 +147,7 @@ const AgentManagement = ({ soloLectura = false }) => {
     const [empleados, setEmpleados] = useState([]);
     const [gastoTotal, setGastoTotal] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [refrescando, setRefrescando] = useState(false);
     const [error, setError] = useState('');
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showEditForm, setShowEditForm] = useState(false);
@@ -191,19 +193,32 @@ const AgentManagement = ({ soloLectura = false }) => {
         setPage(1);
     }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, fIngresoDesde, fIngresoHasta, fRegistroDesde, fRegistroHasta, fRetiroDesde, fRetiroHasta, pageSize]);
 
-    const fetchEmpleados = async () => {
+    // `silencioso`: recarga en segundo plano (socket / intervalo / botón) sin mostrar el
+    // esqueleto de carga, para no parpadear la tabla que ya está en pantalla.
+    const fetchEmpleados = async ({ silencioso = false } = {}) => {
         try {
-            setLoading(true);
+            if (silencioso) setRefrescando(true); else setLoading(true);
             const response = await api.get('/users-company');
             setEmpleados(response.data.empleados);
             setError('');
         } catch (err) {
             console.error('Error al cargar empleados:', err);
-            setError('Error al cargar los empleados');
+            if (!silencioso) setError('Error al cargar los empleados');
         } finally {
-            setLoading(false);
+            if (silencioso) setRefrescando(false); else setLoading(false);
         }
     };
+
+    // Vista del admin (solo lectura): se mantiene al día sola. Recarga en vivo cuando RRHH
+    // registra, edita, retira, elimina o carga empleados por Excel (evento de socket
+    // 'empleados:actualizados'), y además cada 30 s como respaldo si el socket no está conectado.
+    useEffect(() => {
+        if (!soloLectura) return;
+        const dejarDeEscuchar = escucharAsistencia('empleados:actualizados', () => fetchEmpleados({ silencioso: true }));
+        const intervalo = setInterval(() => fetchEmpleados({ silencioso: true }), 30000);
+        return () => { dejarDeEscuchar(); clearInterval(intervalo); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [soloLectura]);
 
     const fetchGastoTotal = async () => {
         if (!puedeVerGasto || soloLectura) return;
@@ -359,6 +374,12 @@ const AgentManagement = ({ soloLectura = false }) => {
                                 <LayoutGrid size={14} strokeWidth={1.75} /> Tarjetas
                             </span>
                         </div>
+                        {soloLectura && (
+                            <button onClick={() => fetchEmpleados({ silencioso: true })} className="ai-btn ai-btn--secondary" disabled={refrescando} title="Actualizar la lista">
+                                <RefreshCw size={16} strokeWidth={1.75} className={refrescando ? 'animate-spin' : undefined} />
+                                {refrescando ? 'Actualizando…' : 'Actualizar'}
+                            </button>
+                        )}
                         {!soloLectura && (
                             <>
                                 <button onClick={() => setShowImportModal(true)} className="ai-btn ai-btn--secondary">
