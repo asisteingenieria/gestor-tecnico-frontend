@@ -136,7 +136,9 @@ const FiltroChip = ({ etiqueta, opciones, seleccion, onChange }) => {
     );
 };
 
-const AgentManagement = () => {
+// `soloLectura`: vista de consulta para el admin (Hanny Admin). Ve la lista, la ficha completa y
+// los documentos (ver/descargar), sin crear, editar, eliminar, importar, retirar ni traspasar.
+const AgentManagement = ({ soloLectura = false }) => {
     const { isRecursosHumanos, isFinanciera, isAdmin } = useAuth();
     // El gasto en salarios es de financiera/admin; recursosHumanos solo ve contratación.
     const puedeVerGasto = isFinanciera || isAdmin;
@@ -288,7 +290,7 @@ const AgentManagement = () => {
 
     const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0;
 
-    if (!isRecursosHumanos) {
+    if (!isRecursosHumanos && !(soloLectura && isAdmin)) {
         return (
             <div className="ai-scope" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div className="ai-card" style={{ padding: 32, textAlign: 'center' }}>
@@ -306,7 +308,7 @@ const AgentManagement = () => {
                 <div className="ai-page-head">
                     <div>
                         <h1 className="ai-page-title">Personal de la empresa</h1>
-                        <p className="ai-page-sub">Registra y administra los empleados y sus activos asignados</p>
+                        <p className="ai-page-sub">{soloLectura ? 'Consulta de empleados, su ficha y documentos (solo lectura)' : 'Registra y administra los empleados y sus activos asignados'}</p>
                     </div>
                     <div className="ai-row">
                         <div className="ai-seg">
@@ -317,14 +319,18 @@ const AgentManagement = () => {
                                 <LayoutGrid size={14} strokeWidth={1.75} /> Tarjetas
                             </span>
                         </div>
-                        <button onClick={() => setShowImportModal(true)} className="ai-btn ai-btn--secondary">
-                            <Upload size={16} strokeWidth={1.75} />
-                            Cargar Excel
-                        </button>
-                        <button onClick={handleCreateEmpleado} className="ai-btn ai-btn--primary">
-                            <Plus size={16} strokeWidth={1.75} />
-                            Nuevo empleado
-                        </button>
+                        {!soloLectura && (
+                            <>
+                                <button onClick={() => setShowImportModal(true)} className="ai-btn ai-btn--secondary">
+                                    <Upload size={16} strokeWidth={1.75} />
+                                    Cargar Excel
+                                </button>
+                                <button onClick={handleCreateEmpleado} className="ai-btn ai-btn--primary">
+                                    <Plus size={16} strokeWidth={1.75} />
+                                    Nuevo empleado
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -428,8 +434,12 @@ const AgentManagement = () => {
                                         </div>
                                         <div className="ai-row" style={{ justifyContent: 'flex-end' }}>
                                             <button className="ai-icon-btn" aria-label="Ver perfil" onClick={() => abrirPerfil(empleado.id)}><Eye size={16} strokeWidth={1.75} /></button>
-                                            <button className="ai-icon-btn" aria-label="Editar empleado" onClick={() => handleEditEmpleado(empleado)}><Edit3 size={16} strokeWidth={1.75} /></button>
-                                            <button className="ai-icon-btn ai-icon-btn--danger" aria-label="Eliminar empleado" onClick={() => setEmpleadoAEliminar(empleado)}><Trash2 size={16} strokeWidth={1.75} /></button>
+                                            {!soloLectura && (
+                                                <>
+                                                    <button className="ai-icon-btn" aria-label="Editar empleado" onClick={() => handleEditEmpleado(empleado)}><Edit3 size={16} strokeWidth={1.75} /></button>
+                                                    <button className="ai-icon-btn ai-icon-btn--danger" aria-label="Eliminar empleado" onClick={() => setEmpleadoAEliminar(empleado)}><Trash2 size={16} strokeWidth={1.75} /></button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -482,12 +492,16 @@ const AgentManagement = () => {
                                                     <button className="ai-icon-btn" aria-label="Ver perfil" title="Ver perfil" onClick={() => abrirPerfil(empleado.id)}>
                                                         <Eye size={16} strokeWidth={1.75} />
                                                     </button>
-                                                    <button className="ai-icon-btn" aria-label="Editar empleado" title="Editar empleado" onClick={() => handleEditEmpleado(empleado)}>
-                                                        <Edit3 size={16} strokeWidth={1.75} />
-                                                    </button>
-                                                    <button className="ai-icon-btn ai-icon-btn--danger" aria-label="Eliminar empleado" title="Eliminar empleado" onClick={() => setEmpleadoAEliminar(empleado)}>
-                                                        <Trash2 size={16} strokeWidth={1.75} />
-                                                    </button>
+                                                    {!soloLectura && (
+                                                        <>
+                                                            <button className="ai-icon-btn" aria-label="Editar empleado" title="Editar empleado" onClick={() => handleEditEmpleado(empleado)}>
+                                                                <Edit3 size={16} strokeWidth={1.75} />
+                                                            </button>
+                                                            <button className="ai-icon-btn ai-icon-btn--danger" aria-label="Eliminar empleado" title="Eliminar empleado" onClick={() => setEmpleadoAEliminar(empleado)}>
+                                                                <Trash2 size={16} strokeWidth={1.75} />
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -518,6 +532,7 @@ const AgentManagement = () => {
                     onClose={() => setPerfilEmpleadoId(null)}
                     empleadoId={perfilEmpleadoId}
                     tabInicial={perfilTabInicial}
+                    soloLectura={soloLectura}
                     onDocumentosCambio={fetchEmpleados}
                     onEditar={(empleado) => {
                         setPerfilEmpleadoId(null);

@@ -43,9 +43,13 @@ const Overline = ({ children }) => (
 const TAB_DOCUMENTOS = 'Documentos';
 // Documentos: los dos PDF del empleado (migración 088) y, si llegó de Hydra, los de contratación (087).
 const TABS = ['Información', 'Activos', 'Novedades', 'Historial', TAB_DOCUMENTOS];
+// En solo lectura (admin, Hanny) no se muestran Novedades ni Historial: son submódulos cerrados al
+// admin en el backend (verificarGestionRRHH) y quedan fuera de su alcance (empleados + documentos).
+const TABS_SOLO_LECTURA = ['Información', 'Activos', TAB_DOCUMENTOS];
 
 // `tabInicial`: con qué pestaña abre (al crear un empleado se abre en Documentos para cargarlos).
-const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTraspaso, tabInicial = 'Información', onDocumentosCambio }) => {
+// `soloLectura`: el admin solo consulta — sin editar, retirar, traspasar ni gestionar documentos.
+const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTraspaso, tabInicial = 'Información', onDocumentosCambio, soloLectura = false }) => {
     const [tab, setTab] = useState(tabInicial);
     const [empleado, setEmpleado] = useState(null);
     const [catalogos, setCatalogos] = useState(null);
@@ -85,7 +89,11 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                 setDocumentos(documentosRes.data.documentos || null);
 
                 const contratoId = empRes.data.empleado?.contrato?.idcontrato;
-                if (contratoId) {
+                if (soloLectura) {
+                    // El admin no consulta novedades ni traspasos (403 en el backend); se omiten.
+                    setNovedades([]);
+                    setTraspasos([]);
+                } else if (contratoId) {
                     const [novRes, trasRes] = await Promise.all([
                         novedadRrhhService.getAll({ contrato_id: contratoId }).catch(() => ({ data: { novedades: [] } })),
                         traspasoService.getAll({ contrato_id: contratoId }).catch(() => ({ data: { traspasos: [] } }))
@@ -108,7 +116,7 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
 
         cargar();
         return () => { cancelado = true; };
-    }, [isOpen, empleadoId, tabInicial]);
+    }, [isOpen, empleadoId, tabInicial, soloLectura]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -158,7 +166,7 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                 </div>
 
                 <div className="ai-tabs">
-                    {TABS.map(t => (
+                    {(soloLectura ? TABS_SOLO_LECTURA : TABS).map(t => (
                         <button key={t} type="button" className={`ai-tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)} style={{ background: 'transparent', border: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                             {t}
                             {t === 'Activos' && <span className="ai-count">{activos.length}</span>}
@@ -326,7 +334,7 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                     ) : tab === TAB_DOCUMENTOS ? (
                         <div className="ai-stack" style={{ gap: 16 }}>
                             {documentos
-                                ? <DocumentosEmpleado empleadoId={empleadoId} documentos={documentos} onCambio={(nuevos) => { setDocumentos(nuevos); onDocumentosCambio?.(); }} />
+                                ? <DocumentosEmpleado empleadoId={empleadoId} documentos={documentos} soloLectura={soloLectura} onCambio={(nuevos) => { setDocumentos(nuevos); onDocumentosCambio?.(); }} />
                                 : <p className="ai-muted" style={{ fontSize: 14 }}>No se pudieron cargar los documentos del empleado.</p>}
                             {documentosHydra && (
                                 <div>
@@ -376,26 +384,28 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                     )}
                 </div>
 
-                <div className="ai-modal-foot">
-                    <button
-                        type="button"
-                        className="ai-btn ai-btn--secondary"
-                        onClick={() => onTraspaso?.(empleadoId)}
-                        disabled={!puedeTraspasar}
-                        title={empleado && !puedeTraspasar ? 'Solo se traspasa a un empleado con contrato vigente' : undefined}
-                    >
-                        <ArrowLeftRight size={16} strokeWidth={1.75} />
-                        Traspasar
-                    </button>
-                    <button type="button" className="ai-btn ai-btn--secondary" onClick={() => onRetiro?.(empleadoId)} disabled={!empleado}>
-                        <UserX size={16} strokeWidth={1.75} />
-                        {retiro ? 'Ver retiro' : 'Registrar retiro'}
-                    </button>
-                    <button type="button" className="ai-btn ai-btn--primary" onClick={() => onEditar?.(empleado)} disabled={!empleado}>
-                        <Edit3 size={16} strokeWidth={1.75} />
-                        Editar
-                    </button>
-                </div>
+                {!soloLectura && (
+                    <div className="ai-modal-foot">
+                        <button
+                            type="button"
+                            className="ai-btn ai-btn--secondary"
+                            onClick={() => onTraspaso?.(empleadoId)}
+                            disabled={!puedeTraspasar}
+                            title={empleado && !puedeTraspasar ? 'Solo se traspasa a un empleado con contrato vigente' : undefined}
+                        >
+                            <ArrowLeftRight size={16} strokeWidth={1.75} />
+                            Traspasar
+                        </button>
+                        <button type="button" className="ai-btn ai-btn--secondary" onClick={() => onRetiro?.(empleadoId)} disabled={!empleado}>
+                            <UserX size={16} strokeWidth={1.75} />
+                            {retiro ? 'Ver retiro' : 'Registrar retiro'}
+                        </button>
+                        <button type="button" className="ai-btn ai-btn--primary" onClick={() => onEditar?.(empleado)} disabled={!empleado}>
+                            <Edit3 size={16} strokeWidth={1.75} />
+                            Editar
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
