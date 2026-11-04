@@ -98,7 +98,8 @@ export const SECCIONES_UI = [
                 alCambiar: (d, valor, cat) => conJefaturaSugerida({ ...d, 'contrato.campania_id': valor, _cliente_id: clienteDeCampania(cat.campanias, valor) || d._cliente_id }, cat)
             },
             { ruta: 'contrato.area_id', label: 'Área', tipo: 'select', catalogo: 'areas', requerido: true },
-            { ruta: 'contrato.centro_costo_id', label: 'Centro de costo', tipo: 'select', catalogo: 'centros_costo', requerido: true, render: (o) => `${o.codigo} — ${o.nombre}` },
+            // Solo los centros oficiales de Financiera (migración 093), más el ya elegido.
+            { ruta: 'contrato.centro_costo_id', label: 'Centro de costo', tipo: 'select', opciones: (d, cat) => entidadesVigentes(cat.centros_costo || [], d['contrato.centro_costo_id']), requerido: true, render: (o) => `${o.codigo} — ${o.nombre}` },
             {
                 ruta: 'contrato.cargo_id', label: 'Cargo', tipo: 'select', requerido: true, etiquetaSalario: true,
                 opciones: (d, cat) => cargosDeCliente(cat.cargos, cat.salarios_referencia, d._cliente_id, d['contrato.cargo_id']),

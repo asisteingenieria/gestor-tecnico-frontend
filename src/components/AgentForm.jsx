@@ -841,7 +841,7 @@ const AgentForm = ({ isOpen, onClose, agente = null, onSuccess }) => {
                                     {selectField('Cliente', 'cliente_id', clienteId, handleClienteChange, clientesUnicos, { required: paso === 2, tagSalario: true })}
                                     {selectField('Campaña', 'campania_id', contrato.campania_id, handleCampaniaChange, campaniasFiltradas, { required: paso === 2 })}
                                     {selectField('Área', 'area_id', contrato.area_id, onChange(setContrato), catalogos.areas, { required: paso === 2 })}
-                                    {selectField('Centro de costo', 'centro_costo_id', contrato.centro_costo_id, onChange(setContrato), catalogos.centros_costo, { required: paso === 2, render: o => `${o.codigo} — ${o.nombre}` })}
+                                    {selectField('Centro de costo', 'centro_costo_id', contrato.centro_costo_id, onChange(setContrato), entidadesVigentes(catalogos.centros_costo, contrato.centro_costo_id), { required: paso === 2, render: o => `${o.codigo} — ${o.nombre}` })}
                                     {selectField('Cargo', 'cargo_id', contrato.cargo_id, handleCargoChange, cargosFiltrados, { required: paso === 2, tagSalario: true })}
                                     {selectField('Tipo de contrato', 'tipo_contrato_id', contrato.tipo_contrato_id, handleTipoContratoChange, catalogos.tipos_contrato, { required: paso === 2 })}
                                     {selectField('Modalidad', 'modalidad_id', contrato.modalidad_id, onChange(setContrato), catalogos.modalidades, { required: paso === 2 })}
