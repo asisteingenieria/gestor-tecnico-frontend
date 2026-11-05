@@ -36,7 +36,7 @@ const Layout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [hearts, setHearts] = useState([]);
     const [sparks, setSparks] = useState([]);
-    const { user, logout, isAdmin, isSupervisor, isCoordinador, isJefeOperaciones, isTechnician, isDisenador, canSupervise } = useAuth();
+    const { user, logout, isAdmin, isSupervisor, isCoordinador, isJefeOperaciones, isTechnician, isDisenador, canSupervise, canVerEmpleadosRrhh } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -140,12 +140,15 @@ const Layout = () => {
         { name: 'Técnicos', href: '/tecnicos', icon: Trophy, roles: ['admin'] },
         { name: 'Analíticas', href: '/analytics', icon: BarChart3, roles: ['admin'] },
         { name: 'Tablero financiero', href: '/recursos-humanos/home', icon: LayoutDashboard, roles: ['admin'] },
-        { name: 'Empleados RRHH', href: '/empleados-consulta', icon: User, roles: ['admin'] },
+        { name: 'Empleados RRHH', href: '/empleados-consulta', icon: User, roles: ['admin'], permisoVerEmpleados: true },
         { name: 'Historial Componentes', href: '/asset-history', icon: History, roles: ['admin'] },
     ];
 
-    const filteredNavigation = navigation.filter(item => 
+    const filteredNavigation = navigation.filter(item =>
         item.roles.includes(user?.role)
+        // "Empleados RRHH" también aparece para usuarios con el permiso de solo lectura
+        // ver_empleados_rrhh (migración 095), aunque su rol no esté en la lista.
+        || (item.permisoVerEmpleados && canVerEmpleadosRrhh)
     );
 
     const isActive = (href) => location.pathname === href;

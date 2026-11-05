@@ -114,6 +114,10 @@ export const AuthProvider = ({ children }) => {
         // Viene como debeCambiarPassword del login o debe_cambiar_password de /auth/me.
         debeCambiarPassword: Boolean(user?.debeCambiarPassword || user?.debe_cambiar_password),
         isAdmin: user?.role === 'admin',
+        // Vista de empleados de RRHH en solo lectura (/empleados-consulta): el admin por su rol,
+        // o cualquier usuario con el permiso ver_empleados_rrhh (migración 095). Llega como
+        // verEmpleadosRrhh del login o ver_empleados_rrhh de /auth/me.
+        canVerEmpleadosRrhh: user?.role === 'admin' || Boolean(user?.verEmpleadosRrhh || user?.ver_empleados_rrhh),
         isCoordinador: user?.role === 'coordinador',
         isJefeOperaciones: user?.role === 'jefe_operaciones',
         isAdministrativo: user?.role === 'administrativo',

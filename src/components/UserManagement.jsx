@@ -40,7 +40,8 @@ const UserManagement = () => {
         role: '',
         sede: 'bogota',
         departamento: 'claro',
-        users_company_id: null
+        users_company_id: null,
+        ver_empleados_rrhh: false
     });
     const [showPassword, setShowPassword] = useState(false);
     const [empleadosDisponibles, setEmpleadosDisponibles] = useState([]);
@@ -248,7 +249,8 @@ const UserManagement = () => {
             role: '',
             sede: 'bogota',
             departamento: 'claro',
-            users_company_id: null
+            users_company_id: null,
+            ver_empleados_rrhh: false
         });
         setEmpleadosDisponibles([]);
         setBusquedaEmpleado('');
@@ -266,7 +268,8 @@ const UserManagement = () => {
             role: user.role,
             sede: user.sede || 'bogota',
             departamento: user.departamento || 'claro',
-            users_company_id: user.users_company_id || null
+            users_company_id: user.users_company_id || null,
+            ver_empleados_rrhh: Boolean(user.ver_empleados_rrhh)
         });
         if (ROLES_VINCULADOS_A_EMPLEADO.includes(user.role)) {
             cargarEmpleadosDisponibles(user.users_company_id || null);
@@ -653,6 +656,31 @@ const UserManagement = () => {
                                         ))}
                                     </select>
                                 </div>
+
+                                {/* Permiso: ver empleados de RRHH en solo lectura (migración 095).
+                                    Para roles que no administran RRHH por sí mismos (admin, RRHH y
+                                    financiera ya lo ven). Útil para habilitarle la vista a un
+                                    técnico puntual sin cambiarle el rol. */}
+                                {formData.role && !['admin', 'recursosHumanos', 'financiera'].includes(formData.role) && (
+                                    <div className="bg-slate-50 border border-slate-200 rounded-md p-3">
+                                        <label className="flex items-start gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(formData.ver_empleados_rrhh)}
+                                                onChange={(e) => setFormData({ ...formData, ver_empleados_rrhh: e.target.checked })}
+                                                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            />
+                                            <span className="text-sm text-gray-700">
+                                                <strong>Ver empleados de RRHH (solo lectura)</strong>
+                                                <span className="block text-xs text-gray-500 mt-0.5">
+                                                    Agrega al menú la opción "Empleados RRHH": puede ver la lista, la
+                                                    ficha completa y los documentos de los empleados, pero no crear,
+                                                    editar, eliminar, importar ni retirar.
+                                                </span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                )}
 
                                 {/* Empleado (ficha RRHH) - director_operaciones, empleado y recursosHumanos */}
                                 {ROLES_VINCULADOS_A_EMPLEADO.includes(formData.role) && (
