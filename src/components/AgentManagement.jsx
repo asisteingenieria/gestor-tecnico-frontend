@@ -156,7 +156,7 @@ const FiltroChip = ({ etiqueta, opciones, seleccion, onChange }) => {
 // `soloLectura`: vista de consulta para el admin (Hanny Admin). Ve la lista, la ficha completa y
 // los documentos (ver/descargar), sin crear, editar, eliminar, importar, retirar ni traspasar.
 const AgentManagement = ({ soloLectura = false }) => {
-    const { isRecursosHumanos, isFinanciera, isAdmin } = useAuth();
+    const { isRecursosHumanos, isFinanciera, isAdmin, canVerEmpleadosRrhh } = useAuth();
     // El gasto en salarios es de financiera/admin; recursosHumanos solo ve contratación.
     const puedeVerGasto = isFinanciera || isAdmin;
     const [empleados, setEmpleados] = useState([]);
@@ -343,7 +343,7 @@ const AgentManagement = ({ soloLectura = false }) => {
     const hayFiltrosFecha = fIngreso || fRegistro || fRetiro;
     const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0 || hayFiltrosFecha;
 
-    if (!isRecursosHumanos && !(soloLectura && isAdmin)) {
+    if (!isRecursosHumanos && !(soloLectura && canVerEmpleadosRrhh)) {
         return (
             <div className="ai-scope" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div className="ai-card" style={{ padding: 32, textAlign: 'center' }}>
