@@ -56,6 +56,9 @@ const UserManagement = () => {
     const ROLES_VINCULADOS_A_EMPLEADO = ['director_operaciones', 'empleado', 'recursosHumanos', 'financiera', 'sst'];
 
     const roles = [
+        // Administrador (admin) es distinto de "Administrativo": es el rol con el menú completo.
+        // Se incluye para poder editar una cuenta admin sin cambiarle el rol sin querer.
+        { value: 'admin', label: 'Administrador', color: 'bg-red-100 text-red-800' },
         { value: 'coordinador', label: 'Coordinador', color: 'bg-blue-100 text-blue-800' },
         { value: 'technician', label: 'Técnico', color: 'bg-green-100 text-green-800' },
         { value: 'jefe_operaciones', label: 'Jefe de Operaciones', color: 'bg-purple-100 text-purple-800' },
@@ -445,6 +448,7 @@ const UserManagement = () => {
                             className="block w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="all">Todos los roles</option>
+                            <option value="admin">Administradores</option>
                             <option value="coordinador">Coordinadores</option>
                             <option value="technician">Técnicos</option>
                             <option value="jefe_operaciones">Jefes de Operaciones</option>
