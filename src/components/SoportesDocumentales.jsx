@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ACCEPT_SOPORTE, tamanoLegible, abrirSoporte } from '../utils/soportesRrhh';
+import { ACCEPT_SOPORTE, tamanoLegible } from '../utils/soportesRrhh';
 import { Upload, FileText, Eye, Trash2, Check, X as XIcon } from 'lucide-react';
+import PrevisualizacionDocumento from './PrevisualizacionDocumento';
+import { usePrevisualizacion } from '../hooks/usePrevisualizacion';
 
 /**
  * Sección "Soportes documentales" de los formularios de RRHH (novedades, traspasos): muestra solo
@@ -101,31 +103,59 @@ const SoportesDocumentales = ({
 
 /**
  * Resumen de solo lectura para el detalle de una fila (tablas de novedades y traspasos): los
- * soportes que aplican, en verde los cargados (se abren con un clic: la descarga va con el token,
- * no hay URL pública) y en gris los pendientes.
+ * soportes que aplican, en verde los cargados (se abren con un clic en el visor en modal: la descarga
+ * va con el token, no hay URL pública) y en gris los pendientes.
  *  - cargar(): promesa con { data: { soportes } }; descargar(tipoSoporteId): promesa con el blob.
  */
-export const SoportesResumen = ({ cargar, descargar, textoSinSoportes = 'Este tipo no requiere soportes.' }) => {
+export const SoportesResumen = ({ cargar, descargar, descargarExpediente, textoSinSoportes = 'Este tipo no requiere soportes.' }) => {
     const [soportes, setSoportes] = useState(null);
+    const [expediente, setExpediente] = useState([]);
     const [error, setError] = useState('');
 
     useEffect(() => {
         cargar()
-            .then(({ data }) => setSoportes(data.soportes))
+            .then(({ data }) => { setSoportes(data.soportes); setExpediente(data.expediente || []); })
             .catch(() => setError('No se pudieron cargar los soportes'));
         // eslint-disable-next-line react-hooks/exhaustive-deps -- se carga una vez al abrir el detalle
     }, []);
 
-    const abrir = (tipoSoporteId) => abrirSoporte(() => descargar(tipoSoporteId)).catch(() => setError('No se pudo abrir el soporte'));
+    const { vista, abriendo, error: errorVista, abrir: previsualizar, cerrar } = usePrevisualizacion();
+    const abrir = (s) => previsualizar(`s${s.tipo_soporte_id}`,
+        { nombre: s.nombre, nombre_original: s.nombre_original, mime: s.mime, tamano_bytes: s.tamano },
+        () => descargar(s.tipo_soporte_id));
+    const abrirDelExpediente = (a) => previsualizar(`e${a.id}`,
+        { nombre: a.nombre, nombre_original: a.nombre, mime: a.mime, tamano_bytes: a.tamano },
+        () => descargarExpediente(a.id));
+    const visor = (
+        <>
+            {errorVista && <p className="ai-muted" style={{ fontSize: 13, color: 'var(--danger)', marginTop: 8 }}>{errorVista}</p>}
+            <PrevisualizacionDocumento vista={vista} onClose={cerrar} />
+        </>
+    );
 
     if (error) return <p className="ai-muted" style={{ fontSize: 13 }}>{error}</p>;
     if (!soportes) return <p className="ai-muted" style={{ fontSize: 13 }}>Cargando…</p>;
     const aplican = soportes.filter(s => Number(s.aplica) === 1);
-    if (aplican.length === 0) return <p className="ai-muted" style={{ fontSize: 13 }}>{textoSinSoportes}</p>;
+    // Documentos del expediente enlazados a la novedad (cargue masivo, migración 098): el PDF de la
+    // carpeta compartida suele traer todos los soportes juntos, por eso van aparte.
+    const delExpediente = descargarExpediente && expediente.length > 0 && (
+        <div style={{ marginTop: aplican.length ? 12 : 0 }}>
+            <p className="ai-muted" style={{ fontSize: 12, marginBottom: 6 }}>Documento del expediente (6. Novedades)</p>
+            <div className="ai-row">
+                {expediente.map(a => (
+                    <button key={a.id} type="button" onClick={() => abrirDelExpediente(a)} disabled={abriendo === `e${a.id}`} className="ai-badge ai-badge--info" style={{ cursor: 'pointer', border: 0 }} title={`${a.subcarpeta ? `${a.subcarpeta}/` : ''}${a.nombre}`}>
+                        <FileText size={12} /> {a.nombre}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+    if (aplican.length === 0) return <>{delExpediente || <p className="ai-muted" style={{ fontSize: 13 }}>{textoSinSoportes}</p>}{visor}</>;
     return (
+        <>
         <div className="ai-row">
             {aplican.map(s => s.id ? (
-                <button key={s.tipo_soporte_id} type="button" onClick={() => abrir(s.tipo_soporte_id)} className="ai-badge ai-badge--success" style={{ cursor: 'pointer', border: 0 }} title={s.nombre_original}>
+                <button key={s.tipo_soporte_id} type="button" onClick={() => abrir(s)} disabled={abriendo === `s${s.tipo_soporte_id}`} className="ai-badge ai-badge--success" style={{ cursor: 'pointer', border: 0 }} title={s.nombre_original}>
                     <Check size={12} /> {s.nombre}
                 </button>
             ) : (
@@ -134,6 +164,9 @@ export const SoportesResumen = ({ cargar, descargar, textoSinSoportes = 'Este ti
                 </span>
             ))}
         </div>
+        {delExpediente}
+        {visor}
+        </>
     );
 };
 
