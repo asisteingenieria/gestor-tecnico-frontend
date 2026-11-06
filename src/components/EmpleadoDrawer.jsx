@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api, { contratacionHydraService, novedadRrhhService, traspasoService, userCompanyService } from '../services/api';
 import DocumentosHydra from './contratacionHydra/DocumentosHydra';
 import DocumentosEmpleado from './DocumentosEmpleado';
+import ExpedienteEmpleado from './ExpedienteEmpleado';
 import { formatearFecha } from '../utils/fecha';
 import { nombrePropio, iniciales, formatearTelefono, primeraMayuscula } from '../utils/formatoRRHH';
 import {
@@ -41,7 +42,8 @@ const Overline = ({ children }) => (
 );
 
 const TAB_DOCUMENTOS = 'Documentos';
-// Documentos: los dos PDF del empleado (migración 088) y, si llegó de Hydra, los de contratación (087).
+// Documentos: el expediente por carpetas (097), los dos PDF del empleado (088) y, si llegó de Hydra,
+// los de contratación (087).
 const TABS = ['Información', 'Activos', 'Novedades', 'Historial', TAB_DOCUMENTOS];
 // En solo lectura (admin, Hanny) no se muestran Novedades ni Historial: son submódulos cerrados al
 // admin en el backend (verificarGestionRRHH) y quedan fuera de su alcance (empleados + documentos).
@@ -141,7 +143,15 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
     const estado = empleado?.estado_contrato_nombre;
     const estadoClase = estado === 'activo' ? 'ai-badge--success' : ['retirado', 'inactivo'].includes(estado) ? 'ai-badge--danger' : 'ai-badge--warning';
     const puedeTraspasar = !!contrato?.idcontrato && !['retirado', 'inactivo'].includes(estado);
-    const documentosPendientes = (documentos || []).filter(d => !d.cargado).length;
+    // Un documento está si se cargó su PDF o si su carpeta del expediente (2.DOCUMENTOS / 3.CONTRATO) tiene
+    // archivos (`completo`, del backend). El aviso nombra los que faltan; si no falta ninguno, no sale.
+    const documentosFaltantes = (documentos || []).filter(d => !(d.completo ?? d.cargado)).map(d => d.nombre);
+    const recargarDocumentos = () => {
+        userCompanyService.getDocumentos(empleadoId)
+            .then(({ data }) => setDocumentos(data.documentos || null))
+            .catch(() => {});
+        onDocumentosCambio?.();
+    };
 
     return (
         <div className="ai-overlay ai-scope" style={{ position: 'fixed', inset: 0, zIndex: 50, justifyContent: 'flex-end', padding: 0 }} onClick={onClose}>
@@ -157,9 +167,9 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                     <div className="ai-row" style={{ marginTop: 10 }}>
                         {empleado?.campania_nombre && <span className="ai-chip" style={{ background: 'rgba(255,255,255,.16)', color: '#fff' }}>{empleado.campania_nombre}</span>}
                         {estado && <span className={`ai-badge ${estadoClase}`} style={{ background: '#fff' }}><span className="ai-dot" />{primeraMayuscula(estado)}</span>}
-                        {documentosPendientes > 0 && (
-                            <button type="button" className="ai-badge ai-badge--warning" style={{ background: '#fff', border: 0, cursor: 'pointer' }} onClick={() => setTab(TAB_DOCUMENTOS)}>
-                                <span className="ai-dot" />Faltan documentos ({documentosPendientes})
+                        {documentosFaltantes.length > 0 && (
+                            <button type="button" className="ai-badge ai-badge--warning" style={{ background: '#fff', border: 0, cursor: 'pointer', height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => setTab(TAB_DOCUMENTOS)}>
+                                <span className="ai-dot" />{documentosFaltantes.length === 1 ? 'Falta' : 'Faltan'}: {documentosFaltantes.join(' y ')}
                             </button>
                         )}
                     </div>
@@ -333,6 +343,8 @@ const EmpleadoDrawer = ({ isOpen, onClose, empleadoId, onEditar, onRetiro, onTra
                         )
                     ) : tab === TAB_DOCUMENTOS ? (
                         <div className="ai-stack" style={{ gap: 16 }}>
+                            {/* Expediente documental (migración 097): carpetas 1.SELECCION … 6.NOVEDADES. */}
+                            <ExpedienteEmpleado empleadoId={empleadoId} soloLectura={soloLectura} onCambio={recargarDocumentos} />
                             {documentos
                                 ? <DocumentosEmpleado empleadoId={empleadoId} documentos={documentos} soloLectura={soloLectura} onCambio={(nuevos) => { setDocumentos(nuevos); onDocumentosCambio?.(); }} />
                                 : <p className="ai-muted" style={{ fontSize: 14 }}>No se pudieron cargar los documentos del empleado.</p>}

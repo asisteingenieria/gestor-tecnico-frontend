@@ -24,7 +24,9 @@ const DocumentosEmpleado = ({ empleadoId, documentos, onCambio, soloLectura = fa
     const inputs = useRef({});
 
     if (!documentos) return null;
-    const pendientes = documentos.filter(d => !d.cargado).length;
+    // Está si se cargó el PDF o si su carpeta del expediente tiene archivos (`completo`, migración 097).
+    const estaCompleto = (d) => d.completo ?? d.cargado;
+    const faltantes = documentos.filter(d => !estaCompleto(d)).map(d => d.nombre);
 
     const subir = async (tipo, archivo) => {
         setError('');
@@ -74,9 +76,11 @@ const DocumentosEmpleado = ({ empleadoId, documentos, onCambio, soloLectura = fa
                 <p className="ai-overline" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <FileText size={14} strokeWidth={1.75} /> Documentos del empleado
                 </p>
-                {pendientes > 0
-                    ? <span className="ai-badge ai-badge--warning"><span className="ai-dot" />{pendientes === 1 ? 'Falta 1' : `Faltan ${pendientes}`}</span>
-                    : <span className="ai-badge ai-badge--success"><span className="ai-dot" />Completos</span>}
+                {faltantes.length > 0 && (
+                    <span className="ai-badge ai-badge--warning" style={{ height: 'auto', whiteSpace: 'normal' }}>
+                        <span className="ai-dot" />{faltantes.length === 1 ? 'Falta' : 'Faltan'}: {faltantes.join(' y ')}
+                    </span>
+                )}
             </div>
 
             {(error || errorVista) && (
@@ -92,7 +96,7 @@ const DocumentosEmpleado = ({ empleadoId, documentos, onCambio, soloLectura = fa
                             {/* Nombre y archivo a todo el ancho; las acciones van debajo para no cortarlos. */}
                             <div style={{ fontSize: 13, minWidth: 0 }}>
                                 <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    {d.cargado
+                                    {estaCompleto(d)
                                         ? <CheckCircle2 size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
                                         : <AlertTriangle size={14} style={{ color: 'var(--warning)', flexShrink: 0 }} />}
                                     {d.nombre}
@@ -102,8 +106,12 @@ const DocumentosEmpleado = ({ empleadoId, documentos, onCambio, soloLectura = fa
                                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.nombre_original}>{d.nombre_original}</div>
                                         <div style={{ color: 'var(--ink-subtle)' }}>{tamanoLegible(d.tamano)} · cargado {fecha(d.cargado_en)}</div>
                                     </>
+                                ) : d.en_expediente > 0 ? (
+                                    <div style={{ color: 'var(--ink-subtle)' }}>
+                                        En el expediente: {d.carpeta_expediente} ({d.en_expediente === 1 ? '1 archivo' : `${d.en_expediente} archivos`})
+                                    </div>
                                 ) : (
-                                    <div style={{ color: 'var(--ink-subtle)' }}>Pendiente · PDF unificado de hasta {MAX_MB} MB</div>
+                                    <div style={{ color: 'var(--ink-subtle)' }}>Pendiente · PDF unificado de hasta {MAX_MB} MB, o súbelo a {d.carpeta_expediente || 'su carpeta'} del expediente</div>
                                 )}
                             </div>
                             <div>
@@ -119,7 +127,7 @@ const DocumentosEmpleado = ({ empleadoId, documentos, onCambio, soloLectura = fa
                                         </button>
                                     )}
                                     {!soloLectura && (
-                                        <button type="button" className={`ai-btn ai-btn--sm ${d.cargado ? 'ai-btn--ghost' : 'ai-btn--primary'}`} disabled={ocupado} onClick={() => elegirArchivo(d.tipo)}>
+                                        <button type="button" className={`ai-btn ai-btn--sm ${estaCompleto(d) ? 'ai-btn--ghost' : 'ai-btn--primary'}`} disabled={ocupado} onClick={() => elegirArchivo(d.tipo)}>
                                             {d.cargado ? <><RefreshCw size={14} /> Reemplazar</> : <><Upload size={14} /> Subir PDF</>}
                                         </button>
                                     )}
@@ -128,7 +136,7 @@ const DocumentosEmpleado = ({ empleadoId, documentos, onCambio, soloLectura = fa
                                             <Trash2 size={15} strokeWidth={1.75} />
                                         </button>
                                     )}
-                                    {!d.cargado && soloLectura && (
+                                    {!estaCompleto(d) && soloLectura && (
                                         <span className="ai-help" style={{ fontSize: 12 }}>Sin cargar</span>
                                     )}
                                     <input
