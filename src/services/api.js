@@ -203,7 +203,9 @@ export const novedadRrhhService = {
         return api.post(`/users-company/novedades/${id}/soportes/${tipoSoporteId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 });
     },
     descargarSoporte: (id, tipoSoporteId) => api.get(`/users-company/novedades/${id}/soportes/${tipoSoporteId}/archivo`, { responseType: 'blob' }),
-    eliminarSoporte: (id, tipoSoporteId) => api.delete(`/users-company/novedades/${id}/soportes/${tipoSoporteId}`)
+    eliminarSoporte: (id, tipoSoporteId) => api.delete(`/users-company/novedades/${id}/soportes/${tipoSoporteId}`),
+    // Documento del expediente enlazado a la novedad por el cargue masivo (migración 098)
+    descargarDocumentoExpediente: (id, archivoId) => api.get(`/users-company/novedades/${id}/expediente/${archivoId}/archivo`, { responseType: 'blob', timeout: 0 })
 };
 
 // === SERVICIOS DE TRASPASOS ===

@@ -4,6 +4,7 @@ import { novedadRrhhService } from '../services/api';
 import ComboboxBuscable from './ComboboxBuscable';
 import SoportesDocumentales from './SoportesDocumentales';
 import { errorArchivoSoporte, abrirSoporte, subirSoportesPendientes } from '../utils/soportesRrhh';
+import { primeraMayuscula } from '../utils/formatoRRHH';
 import { X, Save, ClipboardList } from 'lucide-react';
 
 const fecha = (v) => (v ? String(v).substring(0, 10) : '');
@@ -12,6 +13,40 @@ const fecha = (v) => (v ? String(v).substring(0, 10) : '');
 // FURIPS, SOAT) ya no se muestran: los reemplazan los archivos de la hoja "Novedades" (069).
 // Se conservan en el estado para que editar una novedad vieja no los ponga en 0.
 const FLAGS_SOPORTE_VIEJOS = ['tiene_documento_original', 'tiene_copia_documento', 'tiene_historia_clinica', 'tiene_runt', 'tiene_furips', 'tiene_soat'];
+
+// Responsable de una novedad: se sugieren las personas que pueden reportarla hoy, todas activas
+// (sin retiro): su jefe inmediato, los coordinadores/jefes/team leaders de su campaña y su jefe y
+// director de área. Un jefe retirado no se sugiere (hay fichas que aún apuntan a coordinadores que
+// salieron; §50 de claude/modulo recursoshumanos.md). Se elige solo su jefe inmediato si está activo.
+const CARGO_DE_COORDINACION = /^(COORDINADOR|JEFE|TEAM LEADER)/i;
+const ordenCargo = (cargo) => (/^COORDINADOR/i.test(cargo) ? 0 : /^TEAM LEADER/i.test(cargo) ? 1 : 2);
+const activo = (e) => e && !e.fecha_retiro;
+
+function sugerenciasResponsable(empleado, empleados) {
+    if (!empleado) return { opciones: [], automatico: null, jefeRetirado: null };
+    const porId = new Map();
+    const agregar = (persona, etiqueta) => {
+        if (!activo(persona) || String(persona.id) === String(empleado.id)) return;
+        if (porId.has(persona.id)) { porId.get(persona.id).etiquetas.push(etiqueta); return; }
+        porId.set(persona.id, { id: persona.id, nombreCompleto: persona.nombre_completo, etiquetas: [etiqueta] });
+    };
+    const ficha = (id) => (id ? empleados.find(e => String(e.id) === String(id)) : null);
+
+    const jefeInmediato = ficha(empleado.jefe_inmediato_id);
+    agregar(jefeInmediato, 'Jefe inmediato');
+    empleados
+        .filter(e => empleado.campania_nombre && e.campania_nombre === empleado.campania_nombre && CARGO_DE_COORDINACION.test(e.cargo_nombre || ''))
+        .sort((a, b) => ordenCargo(a.cargo_nombre) - ordenCargo(b.cargo_nombre) || a.nombre_completo.localeCompare(b.nombre_completo))
+        .forEach(e => agregar(e, primeraMayuscula(e.cargo_nombre)));
+    agregar(ficha(empleado.jefe_area_id), 'Jefe de área');
+    agregar(ficha(empleado.director_area_id), 'Director de área');
+
+    return {
+        opciones: [...porId.values()].map(p => ({ id: p.id, nombre: `${p.nombreCompleto} — ${p.etiquetas.join(' · ')}` })),
+        automatico: activo(jefeInmediato) ? jefeInmediato.id : null,
+        jefeRetirado: jefeInmediato && !activo(jefeInmediato) ? jefeInmediato.nombre_completo : null
+    };
+}
 
 const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
     const [empleados, setEmpleados] = useState([]);
@@ -30,6 +65,7 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
     const [soportesGuardados, setSoportesGuardados] = useState([]);
     const [archivos, setArchivos] = useState({}); // tipo_soporte_id -> File por subir
     const [huboCambios, setHuboCambios] = useState(false);
+    const [responsableEntreTodos, setResponsableEntreTodos] = useState(false);
     const [loadingData, setLoadingData] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -84,9 +120,21 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
         nombre: `${emp.nombre_completo} — ${emp.numero_identificacion}`
     }));
 
+    const empleadoElegido = empleados.find(x => String(x.id) === String(form.empleado_id));
+    const { opciones: jefes, jefeRetirado } = sugerenciasResponsable(empleadoElegido, empleados);
+    const opcionesTodos = empleados.map(emp => ({ id: emp.id, nombre: `${emp.nombre_completo} — ${emp.numero_identificacion}` }));
+    // Solo sus jefes, salvo que pida buscar entre todos o que no tenga jefes registrados. Si la
+    // novedad ya tiene otro responsable (al editar), se conserva en la lista.
+    const soloJefes = !responsableEntreTodos && jefes.length > 0;
+    const opcionesResponsable = soloJefes
+        ? [...jefes, ...opcionesTodos.filter(o => String(o.id) === String(form.responsable_id) && !jefes.some(j => String(j.id) === String(o.id)))]
+        : opcionesTodos;
+
     const onChangeEmpleado = (empleadoId) => {
         const emp = empleados.find(x => String(x.id) === String(empleadoId));
-        setForm(prev => ({ ...prev, empleado_id: empleadoId, contrato_id: emp?.idcontrato || '' }));
+        const { automatico } = sugerenciasResponsable(emp, empleados);
+        setResponsableEntreTodos(false);
+        setForm(prev => ({ ...prev, empleado_id: empleadoId, contrato_id: emp?.idcontrato || '', responsable_id: automatico || '' }));
     };
 
     const onChange = (e) => {
@@ -251,14 +299,30 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Responsable</label>
-                                        <select name="responsable_id" value={form.responsable_id} onChange={onChange} className="ai-input">
-                                            <option value="">Sin especificar</option>
-                                            {empleados.map(emp => (
-                                                <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>
-                                            ))}
-                                        </select>
+                                    <div>
+                                        <ComboboxBuscable
+                                            label="Responsable"
+                                            opciones={opcionesResponsable}
+                                            value={form.responsable_id}
+                                            onChange={(id) => setForm(prev => ({ ...prev, responsable_id: id || '' }))}
+                                            placeholder={soloJefes ? 'Coordinadores y jefes…' : 'Nombre o cédula…'}
+                                            unidad="empleados"
+                                        />
+                                        {jefeRetirado && !form.responsable_id && (
+                                            <p className="ai-muted" style={{ fontSize: 12, marginTop: 4 }}>
+                                                Su jefe inmediato en la ficha ({primeraMayuscula(jefeRetirado)}) está retirado: elige a su coordinador actual.
+                                            </p>
+                                        )}
+                                        {jefes.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setResponsableEntreTodos(v => !v)}
+                                                className="ai-btn ai-btn--ghost ai-btn--sm"
+                                                style={{ marginTop: 4, paddingLeft: 0 }}
+                                            >
+                                                {soloJefes ? 'Buscar entre todos los empleados' : 'Ver solo los sugeridos'}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 {checkboxField('Accidente de tránsito', 'accidente_transito')}

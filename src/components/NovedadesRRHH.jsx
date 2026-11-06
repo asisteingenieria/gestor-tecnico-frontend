@@ -4,17 +4,10 @@ import { novedadRrhhService } from '../services/api';
 import NovedadForm from './NovedadForm';
 import Pagination from './Pagination';
 import { nombrePropio, iniciales, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
-import { SoportesResumen } from './SoportesDocumentales';
-import { ClipboardList, Plus, Search, Edit3, Trash2, AlertCircle, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import NovedadDetalleModal from './NovedadDetalleModal';
+import { ClipboardList, Plus, Search, Edit3, Trash2, AlertCircle, FileCheck, FileText, Eye } from 'lucide-react';
 
 const PAGE_SIZE = 10;
-
-const DetailField = ({ label, value }) => (
-    <div>
-        <p className="ai-overline" style={{ marginBottom: 4 }}>{label}</p>
-        <p style={{ fontSize: 13, color: 'var(--ink)' }}>{value ?? '—'}</p>
-    </div>
-);
 
 const NovedadesRRHH = () => {
     const { isRecursosHumanos } = useAuth();
@@ -25,7 +18,7 @@ const NovedadesRRHH = () => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showEditForm, setShowEditForm] = useState(false);
     const [selectedNovedad, setSelectedNovedad] = useState(null);
-    const [expandedIds, setExpandedIds] = useState(new Set());
+    const [detalle, setDetalle] = useState(null);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
@@ -90,13 +83,6 @@ const NovedadesRRHH = () => {
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-    const toggleExpand = (id) => {
-        setExpandedIds(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id); else next.add(id);
-            return next;
-        });
-    };
 
     if (!isRecursosHumanos) {
         return (
@@ -161,7 +147,6 @@ const NovedadesRRHH = () => {
                         <table className="ai-table ai-table--dense">
                             <thead>
                                 <tr>
-                                    <th style={{ width: 36 }}></th>
                                     <th>Empleado</th>
                                     <th>Campaña</th>
                                     <th>Novedad</th>
@@ -178,19 +163,8 @@ const NovedadesRRHH = () => {
                                     const soportes = Number(n.soportes_cargados) || 0;
                                     const requeridos = Number(n.soportes_requeridos) || 0;
                                     const chip = claseCampania(n.campania_nombre);
-                                    const isExpanded = expandedIds.has(n.idnovedad_rrhh);
                                     return (
-                                        <React.Fragment key={n.idnovedad_rrhh}>
-                                            <tr>
-                                                <td>
-                                                    <button
-                                                        onClick={() => toggleExpand(n.idnovedad_rrhh)}
-                                                        className="ai-icon-btn"
-                                                        aria-label={isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
-                                                    >
-                                                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                                    </button>
-                                                </td>
+                                            <tr key={n.idnovedad_rrhh}>
                                                 <td>
                                                     <div className="ai-person">
                                                         <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(n.empleado_nombre)}</span>
@@ -227,10 +201,18 @@ const NovedadesRRHH = () => {
                                                     >
                                                         <FileCheck size={12} /> {requeridos > 0 ? `${soportes}/${requeridos}` : '—'}
                                                     </span>
+                                                    {Number(n.documentos_expediente) > 0 && (
+                                                        <span className="ai-badge ai-badge--info" style={{ marginLeft: 6 }} title="Documento del expediente enlazado a la novedad">
+                                                            <FileText size={12} /> {n.documentos_expediente}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="ai-muted">{n.responsable_nombre ? nombrePropio(n.responsable_nombre) : '—'}</td>
                                                 <td className="ai-td-actions">
                                                     <div className="ai-row-actions">
+                                                        <button onClick={() => setDetalle(n)} className="ai-icon-btn" aria-label="Ver detalle" title="Ver detalle">
+                                                            <Eye size={16} />
+                                                        </button>
                                                         <button onClick={() => handleEdit(n)} className="ai-icon-btn" aria-label="Editar">
                                                             <Edit3 size={16} />
                                                         </button>
@@ -240,33 +222,6 @@ const NovedadesRRHH = () => {
                                                     </div>
                                                 </td>
                                             </tr>
-                                            {isExpanded && (
-                                                <tr>
-                                                    <td colSpan={10} style={{ background: 'var(--surface-0)' }}>
-                                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16, marginBottom: 16 }}>
-                                                            <DetailField label="Cargo" value={n.cargo_nombre} />
-                                                            <DetailField label="Centro de costo" value={n.centro_costo_nombre} />
-                                                            <DetailField label="Fecha de retorno" value={fmtFecha(n.fecha_retorno)} />
-                                                            <DetailField label="Fecha de recibido" value={fmtFecha(n.fecha_recibido)} />
-                                                            <DetailField label="Fecha de reporte" value={fmtFecha(n.fecha_reporte)} />
-                                                            <DetailField label="Origen de la incapacidad" value={n.origen_incapacidad} />
-                                                        </div>
-                                                        {(n.resumen_diagnostico || n.observaciones) && (
-                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16, marginBottom: 16 }}>
-                                                                {n.resumen_diagnostico && <DetailField label="Diagnóstico" value={n.resumen_diagnostico} />}
-                                                                {n.observaciones && <DetailField label="Observaciones" value={n.observaciones} />}
-                                                            </div>
-                                                        )}
-                                                        <p className="ai-overline" style={{ marginBottom: 8 }}>Soportes documentales</p>
-                                                        <SoportesResumen
-                                                            cargar={() => novedadRrhhService.getSoportes(n.idnovedad_rrhh)}
-                                                            descargar={(tipoSoporteId) => novedadRrhhService.descargarSoporte(n.idnovedad_rrhh, tipoSoporteId)}
-                                                            textoSinSoportes="Este tipo de novedad no requiere soportes."
-                                                        />
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>
@@ -285,6 +240,7 @@ const NovedadesRRHH = () => {
                 </div>
             </div>
 
+            {detalle && <NovedadDetalleModal novedad={detalle} onClose={() => setDetalle(null)} />}
             {showCreateForm && (
                 <NovedadForm isOpen={showCreateForm} onClose={() => setShowCreateForm(false)} novedad={null} onSuccess={handleFormSuccess} />
             )}
