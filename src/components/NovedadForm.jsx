@@ -3,7 +3,9 @@ import api from '../services/api';
 import { novedadRrhhService } from '../services/api';
 import ComboboxBuscable from './ComboboxBuscable';
 import SoportesDocumentales from './SoportesDocumentales';
-import { errorArchivoSoporte, abrirSoporte, subirSoportesPendientes } from '../utils/soportesRrhh';
+import PrevisualizacionDocumento from './PrevisualizacionDocumento';
+import { usePrevisualizacion } from '../hooks/usePrevisualizacion';
+import { errorArchivoSoporte, subirSoportesPendientes } from '../utils/soportesRrhh';
 import { primeraMayuscula } from '../utils/formatoRRHH';
 import { X, Save, ClipboardList } from 'lucide-react';
 
@@ -63,6 +65,8 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
     // algún soporte (así un segundo "Guardar" la actualiza en vez de crear otra).
     const [novedadId, setNovedadId] = useState(novedad?.idnovedad_rrhh || null);
     const [soportesGuardados, setSoportesGuardados] = useState([]);
+    const [expediente, setExpediente] = useState([]); // documentos del expediente enlazados (098)
+    const { vista, error: errorVista, abrir: previsualizar, cerrar: cerrarVista } = usePrevisualizacion();
     const [archivos, setArchivos] = useState({}); // tipo_soporte_id -> File por subir
     const [huboCambios, setHuboCambios] = useState(false);
     const [responsableEntreTodos, setResponsableEntreTodos] = useState(false);
@@ -83,6 +87,7 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
                 setTiposNovedad(catRes.data.catalogos.tipos_novedad || []);
                 setTiposSoporte(catRes.data.catalogos.tipos_soporte_novedad || []);
                 setSoportesGuardados(sopRes?.data.soportes || []);
+                setExpediente(sopRes?.data.expediente || []);
 
                 if (novedad) {
                     setForm({
@@ -168,14 +173,16 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
         });
     };
 
-    const verSoporte = async (tipoSoporteId) => {
-        try {
-            await abrirSoporte(() => novedadRrhhService.descargarSoporte(novedadId, tipoSoporteId));
-        } catch (err) {
-            console.error('Error al abrir soporte:', err);
-            setError('No se pudo abrir el soporte');
-        }
+    // Soportes y documentos del expediente se ven en el visor en modal, no en otra pestaña.
+    const verSoporte = (tipoSoporteId) => {
+        const s = soportesGuardados.find(x => String(x.tipo_soporte_id) === String(tipoSoporteId));
+        previsualizar(`s${tipoSoporteId}`,
+            { nombre: s?.nombre || 'Soporte', nombre_original: s?.nombre_original || '', mime: s?.mime || 'application/pdf', tamano_bytes: s?.tamano },
+            () => novedadRrhhService.descargarSoporte(novedadId, tipoSoporteId));
     };
+    const verExpediente = (a) => previsualizar(`e${a.id}`,
+        { nombre: a.nombre, nombre_original: a.nombre, mime: a.mime, tamano_bytes: a.tamano },
+        () => novedadRrhhService.descargarDocumentoExpediente(novedadId, a.id));
 
     const eliminarSoporte = async (soporte) => {
         if (!window.confirm(`¿Eliminar el archivo de "${soporte.nombre}"?`)) return;
@@ -270,10 +277,10 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
                 ) : (
                     <form onSubmit={handleSubmit}>
                         <div className="ai-modal-body">
-                            {error && (
+                            {(error || errorVista) && (
                                 <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', marginBottom: 16, width: 'fit-content' }}>
                                     <span className="ai-dot" />
-                                    {error}
+                                    {error || errorVista}
                                 </div>
                             )}
 
@@ -377,6 +384,8 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
                                     onElegir={elegirArchivo}
                                     onQuitar={quitarPendiente}
                                     onVer={verSoporte}
+                                    expediente={expediente}
+                                    onVerExpediente={verExpediente}
                                     onEliminar={eliminarSoporte}
                                     textoSinTipo="Elige el tipo de novedad para ver qué soportes aplican."
                                     textoSinSoportes="Este tipo de novedad no requiere soportes."
@@ -394,6 +403,7 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
                     </form>
                 )}
             </div>
+            <PrevisualizacionDocumento vista={vista} onClose={cerrarVista} />
         </div>
     );
 };

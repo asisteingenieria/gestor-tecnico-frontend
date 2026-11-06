@@ -15,10 +15,13 @@ import { usePrevisualizacion } from '../hooks/usePrevisualizacion';
  *  - guardados: lo que devuelve el backend en `soportes` ({ tipo_soporte_id, id, nombre, nombre_original, tamano, aplica }).
  *  - archivos: { [tipoSoporteId]: File } — elegidos, se suben al guardar.
  *  - onElegir(tipoSoporteId, File), onQuitar(tipoSoporteId), onVer(tipoSoporteId), onEliminar({ tipo_soporte_id, nombre }).
+ *  - expediente: [{ id, subcarpeta, nombre, tamano }] — documentos del expediente enlazados (cargue masivo de
+ *    novedades, migración 098). El PDF de la carpeta compartida trae los soportes juntos: si hay uno, los
+ *    soportes sin archivo propio salen como incluidos en él, no como pendientes. onVerExpediente(archivo).
  */
 const SoportesDocumentales = ({
     titulo = 'Soportes documentales', tipoElegido, aplican, guardados, archivos,
-    onElegir, onQuitar, onVer, onEliminar,
+    onElegir, onQuitar, onVer, onEliminar, expediente = [], onVerExpediente,
     textoSinTipo = 'Elige el tipo para ver qué soportes aplican.',
     textoSinSoportes = 'Este tipo no requiere soportes.'
 }) => {
@@ -53,8 +56,10 @@ const SoportesDocumentales = ({
                         {pendiente
                             ? <>Se cargará al guardar: {pendiente.name} · {tamanoLegible(pendiente.size)}</>
                             : guardado
-                                ? <><Check size={12} style={{ verticalAlign: -2 }} /> {guardado.nombre_original} · {tamanoLegible(guardado.tamano)}</>
-                                : 'Pendiente — PDF o imagen'}
+                                ? <><Check size={12} style={{ display: 'inline', verticalAlign: -2 }} /> {guardado.nombre_original} · {tamanoLegible(guardado.tamano)}</>
+                                : expediente.length > 0
+                                    ? 'Incluido en el documento del expediente (puedes cargarlo aparte)'
+                                    : 'Pendiente — PDF o imagen'}
                     </div>
                 </div>
                 {pendiente ? (
@@ -73,8 +78,26 @@ const SoportesDocumentales = ({
     return (
         <>
             <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-                {titulo}{tipoElegido && aplican.length > 0 ? ` · ${cargados} de ${aplican.length}` : ''}
+                {titulo}{expediente.length > 0 ? ' · documento del expediente' : tipoElegido && aplican.length > 0 ? ` · ${cargados} de ${aplican.length}` : ''}
             </p>
+            {expediente.length > 0 && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                    {expediente.map(a => (
+                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface-0)' }}>
+                            <FileText size={16} style={{ color: 'var(--primary)' }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>Documento del expediente</div>
+                                <div className="ai-muted" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <Check size={12} style={{ display: 'inline', verticalAlign: -2 }} /> 6.NOVEDADES/{a.subcarpeta ? `${a.subcarpeta}/` : ''}{a.nombre} · {tamanoLegible(a.tamano)}
+                                </div>
+                            </div>
+                            {onVerExpediente && (
+                                <button type="button" onClick={() => onVerExpediente(a)} className="ai-icon-btn" aria-label={`Ver ${a.nombre}`}><Eye size={16} /></button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
             {!tipoElegido ? (
                 <p className="ai-muted" style={{ fontSize: 13, margin: 0 }}>{textoSinTipo}</p>
             ) : aplican.length === 0 ? (
@@ -135,7 +158,8 @@ export const SoportesResumen = ({ cargar, descargar, descargarExpediente, textoS
 
     if (error) return <p className="ai-muted" style={{ fontSize: 13 }}>{error}</p>;
     if (!soportes) return <p className="ai-muted" style={{ fontSize: 13 }}>Cargando…</p>;
-    const aplican = soportes.filter(s => Number(s.aplica) === 1);
+    // Con documento del expediente (que trae los soportes juntos) solo se listan los soportes con archivo propio.
+    const aplican = soportes.filter(s => Number(s.aplica) === 1 && (!expediente.length || s.id));
     // Documentos del expediente enlazados a la novedad (cargue masivo, migración 098): el PDF de la
     // carpeta compartida suele traer todos los soportes juntos, por eso van aparte.
     const delExpediente = descargarExpediente && expediente.length > 0 && (

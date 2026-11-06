@@ -195,15 +195,18 @@ const NovedadesRRHH = () => {
                                                 <td className="ai-muted">{fmtFecha(n.fecha_final)}</td>
                                                 <td className="ai-num">{n.total_dias ?? '—'}</td>
                                                 <td>
-                                                    <span
-                                                        className={`ai-badge${requeridos > 0 && soportes === requeridos ? ' ai-badge--success' : soportes > 0 ? ' ai-badge--warning' : ''}`}
-                                                        style={soportes === 0 || requeridos === 0 ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
-                                                    >
-                                                        <FileCheck size={12} /> {requeridos > 0 ? `${soportes}/${requeridos}` : '—'}
-                                                    </span>
-                                                    {Number(n.documentos_expediente) > 0 && (
-                                                        <span className="ai-badge ai-badge--info" style={{ marginLeft: 6 }} title="Documento del expediente enlazado a la novedad">
-                                                            <FileText size={12} /> {n.documentos_expediente}
+                                                    {/* Con documento del expediente (cargue masivo, 098), que trae los soportes juntos,
+                                                        la novedad cuenta como soportada aunque no tenga cada soporte por separado. */}
+                                                    {Number(n.documentos_expediente) > 0 ? (
+                                                        <span className="ai-badge ai-badge--success" title="Documento del expediente enlazado a la novedad (incluye los soportes)">
+                                                            <FileText size={12} /> Expediente
+                                                        </span>
+                                                    ) : (
+                                                        <span
+                                                            className={`ai-badge${requeridos > 0 && soportes === requeridos ? ' ai-badge--success' : soportes > 0 ? ' ai-badge--warning' : ''}`}
+                                                            style={soportes === 0 || requeridos === 0 ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
+                                                        >
+                                                            <FileCheck size={12} /> {requeridos > 0 ? `${soportes}/${requeridos}` : '—'}
                                                         </span>
                                                     )}
                                                 </td>
