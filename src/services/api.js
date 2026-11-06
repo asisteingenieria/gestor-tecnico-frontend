@@ -174,7 +174,18 @@ export const userCompanyService = {
         return api.put(`/users-company/${id}/documentos/${tipo}`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0, onUploadProgress });
     },
     descargarDocumento: (id, tipo) => api.get(`/users-company/${id}/documentos/${tipo}/archivo`, { responseType: 'blob', timeout: 0 }),
-    eliminarDocumento: (id, tipo) => api.delete(`/users-company/${id}/documentos/${tipo}`)
+    eliminarDocumento: (id, tipo) => api.delete(`/users-company/${id}/documentos/${tipo}`),
+    // Expediente documental (migración 097): carpetas 1.SELECCION … 6.NOVEDADES del empleado, con la
+    // misma estructura que la carpeta compartida de Gestión Humana. En NOVEDADES va `subcarpeta` (INC, LNR…).
+    getExpediente: (id) => api.get(`/users-company/${id}/expediente`),
+    subirArchivoExpediente: (id, categoria, archivo, subcarpeta, onUploadProgress) => {
+        const formData = new FormData();
+        if (subcarpeta) formData.append('subcarpeta', subcarpeta);
+        formData.append('archivo', archivo);
+        return api.post(`/users-company/${id}/expediente/${categoria}`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0, onUploadProgress });
+    },
+    descargarArchivoExpediente: (id, archivoId) => api.get(`/users-company/${id}/expediente/${archivoId}/archivo`, { responseType: 'blob', timeout: 0 }),
+    eliminarArchivoExpediente: (id, archivoId) => api.delete(`/users-company/${id}/expediente/${archivoId}`)
 };
 
 // === SERVICIOS DE NOVEDADES RRHH ===
