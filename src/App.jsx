@@ -50,6 +50,7 @@ import TrazabilidadEmpleado from './components/asistencia/TrazabilidadEmpleado';
 import GestionHorarios from './components/asistencia/GestionHorarios';
 import ReporteHorasExtra from './components/asistencia/ReporteHorasExtra';
 import CambiosTurno from './components/asistencia/CambiosTurno';
+import NovedadesEquipo from './components/asistencia/NovedadesEquipo';
 import ReportesHorasExtra from './components/financiera/ReportesHorasExtra';
 import AsistenciaMensualFinanciera from './components/financiera/AsistenciaMensual';
 import HomeFinanciera from './components/financiera/HomeFinanciera';
@@ -597,6 +598,11 @@ function App() {
               <Route path="asistencia/horas-extra" element={<EmpleadoRoute><HorasExtra /></EmpleadoRoute>} />
               {/* Coordinadores: piden cambios de turno (asistencia.md §50). */}
               <Route path="asistencia/cambios-turno" element={<EmpleadoRoute><CambiosTurno /></EmpleadoRoute>} />
+              {/* Coordinadores (jefe inmediato): consulta de su equipo, sin gestión (asistencia.md §57). */}
+              <Route path="asistencia/equipo" element={<EmpleadoRoute><EquipoAsistencia /></EmpleadoRoute>} />
+              <Route path="asistencia/equipo/mes" element={<EmpleadoRoute><EquipoMensual /></EmpleadoRoute>} />
+              <Route path="asistencia/equipo/novedades" element={<EmpleadoRoute><NovedadesEquipo vistaEquipo /></EmpleadoRoute>} />
+              <Route path="asistencia/equipo/:empleadoId/trazabilidad" element={<EmpleadoRoute><TrazabilidadEmpleado /></EmpleadoRoute>} />
 
               {/* Rutas de asistencia — director de operaciones */}
               <Route path="operaciones" element={<DirectorOperacionesRoute><MiJornada /></DirectorOperacionesRoute>} />
@@ -610,6 +616,7 @@ function App() {
               <Route path="operaciones/horas-extra" element={<DirectorOperacionesRoute><HorasExtra /></DirectorOperacionesRoute>} />
               <Route path="operaciones/cambios-turno" element={<DirectorOperacionesRoute><CambiosTurno /></DirectorOperacionesRoute>} />
               <Route path="operaciones/reporte-horas-extra" element={<DirectorOperacionesRoute><ReporteHorasExtra /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/equipo/novedades" element={<DirectorOperacionesRoute><NovedadesEquipo vistaEquipo /></DirectorOperacionesRoute>} />
             </Route>
 
             {/* Ruta catch-all */}

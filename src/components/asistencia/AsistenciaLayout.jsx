@@ -38,6 +38,8 @@ const AsistenciaLayout = () => {
     // RRHH (jefe inmediato o gestor de alguien), no del rol.
     const [permisosCambioTurno, setPermisosCambioTurno] = useState({ puede_solicitar: false, puede_aprobar: false });
     const [pendientesCambioTurno, setPendientesCambioTurno] = useState(null);
+    // Coordinador (jefe inmediato) sin gestión de asistencia: ve su equipo en consulta (§57). Sale de RRHH.
+    const [puedeVerEquipo, setPuedeVerEquipo] = useState(false);
     const [horaActual, setHoraActual] = useState(() => formatearHoraBogota(new Date()));
     const [tema, setTema] = useState(() => {
         if (typeof document === 'undefined') return 'light';
@@ -46,6 +48,7 @@ const AsistenciaLayout = () => {
         return guardado || document.documentElement.dataset.theme || 'light';
     });
     const menuRef = useRef(null);
+    const navLinksRef = useRef(null);
 
     const base = isDirectorOperaciones ? '/operaciones' : '/asistencia';
 
@@ -60,18 +63,28 @@ const AsistenciaLayout = () => {
     ];
 
     const navEquipo = isDirectorOperaciones ? [
-        // Una sola entrada: hoy en vivo y, con el selector de la página, el histórico mes a mes.
+        // Una sola entrada: hoy en vivo y, con el selector de la página, el histórico mes a mes y las novedades.
         { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true },
         { to: `${base}/horarios`, label: 'Horarios', icon: CalendarClock },
         { to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3, count: pendientesHorasExtra },
         { to: `${base}/cambios-turno`, label: 'Cambios de turno', icon: Repeat, count: pendientesCambioTurno, alert: true },
         { to: `${base}/reporte-horas-extra`, label: 'Reporte horas extra', icon: FileSpreadsheet }
+    ] : puedeVerEquipo ? [
+        // Coordinador: solo consulta (hoy, histórico y novedades), sin horarios ni horas extra del equipo.
+        { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true }
     ] : [];
+
+    useEffect(() => {
+        if (!user || isDirectorOperaciones) return;
+        asistenciaService.getPermisosEquipo()
+            .then(({ data }) => setPuedeVerEquipo(Boolean(data.puede_ver)))
+            .catch(() => setPuedeVerEquipo(false));
+    }, [user, isDirectorOperaciones]);
 
     // Los contadores del menú se recargan al cambiar de pantalla y cuando una pantalla avisa
     // que los cambió sin cambiar de ruta (p. ej. al aprobar una hora extra).
     useEffect(() => {
-        if (!isDirectorOperaciones) return undefined;
+        if (!isDirectorOperaciones && !puedeVerEquipo) return undefined;
         const cargarContadores = () => {
             asistenciaService.getEquipo()
                 .then(({ data }) => {
@@ -79,13 +92,14 @@ const AsistenciaLayout = () => {
                     setAlertasEquipo(conAlerta);
                 })
                 .catch(() => setAlertasEquipo(null));
+            if (!isDirectorOperaciones) return;
             asistenciaService.getBandejaHorasExtra({ estado: 'pendiente' })
                 .then(({ data }) => setPendientesHorasExtra(data.length))
                 .catch(() => setPendientesHorasExtra(null));
         };
         cargarContadores();
         return alCambiarContadores(cargarContadores);
-    }, [isDirectorOperaciones, location.pathname]);
+    }, [isDirectorOperaciones, puedeVerEquipo, location.pathname]);
 
     // Permisos de cambio de turno y, para el jefe, cuántas solicitudes tiene por aprobar (en vivo).
     useEffect(() => {
@@ -104,6 +118,12 @@ const AsistenciaLayout = () => {
         const quitarSocket = escucharAsistencia('asistencia:notificacion', cargar);
         return () => { quitarContadores(); quitarSocket(); };
     }, [user, location.pathname]);
+
+    // El menú se desplaza en horizontal con la barra oculta: si no caben todas las pestañas, la activa
+    // se trae a la vista para que no quede cortada.
+    useEffect(() => {
+        navLinksRef.current?.querySelector('.is-active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }, [location.pathname, navEquipo.length, navPersonal.length]);
 
     useEffect(() => {
         const id = setInterval(() => setHoraActual(formatearHoraBogota(new Date())), 30000);
@@ -163,7 +183,7 @@ const AsistenciaLayout = () => {
                     </div>
                 </NavLink>
 
-                <div className="ai-topnav-links" style={{ display: 'none' }} data-desktop-nav>
+                <div className="ai-topnav-links" style={{ display: 'none' }} data-desktop-nav ref={navLinksRef}>
                     {navPersonal.map(renderLink)}
                     {navEquipo.length > 0 && (
                         <>

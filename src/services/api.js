@@ -296,6 +296,10 @@ export const asistenciaService = {
     getMisJornadas: (params = {}) => api.get('/asistencia/mis-jornadas', { params }),
     getMisEstadisticas: (params = {}) => api.get('/asistencia/mis-estadisticas', { params }),
     getMisHorasExtra: (params = {}) => api.get('/asistencia/mis-horas-extra', { params }),
+    // Consulta del equipo (§57): coordinadores, jefes de área y directores. { puede_ver, puede_gestionar }
+    getPermisosEquipo: () => api.get('/asistencia/equipo/permisos'),
+    // Historial de novedades de RRHH del equipo (§56)
+    getNovedadesEquipo: (params = {}) => api.get('/asistencia/novedades-equipo', { params }),
     // Campana: alertas de traspasos dirigidas a mí
     getMisAlertas: () => api.get('/asistencia/mis-alertas'),
     marcarAlertaLeida: (id) => api.post(`/asistencia/mis-alertas/${id}/leida`),

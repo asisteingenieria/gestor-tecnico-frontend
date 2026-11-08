@@ -7,6 +7,7 @@ import { descargarCsv } from '../../utils/csv';
 import { periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
 import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
+import { useBaseEquipo } from '../../utils/rutaEquipo';
 import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
 
 // Histórico del equipo para el jefe (asistencia.md §35): KPIs del mes, un calendario tipo heatmap
@@ -57,6 +58,7 @@ const opciones = (empleados, campo) => [...new Set(empleados.map((e) => e[campo]
     .sort((a, b) => a.localeCompare(b));
 
 const EquipoMensual = () => {
+    const baseEquipo = useBaseEquipo();
     const [searchParams, setSearchParams] = useSearchParams();
     const periodo = searchParams.get('periodo') || periodoActual();
     const [datos, setDatos] = useState(null);
@@ -279,7 +281,7 @@ const EquipoMensual = () => {
                                                                 return (
                                                                     <td key={d.d} style={{ padding: 0 }}>
                                                                         <Link
-                                                                            to={`/operaciones/equipo/${e.users_company_id}/trazabilidad?fecha=${d.fecha}`}
+                                                                            to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad?fecha=${d.fecha}`}
                                                                             title={titulo}
                                                                             style={{
                                                                                 display: 'block', width: 18, height: 18, borderRadius: 3,
@@ -337,7 +339,7 @@ const EquipoMensual = () => {
                                                 {g.empleados.map((e) => (
                                                     <tr key={e.users_company_id}>
                                                         <td>
-                                                            <Link to={`/operaciones/equipo/${e.users_company_id}/trazabilidad`} className="ai-row" style={{ gap: 8, textDecoration: 'none', color: 'inherit' }}>
+                                                            <Link to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad`} className="ai-row" style={{ gap: 8, textDecoration: 'none', color: 'inherit' }}>
                                                                 <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(e.nombre)}</span>
                                                                 <span>
                                                                     <div style={{ fontWeight: 600 }}>{nombrePropio(e.nombre)}</div>
