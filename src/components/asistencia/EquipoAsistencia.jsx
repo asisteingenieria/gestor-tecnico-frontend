@@ -11,6 +11,7 @@ import { MODALIDAD_INGRESO, textoConexion } from '../../utils/asislock';
 import { datosPausa } from '../../utils/pausasAsistencia';
 import { escucharAsistencia, escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
+import { useBaseEquipo } from '../../utils/rutaEquipo';
 import CuadroLlegada from './CuadroLlegada';
 import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
 
@@ -94,6 +95,7 @@ function textoTurno(turno) {
 // `financiera`, ve a toda la empresa filtrando por campaña y centro de costo (asistencia.md §47).
 // El histórico de cada persona es su trazabilidad día a día y el reporte mensual.
 const EquipoAsistencia = ({ financiera = false }) => {
+    const baseEquipo = useBaseEquipo();
     const [equipo, setEquipo] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -359,9 +361,9 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                         <td>
                                             <div style={{ fontWeight: 600, fontSize: 13 }}>{emp.centro_costo || SIN_CENTRO}</div>
                                             <div className="ai-muted" style={{ fontSize: 12 }}>{textoTurno(emp.turno)}</div>
-                                            {(financiera ? (emp.campania || emp.jefe_area) : emp.jefe_area) && (
+                                            {(financiera ? (emp.campania || emp.jefe_area) : (emp.jefe_area || emp.jefe_inmediato)) && (
                                                 <div className="ai-muted" style={{ fontSize: 11 }}>
-                                                    {primeraMayuscula(emp.campania || '')}{emp.campania && emp.jefe_area ? ' · ' : ''}{emp.jefe_area ? `Jefe: ${nombrePropio(emp.jefe_area)}` : ''}
+                                                    {primeraMayuscula(emp.campania || '')}{emp.campania && emp.jefe_area ? ' · ' : ''}{emp.jefe_area ? `Jefe: ${nombrePropio(emp.jefe_area)}` : ''}{!financiera && emp.jefe_inmediato ? `${emp.campania || emp.jefe_area ? ' · ' : ''}Coord.: ${nombrePropio(emp.jefe_inmediato)}` : ''}
                                                 </div>
                                             )}
                                         </td>
@@ -402,7 +404,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                         <td>
                                             {/* Abre la trazabilidad de hoy (entrada, pausas, alertas); desde ahí se navega a días anteriores. */}
                                             <Link
-                                                to={financiera ? `/recursos-humanos/trazabilidad/${emp.users_company_id}?origen=en-vivo` : `/operaciones/equipo/${emp.users_company_id}/trazabilidad`}
+                                                to={financiera ? `/recursos-humanos/trazabilidad/${emp.users_company_id}?origen=en-vivo` : `${baseEquipo}/equipo/${emp.users_company_id}/trazabilidad`}
                                                 className="ai-btn ai-btn--secondary ai-btn--sm" style={{ whiteSpace: 'nowrap' }}
                                                 title="Detalle del empleado hoy: entrada, pausas, alertas y salida" aria-label={`Detalle de hoy de ${nombrePropio(emp.nombre)}`}
                                             >

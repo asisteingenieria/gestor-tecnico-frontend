@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { asistenciaService, financieraService } from '../../services/api';
+import { useBaseEquipo } from '../../utils/rutaEquipo';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import { formatearFecha } from '../../utils/fecha';
 import { descargarCsv } from '../../utils/csv';
@@ -29,6 +30,7 @@ const ETIQUETAS_EVENTO = {
 // `financiera`: la ve el rol financiera desde la trazabilidad por campaña (asistencia.md §32), con
 // su propio endpoint, que trae también el empleado y su horario y no exige que sea de su equipo.
 const TrazabilidadEmpleado = ({ financiera = false }) => {
+    const baseEquipo = useBaseEquipo();
     const { empleadoId } = useParams();
     const [searchParams] = useSearchParams();
     // Permite abrir una fecha concreta (p. ej. desde el calendario mensual del equipo).
@@ -72,12 +74,11 @@ const TrazabilidadEmpleado = ({ financiera = false }) => {
                     }
                     return;
                 }
-                const [{ data: trazabilidad }, { data: horarios }] = await Promise.all([
-                    asistenciaService.getTrazabilidadDe(empleadoId, fecha),
-                    asistenciaService.getHorarios({ empleadoId, desde: fecha, hasta: fecha })
-                ]);
+                // El horario del día viene en la respuesta: GET /horarios es solo de quien gestiona y el
+                // coordinador o el director (con gente de sus jefes) no lo pueden pedir (§57).
+                const { data: trazabilidad } = await asistenciaService.getTrazabilidadDe(empleadoId, fecha);
                 setDatos(trazabilidad);
-                setHorario(horarios?.[0] || null);
+                setHorario(trazabilidad.horario || null);
             } catch (err) {
                 setDatos(null);
                 setHorario(null);
@@ -108,7 +109,7 @@ const TrazabilidadEmpleado = ({ financiera = false }) => {
                 </Link>
             ) : (
                 <Link
-                    to={financiera ? `/recursos-humanos/asistencia-mensual?periodo=${fecha.slice(0, 7)}${empleado?.idcampania ? `&campania=${empleado.idcampania}` : ''}` : '/operaciones/equipo'}
+                    to={financiera ? `/recursos-humanos/asistencia-mensual?periodo=${fecha.slice(0, 7)}${empleado?.idcampania ? `&campania=${empleado.idcampania}` : ''}` : `${baseEquipo}/equipo`}
                     className="ai-link"
                 >
                     <ArrowLeft size={14} strokeWidth={1.75} /> {financiera ? 'Volver al reporte' : 'Volver al equipo'}
