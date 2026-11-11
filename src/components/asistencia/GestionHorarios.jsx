@@ -15,7 +15,13 @@ const PLANTILLA_VACIA = {
     nombre: '', hora_entrada: '08:00', hora_salida: '17:00',
     minutos_almuerzo: 60, hora_almuerzo_inicio: '12:30', tolerancia_entrada_min: 0, centro_costo_id: ''
 };
-const ASIGNACION_VACIA = { empleados: [], desde: '', hasta: '', dias_semana: [1, 2, 3, 4, 5], plantilla_id: '' };
+const ASIGNACION_VACIA = { empleados: [], desde: '', hasta: '', dias_semana: [1, 2, 3, 4, 5], plantilla_id: '', modalidad: '' };
+
+// Modalidad del día que AsisLock recibe con el horario (asistencia.md §58). Vacío = la del contrato.
+const MODALIDADES = [
+    { valor: 'presencial', label: 'Presencial' },
+    { valor: 'virtual', label: 'Virtual' }
+];
 
 // Un jefe tiene gente de varios centros de costo con horarios distintos: se asigna por centro.
 // La clave agrupa también a quien no tiene centro de costo en su contrato.
@@ -90,6 +96,7 @@ const GestionHorarios = () => {
 
     const [celda, setCelda] = useState(null); // { empleado, fecha, existente }
     const [celdaPlantillaId, setCeldaPlantillaId] = useState('');
+    const [celdaModalidad, setCeldaModalidad] = useState('');
     const [guardandoCelda, setGuardandoCelda] = useState(false);
 
     const dias = useMemo(() => Array.from({ length: 7 }, (_, i) => sumarDias(semanaInicio, i)), [semanaInicio]);
@@ -273,7 +280,9 @@ const GestionHorarios = () => {
                 desde: formAsignacion.desde,
                 hasta: formAsignacion.hasta,
                 dias_semana: formAsignacion.dias_semana,
-                plantilla_id: Number(formAsignacion.plantilla_id)
+                plantilla_id: Number(formAsignacion.plantilla_id),
+                // Sin modalidad, cada día conserva la que ya tenía.
+                modalidad: formAsignacion.modalidad || undefined
             });
             setMensaje({ tipo: 'ok', texto: `${data.horarios_creados ?? ''} horario(s) asignado(s).` });
             setFormAsignacion(ASIGNACION_VACIA);
@@ -291,19 +300,29 @@ const GestionHorarios = () => {
         const existente = mapaCeldas[`${empleado.users_company_id}_${fecha}`] || null;
         setCelda({ empleado, fecha, existente });
         setCeldaPlantillaId(existente?.horario_plantilla_id ? String(existente.horario_plantilla_id) : '');
+        setCeldaModalidad(existente?.modalidad || '');
     };
 
     const guardarCelda = async () => {
-        if (!celda || !celdaPlantillaId) return;
+        if (!celda || (!celdaPlantillaId && !celda.existente)) return;
         setGuardandoCelda(true);
         try {
-            await asistenciaService.asignarHorarios({
-                empleados: [celda.empleado.users_company_id],
-                desde: celda.fecha,
-                hasta: celda.fecha,
-                dias_semana: [isoDow(celda.fecha)],
-                plantilla_id: Number(celdaPlantillaId)
-            });
+            const existente = celda.existente;
+            const cambioPlantilla = celdaPlantillaId && String(existente?.horario_plantilla_id ?? '') !== celdaPlantillaId;
+            if (cambioPlantilla || !existente) {
+                await asistenciaService.asignarHorarios({
+                    empleados: [celda.empleado.users_company_id],
+                    desde: celda.fecha,
+                    hasta: celda.fecha,
+                    dias_semana: [isoDow(celda.fecha)],
+                    plantilla_id: Number(celdaPlantillaId),
+                    modalidad: celdaModalidad || undefined
+                });
+            }
+            // Asignar no borra la modalidad (la conserva si no viene): volver a "la del contrato" va por PUT.
+            if (existente && (existente.modalidad || '') !== celdaModalidad && (!cambioPlantilla || !celdaModalidad)) {
+                await asistenciaService.actualizarHorario(existente.idhorario_asignado, { modalidad: celdaModalidad || null });
+            }
             setCelda(null);
             cargarSemana(semanaInicio);
         } catch (err) {
@@ -508,7 +527,7 @@ const GestionHorarios = () => {
                                                         onClick={() => abrirCelda(emp, fecha)}
                                                     >
                                                         {nombrePlantilla}
-                                                        <small>{hhmm(h.hora_entrada)}–{hhmm(h.hora_salida)}</small>
+                                                        <small>{hhmm(h.hora_entrada)}–{hhmm(h.hora_salida)}{h.modalidad === 'virtual' ? ' · Virtual' : ''}</small>
                                                     </button>
                                                 </td>
                                             );
@@ -603,6 +622,13 @@ const GestionHorarios = () => {
                                     <select required className="ai-input" value={formAsignacion.plantilla_id} onChange={(e) => setFormAsignacion({ ...formAsignacion, plantilla_id: e.target.value })}>
                                         <option value="">Selecciona una plantilla</option>
                                         <OpcionesPlantilla plantillas={plantillas} centro={centroAsignar} />
+                                    </select>
+                                </div>
+                                <div className="ai-field">
+                                    <label className="ai-label">Modalidad</label>
+                                    <select className="ai-input" value={formAsignacion.modalidad} onChange={(e) => setFormAsignacion({ ...formAsignacion, modalidad: e.target.value })}>
+                                        <option value="">Sin cambiar (la que ya tenga el día o la del contrato)</option>
+                                        {MODALIDADES.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}
                                     </select>
                                 </div>
                                 <div className="ai-form-grid">
@@ -704,6 +730,13 @@ const GestionHorarios = () => {
                                     <OpcionesPlantilla plantillas={plantillas} centro={claveCentro(celda.empleado.centro_costo_id)} />
                                 </select>
                             </div>
+                            <div className="ai-field">
+                                <label className="ai-label">Modalidad</label>
+                                <select className="ai-input" value={celdaModalidad} onChange={(e) => setCeldaModalidad(e.target.value)}>
+                                    <option value="">La del contrato</option>
+                                    {MODALIDADES.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}
+                                </select>
+                            </div>
                         </div>
                         <div className="ai-modal-foot" style={{ flexWrap: 'wrap' }}>
                             {celda.existente && (
@@ -712,7 +745,7 @@ const GestionHorarios = () => {
                                     <button type="button" className="ai-btn ai-btn--secondary" onClick={marcarDescanso} disabled={guardandoCelda}>Marcar descanso</button>
                                 </>
                             )}
-                            <button type="button" className="ai-btn ai-btn--primary" onClick={guardarCelda} disabled={guardandoCelda || !celdaPlantillaId} style={{ marginLeft: 'auto' }}>
+                            <button type="button" className="ai-btn ai-btn--primary" onClick={guardarCelda} disabled={guardandoCelda || (!celdaPlantillaId && !celda.existente)} style={{ marginLeft: 'auto' }}>
                                 {guardandoCelda ? 'Guardando...' : 'Guardar'}
                             </button>
                         </div>
