@@ -11,7 +11,10 @@ const OMITIDO_TEXTO = { no_a_cargo: 'No está a tu cargo', no_encontrado: 'Cédu
 // 'YYYY-MM-DD' → 'mar 4 nov'. Mediodía local para que la zona horaria no corra el día.
 const fechaCorta = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
 const hora = (h) => String(h ?? '').slice(0, 5);
-const turnoTexto = (h) => (h.es_descanso ? `Descanso${h.notas && h.notas !== 'Libre' ? ` · ${h.notas}` : ''}` : `${hora(h.hora_entrada)}–${hora(h.hora_salida)}`);
+// La modalidad viene de la columna "Modelo Trabajo" de la malla (§58); solo se señala la virtual.
+const turnoTexto = (h) => (h.es_descanso
+    ? `Descanso${h.notas && h.notas !== 'Libre' ? ` · ${h.notas}` : ''}`
+    : `${hora(h.hora_entrada)}–${hora(h.hora_salida)}${h.modalidad === 'virtual' ? ' · Virtual' : ''}`);
 
 function agruparPorPersona(horarios) {
     const mapa = new Map();
