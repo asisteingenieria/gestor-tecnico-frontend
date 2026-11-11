@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import api, { userCompanyService } from '../services/api';
 import AgentForm from './AgentForm';
 import EmpleadoDrawer from './EmpleadoDrawer';
 import RetiroModal from './RetiroModal';
@@ -14,7 +14,7 @@ import { formatearFecha } from '../utils/fecha';
 import {
     Users, Plus, Search, Edit3, Trash2, Eye,
     Package, AlertCircle, UserCheck, Wallet,
-    Upload, Filter, ChevronDown, LayoutGrid, List, RefreshCw
+    Upload, Filter, ChevronDown, LayoutGrid, List, RefreshCw, Download
 } from 'lucide-react';
 import { escucharAsistencia } from '../utils/socketAsistencia';
 
@@ -206,6 +206,28 @@ const AgentManagement = ({ soloLectura = false }) => {
         setPage(1);
     }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, fIngreso, fRegistro, fRetiro, pageSize]);
 
+    // Excel con la jefatura de cada empleado vigente y quién le sube el horario (backend §51).
+    const [descargandoJefaturas, setDescargandoJefaturas] = useState(false);
+    const descargarJefaturas = async () => {
+        setDescargandoJefaturas(true);
+        try {
+            const response = await userCompanyService.exportarJefaturas();
+            const disposicion = response.headers?.['content-disposition'] || '';
+            const nombre = disposicion.match(/filename="?([^"]+)"?/)?.[1] || 'jefaturas.xlsx';
+            const url = URL.createObjectURL(response.data);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Error al descargar jefaturas:', err);
+            setError('No se pudo descargar el Excel de jefaturas');
+        } finally {
+            setDescargandoJefaturas(false);
+        }
+    };
+
     // `silencioso`: recarga en segundo plano (socket / intervalo / botón) sin mostrar el
     // esqueleto de carga, para no parpadear la tabla que ya está en pantalla.
     const fetchEmpleados = async ({ silencioso = false } = {}) => {
@@ -372,6 +394,10 @@ const AgentManagement = ({ soloLectura = false }) => {
                                 <LayoutGrid size={14} strokeWidth={1.75} /> Tarjetas
                             </span>
                         </div>
+                        <button onClick={descargarJefaturas} className="ai-btn ai-btn--secondary" disabled={descargandoJefaturas} title="Excel con el jefe inmediato, jefe de área, director, gestor de asistencia y quién sube el horario de cada empleado vigente">
+                            <Download size={16} strokeWidth={1.75} />
+                            {descargandoJefaturas ? 'Descargando…' : 'Descargar jefaturas'}
+                        </button>
                         {soloLectura && (
                             <button onClick={() => fetchEmpleados({ silencioso: true })} className="ai-btn ai-btn--secondary" disabled={refrescando} title="Actualizar la lista">
                                 <RefreshCw size={16} strokeWidth={1.75} className={refrescando ? 'animate-spin' : undefined} />
