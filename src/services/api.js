@@ -156,6 +156,8 @@ export const userCompanyService = {
     update: (id, data) => api.put(`/users-company/${id}`, data),
     delete: (id) => api.delete(`/users-company/${id}`),
     getGastoTotal: () => api.get('/users-company/gasto-total'),
+    // Excel con la jefatura de cada empleado vigente y quién le sube el horario.
+    exportarJefaturas: () => api.get('/users-company/export/jefaturas', { responseType: 'blob', timeout: 60000 }),
     getActivos: (id) => api.get(`/users-company/${id}/activos`),
     assignActivo: (id, activoId) => api.put(`/users-company/${id}/activos/${activoId}`),
     unassignActivo: (id, activoId) => api.delete(`/users-company/${id}/activos/${activoId}`),
