@@ -26,6 +26,7 @@ import AssetCharts from './components/AssetCharts';
 import ScriptParser from './components/ScriptParser';
 import TecnicoInventarioLayout from './components/TecnicoInventarioLayout';
 import TecnicoInventarioEdicion from './components/TecnicoInventarioEdicion';
+import EmpleadosAware from './components/EmpleadosAware';
 import AssetComponentHistory from './components/AssetComponentHistory';
 import DirectivoFinancieroLayout from './components/DirectivoFinancieroLayout';
 import DirectivoDashboard from './components/DirectivoDashboard';
@@ -586,6 +587,7 @@ function App() {
 
               {/* Rutas de técnico de inventario */}
               <Route path="inventario-tecnico" element={<TecnicoInventarioRoute><TecnicoInventarioEdicion /></TecnicoInventarioRoute>} />
+              <Route path="inventario-tecnico/empleados" element={<TecnicoInventarioRoute><EmpleadosAware /></TecnicoInventarioRoute>} />
 
               {/* Rutas de diseños */}
               <Route path="disenos" element={<NonAnonymousRoute><Disenos /></NonAnonymousRoute>} />

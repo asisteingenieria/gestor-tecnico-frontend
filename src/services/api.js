@@ -402,4 +402,10 @@ export const redMaestraService = {
     confirmarCargue: (formData) => api.post('/red-maestra/cargue/confirmar', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })
 };
 
+// Empleados activos en la compañía vs. en Aware, por cédula (técnico de inventario). Los datos de
+// Aware llegan por VoxPro, que puede tardar si tiene que volver a consultar los servidores.
+export const awareAgentesService = {
+    getCruce: (refrescar = false) => api.get('/aware-agentes/cruce', { params: refrescar ? { refrescar: 1 } : {}, timeout: 120000 }),
+};
+
 export default api;
