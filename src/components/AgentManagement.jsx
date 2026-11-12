@@ -50,6 +50,19 @@ const fechasUnicas = (lista, campo) => {
     lista.forEach(e => { const d = aYMD(e[campo]); if (d) set.add(d); });
     return [...set].sort((a, b) => b.localeCompare(a));
 };
+// "Fecha de registro" de la vista del admin: para un retirado, el instante en que RRHH lo pasó a
+// retirado (retiro.created_at); para los demás, cuándo se creó la ficha (users_company.created_at).
+const instanteRegistro = (e) => (e.estado_contrato_nombre === 'retirado' && e.retiro_registrado_en
+    ? e.retiro_registrado_en
+    : e.created_at);
+// El mismo instante como día 'YYYY-MM-DD' de Bogotá: la BD guarda UTC y un registro después de las
+// 7 p. m. caería en el día siguiente. Así lo usan la columna y el filtro (formatearFecha lo deja igual).
+const fechaRegistro = (e) => {
+    const v = instanteRegistro(e);
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d) ? null : d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+};
 
 /** Chip de filtro con popover de checkboxes (Campaña / Estado / Cargo). */
 const FiltroChip = ({ etiqueta, opciones, seleccion, onChange }) => {
@@ -317,7 +330,10 @@ const AgentManagement = ({ soloLectura = false }) => {
         () => [...new Set(empleados.map(e => e.analista_encargado_nombre).filter(Boolean))].sort(),
         [empleados]
     );
-    const opcionesFechaRegistro = useMemo(() => fechasUnicas(empleados, 'created_at'), [empleados]);
+    const opcionesFechaRegistro = useMemo(
+        () => fechasUnicas(empleados.map(e => ({ fecha_registro: fechaRegistro(e) })), 'fecha_registro'),
+        [empleados]
+    );
     const opcionesFechaIngreso = useMemo(() => fechasUnicas(empleados, 'fecha_ingreso'), [empleados]);
     const opcionesFechaRetiro = useMemo(() => fechasUnicas(empleados, 'fecha_retiro'), [empleados]);
 
@@ -333,7 +349,7 @@ const AgentManagement = ({ soloLectura = false }) => {
         const coincideAnalista = filtroAnalistas.size === 0 || filtroAnalistas.has(e.analista_encargado_nombre);
         const coincideDocumentos = filtroDocumentos.size === 0 || filtroDocumentos.has(estadoDocumentos(e));
         const coincideIngreso = !soloLectura || !fIngreso || aYMD(e.fecha_ingreso) === fIngreso;
-        const coincideRegistro = !soloLectura || !fRegistro || aYMD(e.created_at) === fRegistro;
+        const coincideRegistro = !soloLectura || !fRegistro || aYMD(fechaRegistro(e)) === fRegistro;
         const coincideRetiro = !soloLectura || !fRetiro || aYMD(e.fecha_retiro) === fRetiro;
         return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos && coincideIngreso && coincideRegistro && coincideRetiro;
     });
@@ -341,11 +357,10 @@ const AgentManagement = ({ soloLectura = false }) => {
     const totalConActivos = empleados.filter(e => e.total_activos > 0).length;
     const totalActivos = empleados.reduce((sum, e) => sum + (e.total_activos || 0), 0);
 
-    // En la vista del admin (solo lectura) se ordena por fecha de registro en el sistema
-    // (users_company.created_at), del más reciente al más antiguo, en vez del orden alfabético
-    // que trae el backend para RRHH.
+    // En la vista del admin (solo lectura) se ordena por fecha de registro (ver fechaRegistro),
+    // del más reciente al más antiguo, en vez del orden alfabético que trae el backend para RRHH.
     const empleadosOrdenados = soloLectura
-        ? [...filteredEmpleados].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+        ? [...filteredEmpleados].sort((a, b) => new Date(instanteRegistro(b) || 0) - new Date(instanteRegistro(a) || 0))
         : filteredEmpleados;
 
     const totalPages = Math.max(1, Math.ceil(empleadosOrdenados.length / pageSize));
@@ -587,7 +602,9 @@ const AgentManagement = ({ soloLectura = false }) => {
                                     return (
                                         <tr key={empleado.id}>
                                             {soloLectura && (
-                                                <td className="ai-num">{formatearFecha(empleado.created_at) || '—'}</td>
+                                                <td className="ai-num" title={empleado.retiro_registrado_en && empleado.estado_contrato_nombre === 'retirado' ? 'Fecha en que RRHH lo pasó a retirado' : 'Fecha en que se creó la ficha'}>
+                                                    {formatearFecha(fechaRegistro(empleado)) || '—'}
+                                                </td>
                                             )}
                                             <td>
                                                 <div className="ai-person">

@@ -17,7 +17,6 @@ const opcionesDe = (opciones, campo, actualId) =>
 
 const fichaDe = (e) => ({
     novedades: e.novedades || '',
-    estado_agente_id: e.estado_agente_id || '',
     cargo_rm_id: e.cargo_rm_id || '',
     estado_rm_id: e.estado_rm_id || ''
 });
@@ -190,7 +189,7 @@ const RedMaestraDrawer = ({ empleadoId, opciones, onClose, onGuardado }) => {
                                     <Dato etiqueta="Usuario SSFF" valor={empleado.usuario_ssff} />
                                     <Dato etiqueta="Cargo" valor={empleado.cargo} />
                                     <Dato etiqueta="Cliente" valor={empleado.cliente} />
-                                    <Dato etiqueta="Estado en el Gestor" valor={empleado.estado_contrato} />
+                                    <Dato etiqueta="Estado agente (RRHH)" valor={empleado.estado_agente && `${empleado.estado_agente} · ${empleado.estado_contrato}`} />
                                 </div>
                             </section>
 
@@ -226,7 +225,6 @@ const RedMaestraDrawer = ({ empleadoId, opciones, onClose, onGuardado }) => {
                                 <div className="ai-panel-head"><h3 className="ai-panel-title">Red Maestra</h3></div>
                                 <div className="ai-panel-body ai-stack">
                                     <div className="ai-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-                                        <SelectOpcion etiqueta="Estado agente" campo="estado_agente" valor={ficha.estado_agente_id} opciones={opciones} onChange={(v) => setFicha({ ...ficha, estado_agente_id: v })} />
                                         <SelectOpcion etiqueta="Cargo RM" campo="cargo_rm" valor={ficha.cargo_rm_id} opciones={opciones} onChange={(v) => setFicha({ ...ficha, cargo_rm_id: v })} />
                                         <SelectOpcion etiqueta="Estado RM" campo="estado_rm" valor={ficha.estado_rm_id} opciones={opciones} onChange={(v) => setFicha({ ...ficha, estado_rm_id: v })} />
                                     </div>

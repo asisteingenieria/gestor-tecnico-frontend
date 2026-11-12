@@ -110,8 +110,8 @@ const CargueRedMaestraModal = ({ onClose, onCargado }) => {
                                 <input ref={inputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={(e) => procesar(e.target.files?.[0])} />
                             </div>
                             <ul className="ai-help" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
-                                <li>Se leen las columnas por nombre: CEDULA (obligatoria), NOVEDADES, ESTADO AGENTE, CARGO RM, ESTADO RM, REQUERIMIENTO, FECHA DE ENVIO, OBSERVACIÓN y ESTADO REQUERIMIENTO.</li>
-                                <li>DOCUMENTO, NOMBRE COMPLETO, CAMPAÑA y USUARIO SSFF se toman del personal registrado, no del archivo.</li>
+                                <li>Se leen las columnas por nombre: CEDULA (obligatoria), NOVEDADES, CARGO RM, ESTADO RM, REQUERIMIENTO, FECHA DE ENVIO, OBSERVACIÓN y ESTADO REQUERIMIENTO.</li>
+                                <li>DOCUMENTO, NOMBRE COMPLETO, CAMPAÑA, USUARIO SSFF y ESTADO AGENTE (activo o retirado) se toman del personal registrado en RRHH, no del archivo.</li>
                                 <li>Una celda vacía no borra lo que ya está guardado. Un requerimiento que ya existe se actualiza, no se duplica.</li>
                                 <li>Los valores que no estén en las listas se agregan a ellas (por ejemplo, un cargo RM nuevo).</li>
                             </ul>
