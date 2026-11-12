@@ -14,7 +14,7 @@ import { formatearFecha } from '../utils/fecha';
 import {
     Users, Plus, Search, Edit3, Trash2, Eye,
     Package, AlertCircle, UserCheck, Wallet,
-    Upload, Filter, ChevronDown, LayoutGrid, List, RefreshCw, Download
+    Upload, Filter, ChevronDown, LayoutGrid, List, RefreshCw, Download, UserMinus
 } from 'lucide-react';
 import { escucharAsistencia } from '../utils/socketAsistencia';
 
@@ -354,6 +354,12 @@ const AgentManagement = ({ soloLectura = false }) => {
         return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos && coincideIngreso && coincideRegistro && coincideRetiro;
     });
 
+    // KPI de personal: activos = contrato vigente (activo, periodo de prueba o suspendido); los retirados
+    // (retirado o inactivo) van en su propio indicador. En la vista del admin no cuenta la ficha placeholder.
+    const empleadosReales = soloLectura ? empleados.filter(e => e.numero_identificacion !== '0123456789') : empleados;
+    const totalRetirados = empleadosReales.filter(e => ['retirado', 'inactivo'].includes(e.estado_contrato_nombre)).length;
+    const totalEmpleadosActivos = empleadosReales.filter(e => ['activo', 'periodo_prueba', 'suspendido'].includes(e.estado_contrato_nombre)).length;
+
     const totalConActivos = empleados.filter(e => e.total_activos > 0).length;
     const totalActivos = empleados.reduce((sum, e) => sum + (e.total_activos || 0), 0);
 
@@ -434,12 +440,19 @@ const AgentManagement = ({ soloLectura = false }) => {
                     </div>
                 </div>
 
-                <div className="ai-kpi-strip" style={soloLectura ? { gridTemplateColumns: 'repeat(1, 1fr)' } : (puedeVerGasto ? undefined : { gridTemplateColumns: 'repeat(3, 1fr)' })}>
+                <div className="ai-kpi-strip" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                     <div>
                         <span className="ai-kpi-icon"><Users size={18} strokeWidth={1.75} /></span>
                         <div>
-                            <p className="ai-kpi-label">Total empleados</p>
-                            <p className="ai-kpi-value ai-num">{empleados.length}</p>
+                            <p className="ai-kpi-label">Empleados activos</p>
+                            <p className="ai-kpi-value ai-num">{totalEmpleadosActivos}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <span className="ai-kpi-icon"><UserMinus size={18} strokeWidth={1.75} /></span>
+                        <div>
+                            <p className="ai-kpi-label">Retirados</p>
+                            <p className="ai-kpi-value ai-num">{totalRetirados}</p>
                         </div>
                     </div>
                     {!soloLectura && (
