@@ -348,7 +348,11 @@ const RedMaestra = () => {
                                                 <td style={{ maxWidth: 200 }}>
                                                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.novedades || ''}>{r.novedades || '—'}</div>
                                                 </td>
-                                                <td>{r.estado_agente || '—'}</td>
+                                                <td title={r.estado_contrato ? `En RRHH: ${r.estado_contrato}` : undefined}>
+                                                    {r.estado_agente
+                                                        ? <span className={`ai-badge ${r.estado_agente === 'ACTIVO' ? 'ai-badge--success' : 'ai-badge--neutral'}`}>{r.estado_agente}</span>
+                                                        : '—'}
+                                                </td>
                                                 <td>{r.cargo_rm || '—'}</td>
                                                 <td><span className={`ai-badge ${est.clase}`}><span className="ai-dot" />{est.texto}</span></td>
                                                 <td>
