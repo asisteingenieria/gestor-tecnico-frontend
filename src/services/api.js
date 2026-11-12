@@ -302,6 +302,10 @@ export const asistenciaService = {
     getPermisosEquipo: () => api.get('/asistencia/equipo/permisos'),
     // Historial de novedades de RRHH del equipo (§56)
     getNovedadesEquipo: (params = {}) => api.get('/asistencia/novedades-equipo', { params }),
+    // Retiros de Claro del equipo y su fecha de retiro en la Red Maestra (backend asistencia.md §59).
+    getRetirosEquipo: (params = {}) => api.get('/asistencia/retiros-equipo', { params }),
+    getRetirosEquipoPendientes: () => api.get('/asistencia/retiros-equipo/pendientes'),
+    registrarRetiroRm: (empleadoId, fecha) => api.put(`/asistencia/retiros-equipo/${empleadoId}/retiro-rm`, { fecha_retiro_rm: fecha || null }),
     // Campana: alertas de traspasos dirigidas a mí
     getMisAlertas: () => api.get('/asistencia/mis-alertas'),
     marcarAlertaLeida: (id) => api.post(`/asistencia/mis-alertas/${id}/leida`),
@@ -377,6 +381,25 @@ export const financieraService = {
     // Asistencia en vivo de hoy de todos o de una campaña (asistencia.md §47).
     getEnVivo: (campaniaId) => api.get('/asistencia/financiera/en-vivo', { params: campaniaId ? { campania_id: campaniaId } : {} }),
     getTrazabilidad: (empleadoId, fecha) => api.get(`/asistencia/financiera/empleados/${empleadoId}/jornada/${fecha}/trazabilidad`)
+};
+
+// Red Maestra (RM) de Claro: solo el admin (backend claude/modulo recursoshumanos.md §52).
+export const redMaestraService = {
+    listar: () => api.get('/red-maestra'),
+    getEmpleado: (id) => api.get(`/red-maestra/${id}`),
+    guardarFicha: (id, data) => api.put(`/red-maestra/${id}`, data),
+    crearRequerimiento: (id, data) => api.post(`/red-maestra/${id}/requerimientos`, data),
+    guardarRetiroRm: (id, fecha) => api.put(`/red-maestra/${id}/retiro-rm`, { fecha_retiro_rm: fecha || null }),
+    ingresos: (params = {}) => api.get('/red-maestra/ingresos', { params }),
+    retiros: (params = {}) => api.get('/red-maestra/retiros', { params }),
+    actualizarRequerimiento: (reqId, data) => api.put(`/red-maestra/requerimientos/${reqId}`, data),
+    eliminarRequerimiento: (reqId) => api.delete(`/red-maestra/requerimientos/${reqId}`),
+    getOpciones: () => api.get('/red-maestra/opciones'),
+    crearOpcion: (data) => api.post('/red-maestra/opciones', data),
+    actualizarOpcion: (id, data) => api.put(`/red-maestra/opciones/${id}`, data),
+    exportar: () => api.get('/red-maestra/export', { responseType: 'blob', timeout: 60000 }),
+    previewCargue: (formData) => api.post('/red-maestra/cargue/preview', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 }),
+    confirmarCargue: (formData) => api.post('/red-maestra/cargue/confirmar', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })
 };
 
 export default api;

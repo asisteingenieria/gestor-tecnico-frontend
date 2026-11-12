@@ -28,6 +28,7 @@ import {
     Zap,
     History,
     Trophy,
+    Network,
     Palette,
     LayoutDashboard
 } from 'lucide-react';
@@ -141,6 +142,8 @@ const Layout = () => {
         { name: 'Analíticas', href: '/analytics', icon: BarChart3, roles: ['admin'] },
         { name: 'Tablero financiero', href: '/recursos-humanos/home', icon: LayoutDashboard, roles: ['admin'] },
         { name: 'Empleados RRHH', href: '/empleados-consulta', icon: User, roles: ['admin'], permisoVerEmpleados: true },
+        // Red Maestra de Claro (backend claude/modulo recursoshumanos.md §52): solo el admin.
+        { name: 'Red Maestra', href: '/red-maestra', icon: Network, roles: ['admin'] },
         { name: 'Historial Componentes', href: '/asset-history', icon: History, roles: ['admin'] },
     ];
 

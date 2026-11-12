@@ -30,6 +30,7 @@ import AssetComponentHistory from './components/AssetComponentHistory';
 import DirectivoFinancieroLayout from './components/DirectivoFinancieroLayout';
 import DirectivoDashboard from './components/DirectivoDashboard';
 import AgentManagement from './components/AgentManagement';
+import RedMaestra from './components/redMaestra/RedMaestra';
 import Disenos from './components/Disenos';
 import RecursosHumanosLayout from './components/RecursosHumanosLayout';
 import CambiarPasswordObligatorio from './components/CambiarPasswordObligatorio';
@@ -51,6 +52,7 @@ import GestionHorarios from './components/asistencia/GestionHorarios';
 import ReporteHorasExtra from './components/asistencia/ReporteHorasExtra';
 import CambiosTurno from './components/asistencia/CambiosTurno';
 import NovedadesEquipo from './components/asistencia/NovedadesEquipo';
+import RetirosEquipo from './components/asistencia/RetirosEquipo';
 import ReportesHorasExtra from './components/financiera/ReportesHorasExtra';
 import AsistenciaMensualFinanciera from './components/financiera/AsistenciaMensual';
 import HomeFinanciera from './components/financiera/HomeFinanciera';
@@ -555,6 +557,8 @@ function App() {
               <Route path="asset-history" element={<AdminRoute><AssetComponentHistory /></AdminRoute>} />
               {/* Consulta de empleados de RRHH para el admin (solo lectura: ficha + documentos). */}
               <Route path="empleados-consulta" element={<EmpleadosConsultaRoute><AgentManagement soloLectura /></EmpleadosConsultaRoute>} />
+              {/* Red Maestra de Claro: solo el admin. */}
+              <Route path="red-maestra" element={<AdminRoute><RedMaestra /></AdminRoute>} />
 
               {/* Rutas de gestión de activos */}
               <Route path="activos" element={<GestorActivosRoute><AssetManagement /></GestorActivosRoute>} />
@@ -602,6 +606,7 @@ function App() {
               <Route path="asistencia/equipo" element={<EmpleadoRoute><EquipoAsistencia /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/mes" element={<EmpleadoRoute><EquipoMensual /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/novedades" element={<EmpleadoRoute><NovedadesEquipo vistaEquipo /></EmpleadoRoute>} />
+              <Route path="asistencia/equipo/retiros" element={<EmpleadoRoute><RetirosEquipo vistaEquipo /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/:empleadoId/trazabilidad" element={<EmpleadoRoute><TrazabilidadEmpleado /></EmpleadoRoute>} />
 
               {/* Rutas de asistencia — director de operaciones */}
@@ -617,6 +622,7 @@ function App() {
               <Route path="operaciones/cambios-turno" element={<DirectorOperacionesRoute><CambiosTurno /></DirectorOperacionesRoute>} />
               <Route path="operaciones/reporte-horas-extra" element={<DirectorOperacionesRoute><ReporteHorasExtra /></DirectorOperacionesRoute>} />
               <Route path="operaciones/equipo/novedades" element={<DirectorOperacionesRoute><NovedadesEquipo vistaEquipo /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/equipo/retiros" element={<DirectorOperacionesRoute><RetirosEquipo vistaEquipo /></DirectorOperacionesRoute>} />
             </Route>
 
             {/* Ruta catch-all */}

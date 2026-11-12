@@ -8,7 +8,7 @@ import { nombrePropio } from '../../utils/formatoRRHH';
 import CampanaAlertas from './CampanaAlertas';
 import {
     Clock, Calendar, History, BarChart3, Users, CalendarClock, Clock3, FileSpreadsheet, Repeat,
-    ChevronDown, Moon, Sun, LogOut, Menu, X
+    ChevronDown, Moon, Sun, LogOut, Menu, X, AlertTriangle, UserMinus
 } from 'lucide-react';
 import asisteMarkWhite from '../../assets/asiste-ui/asiste-mark-white.png';
 
@@ -40,6 +40,8 @@ const AsistenciaLayout = () => {
     const [pendientesCambioTurno, setPendientesCambioTurno] = useState(null);
     // Coordinador (jefe inmediato) sin gestión de asistencia: ve su equipo en consulta (§57). Sale de RRHH.
     const [puedeVerEquipo, setPuedeVerEquipo] = useState(false);
+    // Retiros de Claro del equipo sin fecha de retiro en la Red Maestra (§59): alerta del portal.
+    const [retirosPendientes, setRetirosPendientes] = useState(0);
     const [horaActual, setHoraActual] = useState(() => formatearHoraBogota(new Date()));
     const [tema, setTema] = useState(() => {
         if (typeof document === 'undefined') return 'light';
@@ -65,13 +67,16 @@ const AsistenciaLayout = () => {
     const navEquipo = isDirectorOperaciones ? [
         // Una sola entrada: hoy en vivo y, con el selector de la página, el histórico mes a mes y las novedades.
         { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true },
+        ...(retirosPendientes > 0 ? [{ to: `${base}/equipo/retiros`, label: 'Retiros', icon: UserMinus, count: retirosPendientes, alert: true }] : []),
         { to: `${base}/horarios`, label: 'Horarios', icon: CalendarClock },
         { to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3, count: pendientesHorasExtra },
         { to: `${base}/cambios-turno`, label: 'Cambios de turno', icon: Repeat, count: pendientesCambioTurno, alert: true },
         { to: `${base}/reporte-horas-extra`, label: 'Reporte horas extra', icon: FileSpreadsheet }
     ] : puedeVerEquipo ? [
         // Coordinador: solo consulta (hoy, histórico y novedades), sin horarios ni horas extra del equipo.
-        { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true }
+        // Los retiros de Claro sí los registra en la Red Maestra (§59).
+        { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true },
+        ...(retirosPendientes > 0 ? [{ to: `${base}/equipo/retiros`, label: 'Retiros', icon: UserMinus, count: retirosPendientes, alert: true }] : [])
     ] : [];
 
     useEffect(() => {
@@ -86,6 +91,9 @@ const AsistenciaLayout = () => {
     useEffect(() => {
         if (!isDirectorOperaciones && !puedeVerEquipo) return undefined;
         const cargarContadores = () => {
+            asistenciaService.getRetirosEquipoPendientes()
+                .then(({ data }) => setRetirosPendientes(Number(data.pendientes) || 0))
+                .catch(() => setRetirosPendientes(0));
             asistenciaService.getEquipo()
                 .then(({ data }) => {
                     const conAlerta = data.filter((e) => e.estado === 'ausente' || e.alertas?.includes('llegada_tarde')).length;
@@ -209,6 +217,7 @@ const AsistenciaLayout = () => {
                     <CampanaAlertas
                         rutaCambiosTurno={permisosCambioTurno.puede_solicitar || permisosCambioTurno.puede_aprobar ? `${base}/cambios-turno` : null}
                         rutaHorasExtra={`${base}/horas-extra`}
+                        rutaRetiros={isDirectorOperaciones || puedeVerEquipo ? `${base}/equipo/retiros` : null}
                     />
 
                     <div style={{ position: 'relative' }} ref={menuRef}>
@@ -279,6 +288,21 @@ const AsistenciaLayout = () => {
             )}
 
             <main style={{ flex: 1, background: 'var(--surface-0)' }}>
+                {retirosPendientes > 0 && !location.pathname.endsWith('/equipo/retiros') && (
+                    <div role="alert" style={{
+                        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 24px',
+                        background: 'var(--warning-soft, #fff4e5)', color: 'var(--ink)', borderBottom: '1px solid var(--border)', fontSize: 14
+                    }}>
+                        <AlertTriangle size={16} strokeWidth={1.75} style={{ color: 'var(--warning)' }} />
+                        <span>
+                            RRHH registró {retirosPendientes === 1 ? 'un retiro' : `${retirosPendientes} retiros`} de Claro en tu equipo
+                            sin fecha de retiro en la Red Maestra.
+                        </span>
+                        <button type="button" className="ai-btn ai-btn--primary ai-btn--sm" onClick={() => navigate(`${base}/equipo/retiros`)}>
+                            Ver retirados
+                        </button>
+                    </div>
+                )}
                 <Outlet />
             </main>
 
