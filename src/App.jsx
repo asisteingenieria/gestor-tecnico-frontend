@@ -607,7 +607,8 @@ function App() {
               <Route path="asistencia/equipo" element={<EmpleadoRoute><MonitorEquipo /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/mes" element={<EmpleadoRoute><EquipoMensual /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/novedades" element={<EmpleadoRoute><NovedadesEquipo vistaEquipo /></EmpleadoRoute>} />
-              <Route path="asistencia/equipo/retiros" element={<EmpleadoRoute><RetirosEquipo vistaEquipo /></EmpleadoRoute>} />
+              {/* Retiros de Claro: solo el jefe que gestiona, en /operaciones (§61). */}
+              <Route path="asistencia/equipo/retiros" element={<Navigate to="/asistencia/equipo" replace />} />
               <Route path="asistencia/equipo/:empleadoId/trazabilidad" element={<EmpleadoRoute><TrazabilidadEmpleado /></EmpleadoRoute>} />
 
               {/* Rutas de asistencia — director de operaciones */}

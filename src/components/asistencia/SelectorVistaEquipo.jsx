@@ -10,14 +10,15 @@ const VISTAS = [
     { ruta: '/equipo', label: 'Hoy', icono: <Users size={14} strokeWidth={1.75} /> },
     { ruta: '/equipo/mes', label: 'Histórico', icono: <CalendarRange size={14} strokeWidth={1.75} /> },
     { ruta: '/equipo/novedades', label: 'Novedades', icono: <ClipboardList size={14} strokeWidth={1.75} /> },
-    { ruta: '/equipo/retiros', label: 'Retiros', icono: <UserMinus size={14} strokeWidth={1.75} /> }
+    // Retiros solo para el jefe que gestiona (/operaciones); el coordinador no la ve (§61).
+    { ruta: '/equipo/retiros', label: 'Retiros', icono: <UserMinus size={14} strokeWidth={1.75} />, soloGestion: true }
 ];
 
 const SelectorVistaEquipo = () => {
     const base = useBaseEquipo();
     return (
         <div className="ai-seg" aria-label="Vista del equipo">
-            {VISTAS.map(({ ruta, label, icono }) => (
+            {VISTAS.filter((v) => !v.soloGestion || base === '/operaciones').map(({ ruta, label, icono }) => (
                 <NavLink key={ruta} to={`${base}${ruta}`} end className={({ isActive }) => (isActive ? 'is-active' : '')}>
                     {icono} {label}
                 </NavLink>
