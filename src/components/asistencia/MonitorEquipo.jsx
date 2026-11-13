@@ -17,25 +17,35 @@ const POLL_MS = 30000;
 function estadoMonitor(emp) {
     if (emp.estado === 'en_curso') return { clave: 'conectado', label: 'Conectado', corre: true };
     if (emp.estado === 'en_pausa' && emp.pausa_activa) {
+        // Cada pausa de AsisLock con su clave (break, bano, almuerzo, capacitacion); una desconocida, 'pausa'.
         const tipo = emp.pausa_activa.tipo;
-        return { clave: tipo === 'capacitacion' ? 'capacitacion' : 'pausa', label: datosPausa(tipo).etiqueta, corre: true };
+        return { clave: PAUSAS_CONOCIDAS.includes(tipo) ? tipo : 'pausa', label: datosPausa(tipo).etiqueta, corre: true };
     }
     if (emp.estado === 'en_pausa') return { clave: 'desconectado', label: 'Desconectado', corre: true };
     if (emp.estado === 'finalizada') return { clave: 'finalizado', label: 'Finalizado', corre: false };
     if (emp.estado === 'ausente') return { clave: 'ausente', label: 'Ausente', corre: false };
+    // Sin entrada con su turno ya empezado (lo decide el servidor, §62); si no, aún no le toca, descansa o no tiene horario.
+    if (emp.no_ha_llegado) return { clave: 'no_llego', label: 'No ha llegado', corre: false };
     return { clave: 'sin_iniciar', label: 'Sin iniciar', corre: false };
 }
 
-// Mosaicos de arriba. `estados` = claves de estadoMonitor que cuenta cada uno; un clic filtra la tabla.
+const PAUSAS_CONOCIDAS = ['break', 'bano', 'almuerzo', 'capacitacion'];
+
+// Mosaicos de arriba, uno por estado de AsisLock (asistencia.md §34) y los del día. `estados` = claves de estadoMonitor que cuenta cada uno; un clic filtra la tabla.
 const MOSAICOS = [
-    { id: 'en_turno', label: 'En turno', color: 'azul', estados: ['conectado', 'pausa', 'capacitacion', 'desconectado'] },
-    { id: 'conectado', label: 'Conectados', color: 'verde', estados: ['conectado', 'capacitacion'] },
-    { id: 'pausa', label: 'En pausa', color: 'amarillo', estados: ['pausa'] },
+    { id: 'en_turno', label: 'En turno', color: 'azul', estados: ['conectado', 'break', 'bano', 'almuerzo', 'capacitacion', 'pausa', 'desconectado'] },
+    { id: 'conectado', label: 'Conectados', color: 'verde', estados: ['conectado'] },
+    { id: 'break', label: 'Break', color: 'amarillo', estados: ['break', 'pausa'] },
+    { id: 'bano', label: 'Baño', color: 'morado', estados: ['bano'] },
+    { id: 'almuerzo', label: 'Almuerzo', color: 'ocre', estados: ['almuerzo'] },
+    { id: 'capacitacion', label: 'Capacitación', color: 'celeste', estados: ['capacitacion'] },
     { id: 'desconectado', label: 'Desconectados', color: 'naranja', estados: ['desconectado'] },
-    { id: 'ausente', label: 'Ausentes', color: 'rojo', estados: ['ausente'] }
+    { id: 'sin_iniciar', label: 'Sin iniciar', color: 'gris', estados: ['sin_iniciar'] },
+    { id: 'finalizado', label: 'Finalizados', color: 'pizarra', estados: ['finalizado'] },
+    { id: 'no_llego', label: 'No han llegado', color: 'rojo', estados: ['no_llego', 'ausente'] }
 ];
 
-const ORDEN_ESTADO = { conectado: 0, capacitacion: 1, pausa: 2, desconectado: 3, sin_iniciar: 4, finalizado: 5, ausente: 6 };
+const ORDEN_ESTADO = { conectado: 0, capacitacion: 1, break: 2, pausa: 2, bano: 3, almuerzo: 4, desconectado: 5, no_llego: 6, ausente: 6, sin_iniciar: 7, finalizado: 8 };
 
 // "08:01:46" en hora de Bogotá.
 function hora24(iso) {

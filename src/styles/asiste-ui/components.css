@@ -382,16 +382,20 @@
    al estilo del monitor de la planta telefónica. */
 :root, [data-theme="light"] {
   --mon-azul: #2f6fc4; --mon-verde: #3a9d3f; --mon-amarillo: #c98a0b; --mon-naranja: #d9661f; --mon-rojo: #c9352b;
+  --mon-morado: #7a4fbf; --mon-ocre: #9a6a2e; --mon-celeste: #1f8fb3; --mon-gris: #6b7a90; --mon-pizarra: #4a5568;
+  --mon-fila-bano: #e4d8f6; --mon-fila-almuerzo: #f1dfc4;
   --mon-fila-conectado: #c8ebc6; --mon-fila-pausa: #fbeeb0; --mon-fila-capacitacion: #cfe3f7;
   --mon-fila-desconectado: #fcd2a8; --mon-fila-ausente: #f4c2c0; --mon-fila-neutra: #eef1f5; --mon-fila-ink: #14233a;
 }
 [data-theme="dark"] {
   --mon-azul: #2c64ad; --mon-verde: #2f7f34; --mon-amarillo: #9c6b06; --mon-naranja: #a9501a; --mon-rojo: #a8302a;
+  --mon-morado: #5f3d99; --mon-ocre: #7a5323; --mon-celeste: #19718e; --mon-gris: #4f5d72; --mon-pizarra: #39434f;
+  --mon-fila-bano: #2e2147; --mon-fila-almuerzo: #3a2a14;
   --mon-fila-conectado: #173a1a; --mon-fila-pausa: #3a300c; --mon-fila-capacitacion: #13304f;
   --mon-fila-desconectado: #44260f; --mon-fila-ausente: #431b19; --mon-fila-neutra: #162235; --mon-fila-ink: #e8eef7;
 }
-.ai-monitor-mosaicos { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: var(--space-4, 16px); }
-.ai-monitor-mosaico { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 112px; padding: 10px; border: 3px solid transparent; border-radius: 8px; color: #fff; cursor: pointer; box-shadow: var(--shadow-card); transition: transform .12s, box-shadow .12s; }
+.ai-monitor-mosaicos { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin-bottom: var(--space-4, 16px); }
+.ai-monitor-mosaico { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 96px; padding: 10px; border: 3px solid transparent; border-radius: 8px; color: #fff; cursor: pointer; box-shadow: var(--shadow-card); transition: transform .12s, box-shadow .12s; }
 .ai-monitor-mosaico:hover { transform: translateY(-1px); box-shadow: var(--shadow-pop); }
 .ai-monitor-mosaico.is-active { border-color: var(--ink); }
 .ai-monitor-mosaico--azul { background: var(--mon-azul); }
@@ -399,7 +403,12 @@
 .ai-monitor-mosaico--amarillo { background: var(--mon-amarillo); }
 .ai-monitor-mosaico--naranja { background: var(--mon-naranja); }
 .ai-monitor-mosaico--rojo { background: var(--mon-rojo); }
-.ai-monitor-num { font: 700 56px/1 var(--font-sans); font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.ai-monitor-mosaico--morado { background: var(--mon-morado); }
+.ai-monitor-mosaico--ocre { background: var(--mon-ocre); }
+.ai-monitor-mosaico--celeste { background: var(--mon-celeste); }
+.ai-monitor-mosaico--gris { background: var(--mon-gris); }
+.ai-monitor-mosaico--pizarra { background: var(--mon-pizarra); }
+.ai-monitor-num { font: 700 44px/1 var(--font-sans); font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
 .ai-monitor-lbl { font: 700 12px/16px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; }
 .ai-monitor-tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .ai-monitor-tabla th { padding: 0; background: var(--surface-200); border: 1px solid var(--border); }
@@ -409,15 +418,14 @@
 .ai-monitor-tabla tbody tr:hover td { filter: brightness(0.95); }
 .ai-monitor-centro { text-align: center; white-space: nowrap; }
 .ai-monitor-fila--conectado td { background: var(--mon-fila-conectado); }
-.ai-monitor-fila--pausa td { background: var(--mon-fila-pausa); }
+.ai-monitor-fila--pausa td, .ai-monitor-fila--break td { background: var(--mon-fila-pausa); }
+.ai-monitor-fila--bano td { background: var(--mon-fila-bano); }
+.ai-monitor-fila--almuerzo td { background: var(--mon-fila-almuerzo); }
 .ai-monitor-fila--capacitacion td { background: var(--mon-fila-capacitacion); }
 .ai-monitor-fila--desconectado td { background: var(--mon-fila-desconectado); }
-.ai-monitor-fila--ausente td { background: var(--mon-fila-ausente); }
+.ai-monitor-fila--ausente td, .ai-monitor-fila--no_llego td { background: var(--mon-fila-ausente); }
 .ai-monitor-fila--finalizado td, .ai-monitor-fila--sin_iniciar td { color: var(--ink-muted); }
-@media (max-width: 900px) {
-  .ai-monitor-mosaicos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .ai-monitor-num { font-size: 40px; }
-}
 @media (max-width: 520px) {
   .ai-monitor-mosaicos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ai-monitor-num { font-size: 34px; }
 }

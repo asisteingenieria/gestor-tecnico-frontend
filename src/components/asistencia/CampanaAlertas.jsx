@@ -34,7 +34,8 @@ const CampanaAlertas = ({ rutaCambiosTurno, rutaHorasExtra, rutaRetiros }) => {
                     }))
                     : [];
                 const deNotificaciones = notificaciones.status === 'fulfilled' && Array.isArray(notificaciones.value.data)
-                    ? notificaciones.value.data.map((n) => ({
+                    // Sin acceso a Retiros (el coordinador, §61) no se muestran los avisos de retiro que ya le llegaron.
+                    ? notificaciones.value.data.filter((n) => n.tipo !== 'retiro_empleado' || rutaRetiros).map((n) => ({
                         key: `n${n.idnotificacion_asistencia}`, origen: 'asistencia', id: n.idnotificacion_asistencia, mensaje: n.mensaje,
                         cuando: fmtInstante(n.creada_en), orden: n.creada_en, leida_en: n.leida_en,
                         // retiro_empleado: RRHH retiró a alguien de Claro del equipo → registrar el retiro en la Red Maestra (§59).

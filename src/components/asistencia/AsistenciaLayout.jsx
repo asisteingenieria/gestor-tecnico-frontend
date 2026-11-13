@@ -74,9 +74,8 @@ const AsistenciaLayout = () => {
         { to: `${base}/reporte-horas-extra`, label: 'Reporte horas extra', icon: FileSpreadsheet }
     ] : puedeVerEquipo ? [
         // Coordinador: solo consulta (hoy, histórico y novedades), sin horarios ni horas extra del equipo.
-        // Los retiros de Claro sí los registra en la Red Maestra (§59).
-        { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true },
-        ...(retirosPendientes > 0 ? [{ to: `${base}/equipo/retiros`, label: 'Retiros', icon: UserMinus, count: retirosPendientes, alert: true }] : [])
+        // Tampoco Retiros: la fecha de retiro en la Red Maestra la registra solo el jefe que gestiona (§61).
+        { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true }
     ] : [];
 
     useEffect(() => {
@@ -91,9 +90,11 @@ const AsistenciaLayout = () => {
     useEffect(() => {
         if (!isDirectorOperaciones && !puedeVerEquipo) return undefined;
         const cargarContadores = () => {
-            asistenciaService.getRetirosEquipoPendientes()
-                .then(({ data }) => setRetirosPendientes(Number(data.pendientes) || 0))
-                .catch(() => setRetirosPendientes(0));
+            if (isDirectorOperaciones) {
+                asistenciaService.getRetirosEquipoPendientes()
+                    .then(({ data }) => setRetirosPendientes(Number(data.pendientes) || 0))
+                    .catch(() => setRetirosPendientes(0));
+            }
             asistenciaService.getEquipo()
                 .then(({ data }) => {
                     const conAlerta = data.filter((e) => e.estado === 'ausente' || e.alertas?.includes('llegada_tarde')).length;
@@ -217,7 +218,7 @@ const AsistenciaLayout = () => {
                     <CampanaAlertas
                         rutaCambiosTurno={permisosCambioTurno.puede_solicitar || permisosCambioTurno.puede_aprobar ? `${base}/cambios-turno` : null}
                         rutaHorasExtra={`${base}/horas-extra`}
-                        rutaRetiros={isDirectorOperaciones || puedeVerEquipo ? `${base}/equipo/retiros` : null}
+                        rutaRetiros={isDirectorOperaciones ? `${base}/equipo/retiros` : null}
                     />
 
                     <div style={{ position: 'relative' }} ref={menuRef}>
@@ -288,7 +289,7 @@ const AsistenciaLayout = () => {
             )}
 
             <main style={{ flex: 1, background: 'var(--surface-0)' }}>
-                {retirosPendientes > 0 && !location.pathname.endsWith('/equipo/retiros') && (
+                {isDirectorOperaciones && retirosPendientes > 0 && !location.pathname.endsWith('/equipo/retiros') && (
                     <div role="alert" style={{
                         display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 24px',
                         background: 'var(--warning-soft, #fff4e5)', color: 'var(--ink)', borderBottom: '1px solid var(--border)', fontSize: 14
