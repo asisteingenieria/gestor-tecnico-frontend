@@ -46,6 +46,7 @@ import MiTrazabilidad from './components/asistencia/MiTrazabilidad';
 import MisEstadisticas from './components/asistencia/MisEstadisticas';
 import HorasExtra from './components/asistencia/HorasExtra';
 import EquipoAsistencia from './components/asistencia/EquipoAsistencia';
+import MonitorEquipo from './components/asistencia/MonitorEquipo';
 import EquipoMensual from './components/asistencia/EquipoMensual';
 import TrazabilidadEmpleado from './components/asistencia/TrazabilidadEmpleado';
 import GestionHorarios from './components/asistencia/GestionHorarios';
@@ -602,8 +603,8 @@ function App() {
               <Route path="asistencia/horas-extra" element={<EmpleadoRoute><HorasExtra /></EmpleadoRoute>} />
               {/* Coordinadores: piden cambios de turno (asistencia.md §50). */}
               <Route path="asistencia/cambios-turno" element={<EmpleadoRoute><CambiosTurno /></EmpleadoRoute>} />
-              {/* Coordinadores (jefe inmediato): consulta de su equipo, sin gestión (asistencia.md §57). */}
-              <Route path="asistencia/equipo" element={<EmpleadoRoute><EquipoAsistencia /></EmpleadoRoute>} />
+              {/* Coordinadores (jefe inmediato): consulta de su equipo, sin gestión (asistencia.md §57); "Hoy" es el monitor tipo planta telefónica (§60). */}
+              <Route path="asistencia/equipo" element={<EmpleadoRoute><MonitorEquipo /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/mes" element={<EmpleadoRoute><EquipoMensual /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/novedades" element={<EmpleadoRoute><NovedadesEquipo vistaEquipo /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/retiros" element={<EmpleadoRoute><RetirosEquipo vistaEquipo /></EmpleadoRoute>} />
