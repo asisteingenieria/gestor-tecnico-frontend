@@ -7,7 +7,8 @@ import {
     Cpu,
     Edit3,
     LogOut,
-    User
+    User,
+    Users
 } from 'lucide-react';
 
 const TecnicoInventarioLayout = () => {
@@ -27,8 +28,17 @@ const TecnicoInventarioLayout = () => {
             href: '/inventario-tecnico',
             icon: Edit3,
             current: location.pathname === '/inventario-tecnico'
+        },
+        {
+            name: 'Empleados activos',
+            href: '/inventario-tecnico/empleados',
+            icon: Users,
+            current: location.pathname === '/inventario-tecnico/empleados'
         }
     ];
+    const titulo = navigationItems.find((item) => item.current)?.name === 'Empleados activos'
+        ? 'Empleados activos (compañía y Aware)'
+        : 'Panel de Edición de Componentes';
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -117,6 +127,7 @@ const TecnicoInventarioLayout = () => {
                                 <li>• Editar componentes de hardware</li>
                                 <li>• Todos los activos tecnológicos</li>
                                 <li>• Solicitar baja al administrador</li>
+                                <li>• Ver empleados activos (compañía y Aware)</li>
                             </ul>
                         </div>
                     </div>
@@ -137,7 +148,7 @@ const TecnicoInventarioLayout = () => {
 
                     <div className="flex-1 px-4 flex justify-between">
                         <div className="flex-1 flex items-center">
-                            <h1 className="text-lg font-semibold text-gray-700">Panel de Edición de Componentes</h1>
+                            <h1 className="text-lg font-semibold text-gray-700">{titulo}</h1>
                         </div>
 
                         <div className="ml-4 flex items-center md:ml-6">
