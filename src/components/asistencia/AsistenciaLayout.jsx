@@ -8,7 +8,7 @@ import { nombrePropio } from '../../utils/formatoRRHH';
 import CampanaAlertas from './CampanaAlertas';
 import {
     Clock, Calendar, History, BarChart3, Users, CalendarClock, Clock3, FileSpreadsheet, Repeat,
-    ChevronDown, Moon, Sun, LogOut, Menu, X, AlertTriangle, UserMinus
+    ChevronDown, Moon, Sun, LogOut, Menu, X, AlertTriangle
 } from 'lucide-react';
 import asisteMarkWhite from '../../assets/asiste-ui/asiste-mark-white.png';
 
@@ -65,9 +65,9 @@ const AsistenciaLayout = () => {
     ];
 
     const navEquipo = isDirectorOperaciones ? [
-        // Una sola entrada: hoy en vivo y, con el selector de la página, el histórico mes a mes y las novedades.
+        // Una sola entrada: hoy en vivo y, con el selector de la página, el histórico, las novedades y los retiros.
+        // Retiros no va en el menú (no cabía, §63): se entra por Equipo → Retiros, el banner o la campana.
         { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true },
-        ...(retirosPendientes > 0 ? [{ to: `${base}/equipo/retiros`, label: 'Retiros', icon: UserMinus, count: retirosPendientes, alert: true }] : []),
         { to: `${base}/horarios`, label: 'Horarios', icon: CalendarClock },
         { to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3, count: pendientesHorasExtra },
         { to: `${base}/cambios-turno`, label: 'Cambios de turno', icon: Repeat, count: pendientesCambioTurno, alert: true },
