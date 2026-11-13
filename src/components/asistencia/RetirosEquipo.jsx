@@ -6,7 +6,7 @@ import { avisarCambioContadores } from '../../utils/eventosAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 
 // Retiros de Claro del equipo (asistencia.md §59): cuando RRHH retira a alguien de Claro, sus jefes —
-// coordinador (jefe inmediato), jefe de área y gestor— registran aquí la fecha en que lo retiraron de la
+// jefe de área y gestor; desde §61 no el coordinador— registran aquí la fecha en que lo retiraron de la
 // Red Maestra. El admin del Gestor ve esa fecha en su módulo Red Maestra. Mientras falte, el retiro queda
 // pendiente y el portal muestra la alerta.
 
@@ -18,6 +18,20 @@ const fechaCorta = (f) => {
     const [a, m, d] = f.split('-');
     return `${Number(d)} ${MESES[Number(m) - 1]} ${a}`;
 };
+
+// Cuándo se registró la fecha, en hora de Bogotá (la BD guarda en UTC).
+const registradoEn = (valor) => {
+    if (!valor) return '';
+    const texto = typeof valor === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(valor) ? `${valor.replace(' ', 'T')}Z` : valor;
+    return new Date(texto).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+};
+
+// Pendientes = sin fecha de retiro en la RM; Registrados = ya la tienen (la puso este jefe, otro jefe o el admin).
+const FILTROS = [
+    { id: 'todos', label: 'Todos' },
+    { id: 'pendientes', label: 'Pendientes' },
+    { id: 'registrados', label: 'Registrados' }
+];
 
 const hoyBogota = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 const sinTildes = (s = '') => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -68,7 +82,11 @@ const FilaRetiro = ({ r, onGuardado }) => {
                     )}
                 </div>
                 {error && <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4 }}>{error}</div>}
-                {!cambiado && r.retiro_rm_registrado_por && <div className="ai-person-sub" style={{ marginTop: 2 }}>Registró {nombrePropio(r.retiro_rm_registrado_por)}</div>}
+                {!cambiado && r.retiro_rm_registrado_por && (
+                    <div className="ai-person-sub" style={{ marginTop: 2 }}>
+                        Registró {nombrePropio(r.retiro_rm_registrado_por)}{r.retiro_rm_registrado_en ? ` · ${registradoEn(r.retiro_rm_registrado_en)}` : ''}
+                    </div>
+                )}
             </td>
             <td>
                 {r.pendiente
@@ -84,7 +102,8 @@ const RetirosEquipo = ({ vistaEquipo = false }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [busqueda, setBusqueda] = useState('');
-    const [soloPendientes, setSoloPendientes] = useState(true);
+    // Abre con todos (pendientes primero, como los ordena el servidor): el jefe ve también a quién ya le puso fecha (§66).
+    const [filtro, setFiltro] = useState('todos');
 
     const cargar = useCallback(async () => {
         setLoading(true);
@@ -103,15 +122,17 @@ const RetirosEquipo = ({ vistaEquipo = false }) => {
     useEffect(() => { cargar(); }, [cargar]);
 
     const pendientes = (retiros ?? []).filter((r) => r.pendiente).length;
+    const registrados = (retiros ?? []).length - pendientes;
+    const conteo = { todos: (retiros ?? []).length, pendientes, registrados };
     const filtrados = useMemo(() => {
         const q = sinTildes(busqueda.trim());
         return (retiros ?? []).filter((r) =>
-            (!soloPendientes || r.pendiente)
+            (filtro === 'todos' || (filtro === 'pendientes' ? r.pendiente : !r.pendiente))
             && (!q || sinTildes(r.empleado || '').includes(q) || String(r.cedula).includes(q))
         );
-    }, [retiros, busqueda, soloPendientes]);
+    }, [retiros, busqueda, filtro]);
 
-    // Reemplaza la fila guardada sin recargar (con "Solo pendientes", la registrada sale de la lista)
+    // Reemplaza la fila guardada sin recargar (en "Pendientes", la registrada pasa a "Registrados")
     // y avisa al menú para que actualice la alerta de pendientes.
     const alGuardar = (actualizado) => {
         setRetiros((prev) => prev.map((r) => (r.empleado_id === actualizado.empleado_id ? actualizado : r)));
@@ -147,7 +168,7 @@ const RetirosEquipo = ({ vistaEquipo = false }) => {
                 <div className="ai-panel">
                     <div className="ai-panel-head" style={{ flexWrap: 'wrap', gap: 8 }}>
                         <h3 className="ai-panel-title">
-                            {retiros.length} retirado{retiros.length === 1 ? '' : 's'} de Claro · {pendientes} pendiente{pendientes === 1 ? '' : 's'}
+                            {retiros.length} retirado{retiros.length === 1 ? '' : 's'} de Claro · {pendientes} pendiente{pendientes === 1 ? '' : 's'} · {registrados} registrado{registrados === 1 ? '' : 's'}
                         </h3>
                         <div className="ai-row" style={{ flexWrap: 'wrap', gap: 8 }}>
                             <div style={{ position: 'relative' }}>
@@ -155,17 +176,22 @@ const RetirosEquipo = ({ vistaEquipo = false }) => {
                                 <input className="ai-input" style={{ paddingLeft: 30, width: 220 }} placeholder="Nombre o cédula"
                                     value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar" />
                             </div>
-                            <label className="ai-row" style={{ gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                                <input type="checkbox" checked={soloPendientes} onChange={(e) => setSoloPendientes(e.target.checked)} />
-                                Solo pendientes
-                            </label>
+                            <div className="ai-seg" role="group" aria-label="Filtrar retiros">
+                                {FILTROS.map((f) => (
+                                    <span key={f.id} role="button" tabIndex={0} className={filtro === f.id ? 'is-active' : ''}
+                                        style={{ cursor: 'pointer' }} aria-pressed={filtro === f.id}
+                                        onClick={() => setFiltro(f.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFiltro(f.id); }}>
+                                        {f.label} <span className="ai-count">{conteo[f.id]}</span>
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
                     {filtrados.length === 0 ? (
                         <div className="ai-empty">
                             <UserMinus size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                            <p>{retiros.length === 0 ? 'No hay retiros de Claro en tu equipo.' : soloPendientes ? 'No tienes retiros pendientes. ¡Al día!' : 'Ningún retiro coincide con la búsqueda.'}</p>
+                            <p>{retiros.length === 0 ? 'No hay retiros de Claro en tu equipo.' : filtro === 'pendientes' && !busqueda ? 'No tienes retiros pendientes. ¡Al día!' : filtro === 'registrados' && !busqueda ? 'Todavía no has registrado ninguna fecha de retiro en la Red Maestra.' : 'Ningún retiro coincide con la búsqueda.'}</p>
                         </div>
                     ) : (
                         <div style={{ overflowX: 'auto' }}>

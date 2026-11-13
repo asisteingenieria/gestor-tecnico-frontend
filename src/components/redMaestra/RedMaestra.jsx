@@ -7,6 +7,7 @@ import CargueRedMaestraModal from './CargueRedMaestraModal';
 import ListasRedMaestraModal from './ListasRedMaestraModal';
 import IngresosRedMaestra from './IngresosRedMaestra';
 import RetirosRedMaestra from './RetirosRedMaestra';
+import FechasJefesRedMaestra from './FechasJefesRedMaestra';
 import { TIPOS_PERSONAL, documentoRM, plano } from './redMaestraUtils';
 import { Network, Search, Download, Upload, ListChecks, RefreshCw, UserCheck, UserX, HelpCircle, Clock, Headphones, UserCog, FileStack, Users } from 'lucide-react';
 
@@ -19,7 +20,7 @@ import { Network, Search, Download, Upload, ListChecks, RefreshCw, UserCheck, Us
 const PAGE_SIZES = [25, 50, 100];
 const SIN_ESTADO = '__sin__';
 
-const PESTANAS = { RM: 'rm', INGRESOS: 'ingresos', RETIROS: 'retiros' };
+const PESTANAS = { RM: 'rm', INGRESOS: 'ingresos', RETIROS: 'retiros', FECHAS_JEFES: 'fechas_jefes' };
 
 const ICONO_TIPO = { agente: Headphones, coordinador: UserCog, backoffice: FileStack, otro: Users };
 
@@ -68,6 +69,8 @@ const RedMaestra = () => {
     const [fTipo, setFTipo] = useState('');
     const [pestana, setPestana] = useState(PESTANAS.RM);
     const [retirosPendientes, setRetirosPendientes] = useState(null);
+    // Fechas de retiro en la RM que pusieron los jefes desde su portal (§65).
+    const [fechasDeJefes, setFechasDeJefes] = useState(null);
     // Sube con cada recarga para que las pestañas de ingresos y retiros vuelvan a pedir sus datos.
     const [version, setVersion] = useState(0);
     const [page, setPage] = useState(1);
@@ -86,6 +89,7 @@ const RedMaestra = () => {
             setRegistros(lista.data.data || []);
             setOpciones(ops.data.data || []);
             setRetirosPendientes((retiros.data.data || []).filter((r) => r.pendiente).length);
+            setFechasDeJefes((retiros.data.data || []).filter((r) => r.registrado_por_jefe).length);
             setVersion((v) => v + 1);
             setError('');
         } catch (err) {
@@ -216,9 +220,13 @@ const RedMaestra = () => {
                     <button type="button" role="tab" className={`ai-tab${pestana === PESTANAS.RETIROS ? ' is-active' : ''}`} onClick={() => setPestana(PESTANAS.RETIROS)}>
                         Retiros {retirosPendientes > 0 && <span className="ai-count is-alert" title="Pendientes de registrar el retiro en la Red Maestra">{retirosPendientes}</span>}
                     </button>
+                    <button type="button" role="tab" className={`ai-tab${pestana === PESTANAS.FECHAS_JEFES ? ' is-active' : ''}`} onClick={() => setPestana(PESTANAS.FECHAS_JEFES)}>
+                        Fechas de jefes {fechasDeJefes > 0 && <span className="ai-count" title="Fechas de retiro en la Red Maestra registradas por los jefes">{fechasDeJefes}</span>}
+                    </button>
                 </div>
 
                 {pestana === PESTANAS.INGRESOS && <IngresosRedMaestra onAbrir={setAbierto} version={version} />}
+                {pestana === PESTANAS.FECHAS_JEFES && <FechasJefesRedMaestra onAbrir={setAbierto} version={version} />}
                 {pestana === PESTANAS.RETIROS && <RetirosRedMaestra onAbrir={setAbierto} version={version} onCambio={() => cargar({ silencioso: true })} />}
 
                 {pestana === PESTANAS.RM && (<>
