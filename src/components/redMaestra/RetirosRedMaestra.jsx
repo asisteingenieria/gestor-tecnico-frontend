@@ -55,7 +55,8 @@ const RetirosRedMaestra = ({ onAbrir, version, onCambio }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [busqueda, setBusqueda] = useState('');
-    const [soloPendientes, setSoloPendientes] = useState(true);
+    // Por defecto todos: así el admin ve la fecha que registró el jefe (con quién la puso), no solo los pendientes (§64).
+    const [soloPendientes, setSoloPendientes] = useState(false);
     const [desde, setDesde] = useState('');
     const [hasta, setHasta] = useState('');
 
