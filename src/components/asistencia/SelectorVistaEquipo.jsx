@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useSearchParams } from 'react-router-dom';
 import { Users, CalendarRange, ClipboardList, UserMinus } from 'lucide-react';
 import { useBaseEquipo } from '../../utils/rutaEquipo';
 
@@ -16,10 +16,14 @@ const VISTAS = [
 
 const SelectorVistaEquipo = () => {
     const base = useBaseEquipo();
+    // La campaña elegida (§68) sigue al pasar de Hoy a Histórico; Novedades y Retiros son solo de su equipo.
+    const [searchParams] = useSearchParams();
+    const campania = searchParams.get('campania');
+    const sufijo = (ruta) => (campania && (ruta === '/equipo' || ruta === '/equipo/mes') ? `?campania=${encodeURIComponent(campania)}` : '');
     return (
         <div className="ai-seg" aria-label="Vista del equipo">
             {VISTAS.filter((v) => !v.soloGestion || base === '/operaciones').map(({ ruta, label, icono }) => (
-                <NavLink key={ruta} to={`${base}${ruta}`} end className={({ isActive }) => (isActive ? 'is-active' : '')}>
+                <NavLink key={ruta} to={`${base}${ruta}${sufijo(ruta)}`} end className={({ isActive }) => (isActive ? 'is-active' : '')}>
                     {icono} {label}
                 </NavLink>
             ))}

@@ -315,11 +315,13 @@ export const asistenciaService = {
     marcarTodasNotificacionesLeidas: () => api.post('/asistencia/mis-notificaciones/leidas'),
 
     // Director de operaciones
-    getEquipo: () => api.get('/asistencia/equipo'),
+    // Sin params: su equipo. { alcance: 'todas' } o { campania_id }: Director de Tecnología (backend §68).
+    getEquipo: (params = {}) => api.get('/asistencia/equipo', { params }),
+    getCampaniasEquipo: () => api.get('/asistencia/equipo/campanias'),
     getJornadasDe: (empleadoId, params = {}) => api.get(`/asistencia/equipo/${empleadoId}/jornadas`, { params }),
     getTrazabilidadDe: (empleadoId, fecha) => api.get(`/asistencia/equipo/${empleadoId}/jornada/${fecha}/trazabilidad`),
     getEstadisticasEquipo: (params = {}) => api.get('/asistencia/equipo/estadisticas', { params }),
-    getResumenMensualEquipo: (periodo) => api.get('/asistencia/equipo/resumen-mensual', { params: { periodo } }),
+    getResumenMensualEquipo: (periodo, params = {}) => api.get('/asistencia/equipo/resumen-mensual', { params: { periodo, ...params } }),
     registrarEventoManual: (jornadaId, data) => api.post(`/asistencia/equipo/jornada/${jornadaId}/evento`, data),
 
     getPlantillas: () => api.get('/asistencia/horarios/plantillas'),

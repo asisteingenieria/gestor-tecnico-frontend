@@ -13,6 +13,8 @@ import { escucharAsistencia, escucharCambiosEmpleados } from '../../utils/socket
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 import { useBaseEquipo } from '../../utils/rutaEquipo';
 import CuadroLlegada from './CuadroLlegada';
+import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
+import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
 import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
 
 const POLL_MS = 30000;
@@ -108,11 +110,14 @@ const EquipoAsistencia = ({ financiera = false }) => {
     const [campanias, setCampanias] = useState([]);
     const [campaniaId, setCampaniaId] = useState('');
     const pausadoRef = useRef(false);
+    // Director de Tecnología (§68): entra con su equipo y el filtro cambia a todas o a una campaña.
+    const { verTodas, campanias: campaniasEquipo, alcance, cambiarAlcance } = useAlcanceEquipo();
+    const otroAlcance = !financiera && Boolean(alcance);
 
     const cargar = useCallback(async (silencioso = false) => {
         if (silencioso) setActualizando(true);
         try {
-            const { data } = financiera ? await financieraService.getEnVivo(campaniaId) : await asistenciaService.getEquipo();
+            const { data } = financiera ? await financieraService.getEnVivo(campaniaId) : await asistenciaService.getEquipo(paramsAlcance(alcance));
             setEquipo(data);
             setUltimaActualizacion(Date.now());
             setError(null);
@@ -122,7 +127,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
             setLoading(false);
             setActualizando(false);
         }
-    }, [financiera, campaniaId]);
+    }, [financiera, campaniaId, alcance]);
 
     useEffect(() => {
         if (!financiera) return;
@@ -218,6 +223,12 @@ const EquipoAsistencia = ({ financiera = false }) => {
         setLoading(true);
     };
 
+    const cambiarAlcanceEquipo = (valor) => {
+        cambiarAlcance(valor);
+        setCentro('');
+        setLoading(true);
+    };
+
     if (loading) {
         return (
             <div className="ai-content">
@@ -229,6 +240,10 @@ const EquipoAsistencia = ({ financiera = false }) => {
     }
 
     const nombreCampania = campanias.find((c) => String(c.idcampania) === String(campaniaId))?.nombre;
+    const nombreAlcance = alcance === TODAS
+        ? 'todas las campañas'
+        : primeraMayuscula(campaniasEquipo.find((c) => String(c.idcampania) === alcance)?.nombre || 'campaña');
+    const personas = `${equipo.length} persona${equipo.length === 1 ? '' : 's'}`;
 
     return (
         <div className="ai-content">
@@ -238,7 +253,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                     <p className="ai-page-sub">
                         {financiera
                             ? `${equipo.length} persona${equipo.length === 1 ? '' : 's'} · ${nombreCampania ? primeraMayuscula(nombreCampania) : 'todas las campañas'}`
-                            : `${equipo.length} persona${equipo.length === 1 ? '' : 's'} a tu cargo`}
+                            : otroAlcance ? `${personas} · ${nombreAlcance} · solo consulta` : `${personas} a tu cargo`}
                     </p>
                 </div>
                 <div className="ai-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -317,6 +332,9 @@ const EquipoAsistencia = ({ financiera = false }) => {
                             {campanias.map((c) => <option key={c.idcampania} value={c.idcampania}>{primeraMayuscula(c.nombre)} ({c.empleados})</option>)}
                         </select>
                     )}
+                    {!financiera && verTodas && (
+                        <FiltroCampaniaEquipo alcance={alcance} campanias={campaniasEquipo} onChange={cambiarAlcanceEquipo} />
+                    )}
                     {centros.length > 1 && (
                         <select className="ai-input" style={{ maxWidth: 260 }} value={centro} onChange={(e) => setCentro(e.target.value)} aria-label="Centro de costo">
                             <option value="">Todos los centros de costo ({equipo.length})</option>
@@ -328,7 +346,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                 {filtrado.length === 0 ? (
                     <div className="ai-empty">
                         <Users size={40} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                        <p>{equipo.length === 0 ? (financiera ? 'No hay empleados activos.' : 'No tienes empleados a cargo.') : 'Nadie coincide con este filtro.'}</p>
+                        <p>{equipo.length === 0 ? ((financiera || otroAlcance) ? 'No hay empleados activos.' : 'No tienes empleados a cargo.') : 'Nadie coincide con este filtro.'}</p>
                     </div>
                 ) : (
                     <table className="ai-table ai-table--dense">
@@ -361,7 +379,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                         <td>
                                             <div style={{ fontWeight: 600, fontSize: 13 }}>{emp.centro_costo || SIN_CENTRO}</div>
                                             <div className="ai-muted" style={{ fontSize: 12 }}>{textoTurno(emp.turno)}</div>
-                                            {(financiera ? (emp.campania || emp.jefe_area) : (emp.jefe_area || emp.jefe_inmediato)) && (
+                                            {((financiera || otroAlcance) ? (emp.campania || emp.jefe_area) : (emp.jefe_area || emp.jefe_inmediato)) && (
                                                 <div className="ai-muted" style={{ fontSize: 11 }}>
                                                     {primeraMayuscula(emp.campania || '')}{emp.campania && emp.jefe_area ? ' · ' : ''}{emp.jefe_area ? `Jefe: ${nombrePropio(emp.jefe_area)}` : ''}{!financiera && emp.jefe_inmediato ? `${emp.campania || emp.jefe_area ? ' · ' : ''}Coord.: ${nombrePropio(emp.jefe_inmediato)}` : ''}
                                                 </div>
@@ -404,7 +422,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                         <td>
                                             {/* Abre la trazabilidad de hoy (entrada, pausas, alertas); desde ahí se navega a días anteriores. */}
                                             <Link
-                                                to={financiera ? `/recursos-humanos/trazabilidad/${emp.users_company_id}?origen=en-vivo` : `${baseEquipo}/equipo/${emp.users_company_id}/trazabilidad`}
+                                                to={financiera ? `/recursos-humanos/trazabilidad/${emp.users_company_id}?origen=en-vivo` : `${baseEquipo}/equipo/${emp.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`}
                                                 className="ai-btn ai-btn--secondary ai-btn--sm" style={{ whiteSpace: 'nowrap' }}
                                                 title="Detalle del empleado hoy: entrada, pausas, alertas y salida" aria-label={`Detalle de hoy de ${nombrePropio(emp.nombre)}`}
                                             >

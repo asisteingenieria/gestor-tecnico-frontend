@@ -109,7 +109,7 @@ const TrazabilidadEmpleado = ({ financiera = false }) => {
                 </Link>
             ) : (
                 <Link
-                    to={financiera ? `/recursos-humanos/asistencia-mensual?periodo=${fecha.slice(0, 7)}${empleado?.idcampania ? `&campania=${empleado.idcampania}` : ''}` : `${baseEquipo}/equipo`}
+                    to={financiera ? `/recursos-humanos/asistencia-mensual?periodo=${fecha.slice(0, 7)}${empleado?.idcampania ? `&campania=${empleado.idcampania}` : ''}` : `${baseEquipo}/equipo${searchParams.get('campania') ? `?campania=${encodeURIComponent(searchParams.get('campania'))}` : ''}`}
                     className="ai-link"
                 >
                     <ArrowLeft size={14} strokeWidth={1.75} /> {financiera ? 'Volver al reporte' : 'Volver al equipo'}
