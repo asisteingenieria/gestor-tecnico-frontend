@@ -9,6 +9,8 @@ import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 import { useBaseEquipo } from '../../utils/rutaEquipo';
 import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
+import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
+import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
 
 // Histórico del equipo para el jefe (asistencia.md §35): KPIs del mes, un calendario tipo heatmap
 // (día × empleado) agrupado por centro de costo o por cargo, y la tabla detallada por empleado.
@@ -68,13 +70,18 @@ const EquipoMensual = () => {
     const [filtroCentro, setFiltroCentro] = useState('');
     const [filtroCargo, setFiltroCargo] = useState('');
     const [agrupar, setAgrupar] = useState('centro_costo');
+    // Director de Tecnología (§68): su equipo o una campaña. El histórico va campaña por campaña:
+    // "Todas las campañas" de la vista Hoy aquí es su equipo.
+    const { verTodas, campanias, alcance: alcanceUrl, cambiarAlcance } = useAlcanceEquipo();
+    const alcance = alcanceUrl === TODAS ? '' : alcanceUrl;
+    const nombreCampania = alcance ? primeraMayuscula(campanias.find((c) => String(c.idcampania) === alcance)?.nombre || 'Campaña') : null;
 
     // `silencioso`: recarga en vivo (aviso de un cambio de jornada) sin spinner ni borrar la tabla.
     const cargar = useCallback(async (silencioso = false) => {
         if (!silencioso) setLoading(true);
         setError(null);
         try {
-            const { data } = await asistenciaService.getResumenMensualEquipo(periodo);
+            const { data } = await asistenciaService.getResumenMensualEquipo(periodo, paramsAlcance(alcance, false));
             setDatos(data);
         } catch (err) {
             // Una recarga en vivo que falla deja la tabla que ya se veía.
@@ -84,7 +91,13 @@ const EquipoMensual = () => {
         } finally {
             setLoading(false);
         }
-    }, [periodo]);
+    }, [periodo, alcance]);
+
+    const cambiarCampania = (valor) => {
+        setFiltroCentro('');
+        setFiltroCargo('');
+        cambiarAlcance(valor);
+    };
 
     useEffect(() => { cargar(); }, [cargar]);
 
@@ -157,15 +170,22 @@ const EquipoMensual = () => {
                 <div>
                     <h1 className="ai-page-title">Equipo</h1>
                     <p className="ai-page-sub">
-                        Histórico · {nombrePeriodo(periodo)}
+                        Histórico · {nombrePeriodo(periodo)}{nombreCampania ? ` · ${nombreCampania} · solo consulta` : ''}
                         {datos ? ` · ${filtrando ? `${empleados.length} de ${todos.length}` : todos.length} ${todos.length === 1 ? 'persona' : 'personas'}` : ''}
                     </p>
                 </div>
                 <div className="ai-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <SelectorVistaEquipo />
+                    {verTodas && (
+                        <FiltroCampaniaEquipo alcance={alcance} campanias={campanias} onChange={cambiarCampania} incluirTodas={false} />
+                    )}
                     <input
                         type="month" className="ai-input" style={{ width: 170 }} value={periodo} max={periodoActual()}
-                        onChange={(e) => e.target.value && setSearchParams({ periodo: e.target.value })} aria-label="Mes"
+                        onChange={(e) => e.target.value && setSearchParams((prev) => {
+                            const params = new URLSearchParams(prev);
+                            params.set('periodo', e.target.value);
+                            return params;
+                        })} aria-label="Mes"
                     />
                     <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportar} disabled={empleados.length === 0}>
                         <Download size={14} strokeWidth={1.75} /> Exportar
@@ -182,7 +202,7 @@ const EquipoMensual = () => {
             ) : todos.length === 0 ? (
                 <div className="ai-panel ai-empty">
                     <CalendarRange size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                    <p>No tienes empleados a cargo con datos en {nombrePeriodo(periodo).toLowerCase()}.</p>
+                    <p>{nombreCampania ? `${nombreCampania} no tiene personal activo` : `No tienes empleados a cargo con datos en ${nombrePeriodo(periodo).toLowerCase()}`}.</p>
                 </div>
             ) : (
                 <>
@@ -281,7 +301,7 @@ const EquipoMensual = () => {
                                                                 return (
                                                                     <td key={d.d} style={{ padding: 0 }}>
                                                                         <Link
-                                                                            to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad?fecha=${d.fecha}`}
+                                                                            to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad?fecha=${d.fecha}${sufijoAlcance(alcance, '&')}`}
                                                                             title={titulo}
                                                                             style={{
                                                                                 display: 'block', width: 18, height: 18, borderRadius: 3,
@@ -339,7 +359,7 @@ const EquipoMensual = () => {
                                                 {g.empleados.map((e) => (
                                                     <tr key={e.users_company_id}>
                                                         <td>
-                                                            <Link to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad`} className="ai-row" style={{ gap: 8, textDecoration: 'none', color: 'inherit' }}>
+                                                            <Link to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`} className="ai-row" style={{ gap: 8, textDecoration: 'none', color: 'inherit' }}>
                                                                 <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(e.nombre)}</span>
                                                                 <span>
                                                                     <div style={{ fontWeight: 600 }}>{nombrePropio(e.nombre)}</div>
