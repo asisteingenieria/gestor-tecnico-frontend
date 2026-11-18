@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, Search, FileText, BarChart3 } from 'lucide-react';
+import { Loader2, Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, Search, FileText, BarChart3, ClipboardList } from 'lucide-react';
 import { asistenciaService, financieraService } from '../../services/api';
 import { nombrePropio, iniciales, primeraMayuscula } from '../../utils/formatoRRHH';
 import { formatearDuracion } from '../../utils/tiempoAsistencia';
@@ -16,6 +16,8 @@ import CuadroLlegada from './CuadroLlegada';
 import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
 import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
 import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
+import NovedadChip from './NovedadChip';
+import { etiquetaNovedad, noAsistioPorNovedad } from '../../utils/novedadesAsistencia';
 
 const POLL_MS = 30000;
 // Financiera ve a toda la empresa: los avisos de una ráfaga (cambio de turno) se agrupan en una recarga.
@@ -36,17 +38,23 @@ const ESTADO_BADGE = {
     en_curso: { label: 'En turno', clase: 'ai-badge--success' },
     en_pausa: { label: 'En pausa', clase: 'ai-badge--info' },
     finalizada: { label: 'Finalizada', clase: 'ai-badge--neutral' },
-    ausente: { label: 'Ausente', clase: 'ai-badge--danger' }
+    ausente: { label: 'Ausente', clase: 'ai-badge--danger' },
+    // Novedad de RRHH que cubre hoy (§71): no vino, pero no es ausencia ni "aún no llega".
+    novedad: { label: 'Con novedad', clase: 'ai-nov-badge' }
 };
 
-const ORDEN_ESTADO = { ausente: 0, en_pausa: 1, en_curso: 2, pendiente: 3, finalizada: 4 };
+// Estado con el que se cuenta, filtra y ordena a la persona: la novedad reemplaza a 'pendiente'/'ausente'.
+const estadoVista = (emp) => (noAsistioPorNovedad(emp) ? 'novedad' : emp.estado);
+
+const ORDEN_ESTADO = { ausente: 0, en_pausa: 1, en_curso: 2, pendiente: 3, novedad: 4, finalizada: 5 };
 
 const TABS = [
     { id: 'todos', label: 'Todos' },
     { id: 'en_curso', label: 'En turno' },
     { id: 'en_pausa', label: 'En pausa' },
     { id: 'pendiente', label: 'Sin iniciar' },
-    { id: 'ausente', label: 'Ausentes' }
+    { id: 'ausente', label: 'Ausentes' },
+    { id: 'novedad', label: 'Con novedad' }
 ];
 
 const SIN_CENTRO = 'Sin centro de costo';
@@ -67,6 +75,7 @@ const otrasAlertas = (emp) => (emp.alertas || []).filter((a) => a !== 'llegada_t
 
 // Cuadrito de hoy. Sin turno, o en su día de descanso, no se sabe si llegó tarde: gris en vez de verde.
 function claseHoy(emp) {
+    if (noAsistioPorNovedad(emp)) return 'novedad';
     const clase = claseDia(emp);
     if (!clase || clase === 'pendiente' || clase === 'ausente') return clase;
     if (emp.turno && !emp.turno.es_descanso) return clase;
@@ -79,6 +88,7 @@ function textoLlegada(emp) {
     if (!clase) return '';
     if (clase === 'pendiente') return 'Aún no llega';
     if (clase === 'ausente') return 'Ausente';
+    if (clase === 'novedad') return `Novedad · ${etiquetaNovedad(emp.novedad.tipo)}`;
     if (clase === 'curso_sin_horario') return 'Sin horario · en turno';
     if (clase === 'sin_horario') return 'Sin horario · terminó';
     const llegada = emp.minutos_tarde > 0 ? `Tarde · ${formatearDuracion(emp.minutos_tarde)}` : 'Puntual';
@@ -178,23 +188,24 @@ const EquipoAsistencia = ({ financiera = false }) => {
         enPausaAlmuerzo: delCentro.filter((e) => e.pausa_activa?.tipo === 'almuerzo').length,
         enPausaBreak: delCentro.filter((e) => e.pausa_activa?.tipo === 'break').length,
         enCapacitacion: delCentro.filter((e) => e.pausa_activa?.tipo === 'capacitacion').length,
-        sinIniciar: delCentro.filter((e) => e.estado === 'pendiente').length,
+        sinIniciar: delCentro.filter((e) => estadoVista(e) === 'pendiente').length,
         tarde: delCentro.filter(esTarde).length,
-        ausentes: delCentro.filter((e) => e.estado === 'ausente').length,
+        ausentes: delCentro.filter((e) => estadoVista(e) === 'ausente').length,
+        conNovedad: delCentro.filter((e) => estadoVista(e) === 'novedad').length,
         presencial: delCentro.filter((e) => e.asislock?.modalidad === 'presencial').length,
         teletrabajo: delCentro.filter((e) => e.asislock?.modalidad === 'teletrabajo').length
     }), [delCentro]);
 
     const filtrado = useMemo(() => {
         let lista = delCentro;
-        if (tab !== 'todos') lista = lista.filter((e) => e.estado === tab);
+        if (tab !== 'todos') lista = lista.filter((e) => estadoVista(e) === tab);
         if (busqueda.trim()) {
             const q = busqueda.trim().toLowerCase();
             lista = lista.filter((e) => (e.nombre || '').toLowerCase().includes(q) || e.cedula?.includes(q));
         }
         return [...lista].sort((a, b) => {
-            const pa = (a.estado === 'ausente' || esTarde(a)) ? 0 : ORDEN_ESTADO[a.estado] ?? 9;
-            const pb = (b.estado === 'ausente' || esTarde(b)) ? 0 : ORDEN_ESTADO[b.estado] ?? 9;
+            const pa = (estadoVista(a) === 'ausente' || esTarde(a)) ? 0 : ORDEN_ESTADO[estadoVista(a)] ?? 9;
+            const pb = (estadoVista(b) === 'ausente' || esTarde(b)) ? 0 : ORDEN_ESTADO[estadoVista(b)] ?? 9;
             if (pa !== pb) return pa - pb;
             return (a.nombre || '').localeCompare(b.nombre || '');
         });
@@ -207,7 +218,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
             MODALIDAD_INGRESO[e.asislock?.modalidad]?.label || '',
             e.asislock?.primer_login ? formatearHora12(e.asislock.primer_login) : '',
             textoConexion(e.asislock) || '',
-            textoLlegada(e), formatearDuracion(e.minutos_trabajados), ESTADO_BADGE[e.estado]?.label || e.estado,
+            textoLlegada(e), formatearDuracion(e.minutos_trabajados), (noAsistioPorNovedad(e) ? `Novedad: ${e.novedad.tipo}` : ESTADO_BADGE[e.estado]?.label || e.estado),
             otrasAlertas(e).map((a) => ALERTA_LABEL[a] || a).join(', ')
         ]);
         descargarCsv(
@@ -275,7 +286,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
 
             {error && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
 
-            <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+            <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
                 <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', border: tab === 'en_curso' ? '1px solid var(--primary)' : undefined }} onClick={() => setTab('en_curso')}>
                     <div className="ai-kpi-head"><span className="ai-kpi-label">En turno</span><span className="ai-kpi-icon"><UserCheck size={16} strokeWidth={1.75} /></span></div>
                     <div className="ai-kpi-value" style={{ color: 'var(--success)' }}>{kpis.enTurno}</div>
@@ -298,6 +309,12 @@ const EquipoAsistencia = ({ financiera = false }) => {
                     <div className="ai-kpi-head"><span className="ai-kpi-label">Ausentes</span><span className="ai-kpi-icon" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}><UserX size={16} strokeWidth={1.75} /></span></div>
                     <div className="ai-kpi-value" style={{ color: kpis.ausentes > 0 ? 'var(--danger)' : undefined }}>{kpis.ausentes}</div>
                 </button>
+                <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', borderColor: tab === 'novedad' ? 'var(--primary)' : undefined }} onClick={() => setTab('novedad')}
+                    title="Incapacidades, vacaciones, licencias y suspensiones de RRHH que cubren hoy">
+                    <div className="ai-kpi-head"><span className="ai-kpi-label">Con novedad</span><span className="ai-kpi-icon" style={{ background: '#f6e1f1', color: '#a8338f' }}><ClipboardList size={16} strokeWidth={1.75} /></span></div>
+                    <div className="ai-kpi-value" style={{ color: kpis.conNovedad > 0 ? '#a8338f' : undefined }}>{kpis.conNovedad}</div>
+                    <div className="ai-kpi-foot">No cuentan como ausentes</div>
+                </button>
             </div>
 
             <div className="ai-panel">
@@ -311,7 +328,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                             onClick={() => setTab(t.id)}
                         >
                             {t.label}
-                            <span className="ai-count">{t.id === 'todos' ? delCentro.length : delCentro.filter((e) => e.estado === t.id).length}</span>
+                            <span className="ai-count">{t.id === 'todos' ? delCentro.length : delCentro.filter((e) => estadoVista(e) === t.id).length}</span>
                         </button>
                     ))}
                 </div>
@@ -364,14 +381,14 @@ const EquipoAsistencia = ({ financiera = false }) => {
                         </thead>
                         <tbody>
                             {filtrado.map((emp) => {
-                                const badge = ESTADO_BADGE[emp.estado] || ESTADO_BADGE.pendiente;
+                                const badge = ESTADO_BADGE[estadoVista(emp)] || ESTADO_BADGE.pendiente;
                                 return (
                                     <tr key={emp.users_company_id}>
                                         <td>
                                             <span className="ai-row" style={{ gap: 10 }}>
                                                 <span className="ai-avatar">{iniciales(emp.nombre)}</span>
                                                 <span>
-                                                    <div style={{ fontWeight: 600 }}>{nombrePropio(emp.nombre)}</div>
+                                                    <div style={{ fontWeight: 600 }}>{nombrePropio(emp.nombre)}<NovedadChip novedad={emp.novedad} /></div>
                                                     <div className="ai-muted" style={{ fontSize: 12 }}>{primeraMayuscula(emp.cargo || '')} · CC {emp.cedula}</div>
                                                 </span>
                                             </span>

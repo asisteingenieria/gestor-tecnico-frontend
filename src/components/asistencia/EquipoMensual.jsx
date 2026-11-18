@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
     Loader2, Users, Clock, CalendarX, AlertTriangle, Download, CalendarRange, Search,
-    CalendarDays, CheckCircle2, Timer, User, Bath, Coffee, Utensils, GraduationCap, Table2, BarChart3
+    CalendarDays, CheckCircle2, Timer, User, Bath, Coffee, Utensils, GraduationCap, Table2, BarChart3, ClipboardList
 } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
@@ -14,6 +14,8 @@ import { useBaseEquipo } from '../../utils/rutaEquipo';
 import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
 import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
 import GraficasEquipoMes from './GraficasEquipoMes';
+import NovedadChip from './NovedadChip';
+import { etiquetaNovedad } from '../../utils/novedadesAsistencia';
 import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
 
 // Histórico del equipo para el jefe (asistencia.md §35): KPIs del mes, un calendario tipo heatmap
@@ -21,7 +23,10 @@ import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hoo
 // Es la segunda vista de "Equipo"; la primera es hoy en vivo (EquipoAsistencia).
 
 const AZUL = 'var(--primary)';
-const LEYENDA = ['puntual', 'tarde', 'ausente', 'curso_puntual', 'curso_tarde', 'pendiente'];
+const LEYENDA = ['puntual', 'tarde', 'ausente', 'novedad', 'curso_puntual', 'curso_tarde', 'pendiente'];
+
+// Tipos de novedad de RRHH que tuvo la persona en el mes (para el distintivo y su title, §71).
+const tiposNovedad = (e) => [...new Set((e.dias || []).filter((d) => d.novedad).map((d) => d.novedad.tipo))];
 
 const AGRUPAR = [
     { id: 'centro_costo', label: 'Centro de costo' },
@@ -53,6 +58,7 @@ function totalesDe(empleados) {
         empleados: empleados.length,
         dias_trabajados: diasTrabajados,
         ausencias: suma('ausencias'),
+        dias_novedad: suma('dias_novedad'),
         dias_tarde: suma('dias_tarde'),
         porcentaje_puntualidad: diasTrabajados > 0 ? Math.round((suma('dias_puntuales') / diasTrabajados) * 100) : null,
         ...Object.fromEntries(['minutos_trabajados', 'minutos_extra', 'minutos_bano', 'minutos_break', 'minutos_almuerzo', 'minutos_capacitacion']
@@ -150,13 +156,13 @@ const EquipoMensual = () => {
     const exportar = () => {
         const cuerpo = empleados.map((e, i) => [
             i + 1, e.documento, nombrePropio(e.nombre), e.centro_costo || '', e.cargo || '',
-            e.dias_trabajados, e.ausencias, e.dias_tarde, e.minutos_tarde,
+            e.dias_trabajados, e.ausencias, e.dias_novedad || 0, tiposNovedad(e).join(' / '), e.dias_tarde, e.minutos_tarde,
             e.porcentaje_puntualidad ?? '', hFmt(e.minutos_trabajados), hFmt(e.minutos_extra),
             hFmt(e.minutos_bano), hFmt(e.minutos_break), hFmt(e.minutos_almuerzo), hFmt(e.minutos_capacitacion)
         ]);
         descargarCsv(
             `equipo_mensual_${periodo}.csv`,
-            ['N°', 'Documento', 'Empleado', 'Centro de costo', 'Cargo', 'Días trab.', 'Ausencias', 'Días tarde', 'Min tarde',
+            ['N°', 'Documento', 'Empleado', 'Centro de costo', 'Cargo', 'Días trab.', 'Ausencias', 'Días con novedad', 'Novedades', 'Días tarde', 'Min tarde',
                 'Puntualidad %', 'H. trabajadas', 'H. extra', 'Baño', 'Break', 'Almuerzo', 'Capacitación'],
             cuerpo
         );
@@ -221,6 +227,7 @@ const EquipoMensual = () => {
                         <Mosaico color="en_turno" icono={Users} valor={totales.dias_trabajados} label="Días trabajados" />
                         <Mosaico color="bano" icono={Timer} valor={hFmt(totales.minutos_trabajados)} label="Horas trabajadas" />
                         <Mosaico color="no_llego" icono={CalendarX} valor={totales.ausencias} label="Ausencias" />
+                        <Mosaico color="novedad" icono={ClipboardList} valor={totales.dias_novedad} label="Días con novedad" />
                         <Mosaico color="almuerzo" icono={AlertTriangle} valor={totales.dias_tarde} label="Días tarde" />
                         <Mosaico color="capacitacion" icono={Clock} valor={hFmt(totales.minutos_extra)} label="Horas extra" />
                     </div>
@@ -310,7 +317,7 @@ const EquipoMensual = () => {
                                                                 const clase = claseDia(celda);
                                                                 const cfg = clase ? CELDA[clase] : null;
                                                                 const titulo = celda
-                                                                    ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${celda.minutos_tarde} min)` : ''}`
+                                                                    ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${celda.minutos_tarde} min)` : ''}${celda.novedad ? ` · ${celda.novedad.tipo}` : ''}`
                                                                     : `${d.fecha} · sin jornada`;
                                                                 return (
                                                                     <td key={d.d} style={{ padding: 0 }}>
@@ -395,7 +402,15 @@ const EquipoMensual = () => {
                                                         <Link to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}>
                                                             <i className="ai-monitor-avatar" aria-hidden="true"><User size={16} strokeWidth={2.4} /></i>
                                                             <span>
-                                                                <div>{nombrePropio(e.nombre).toUpperCase()}</div>
+                                                                <div>
+                                                                    {nombrePropio(e.nombre).toUpperCase()}
+                                                                    {e.dias_novedad > 0 && (
+                                                                        <NovedadChip
+                                                                            texto={`${e.dias_novedad} ${e.dias_novedad === 1 ? 'día' : 'días'} · ${[...new Set(tiposNovedad(e).map(etiquetaNovedad))].join(', ')}`}
+                                                                            titulo={`${e.dias_novedad} ${e.dias_novedad === 1 ? 'día' : 'días'} sin asistir por novedad de RRHH: ${tiposNovedad(e).join(', ')}`}
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                                 <div className="ai-muted" style={{ fontSize: 11.5, fontWeight: 500 }}>
                                                                     CC {e.documento}{detalle(e) ? ` · ${detalle(e)}` : ''}
                                                                     {e.jefe_area ? ` · Jefe: ${nombrePropio(e.jefe_area)}` : ''}
@@ -406,6 +421,9 @@ const EquipoMensual = () => {
                                                     <td className="ai-monitor-centro" style={{ fontWeight: 700 }}>{e.dias_trabajados}</td>
                                                     <td className="ai-monitor-centro">
                                                         {e.ausencias > 0 ? <Pastilla color="no_llego">{e.ausencias}</Pastilla> : 0}
+                                                    </td>
+                                                    <td className="ai-monitor-centro" title={tiposNovedad(e).join(', ') || undefined}>
+                                                        {e.dias_novedad > 0 ? <Pastilla color="novedad">{e.dias_novedad}</Pastilla> : 0}
                                                     </td>
                                                     <td className="ai-monitor-centro">
                                                         {e.dias_tarde > 0
@@ -433,6 +451,7 @@ const EquipoMensual = () => {
                                         <td>Total ({totales.empleados})</td>
                                         <td className="ai-monitor-centro">{totales.dias_trabajados}</td>
                                         <td className="ai-monitor-centro">{totales.ausencias}</td>
+                                        <td className="ai-monitor-centro">{totales.dias_novedad}</td>
                                         <td className="ai-monitor-centro">{totales.dias_tarde}</td>
                                         <td className="ai-monitor-centro">{totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'}</td>
                                         <td className="ai-monitor-centro">{hFmt(totales.minutos_trabajados)}</td>
@@ -457,6 +476,7 @@ const COLUMNAS_DETALLE = [
     { id: 'empleado', label: 'Empleado', icono: User },
     { id: 'dias', label: 'Días trab.', icono: CalendarDays },
     { id: 'ausencias', label: 'Ausencias', icono: CalendarX },
+    { id: 'novedad', label: 'Con novedad', icono: ClipboardList, title: 'Días que no asistió por una novedad de RRHH (no son ausencias)' },
     { id: 'tarde', label: 'Días tarde', icono: AlertTriangle },
     { id: 'puntualidad', label: 'Puntualidad', icono: CheckCircle2 },
     { id: 'trabajadas', label: 'H. trabajadas', icono: Timer },

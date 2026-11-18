@@ -16,7 +16,9 @@ const LIMITE = 20;
 const SERIES_ASISTENCIA = [
     { id: 'puntual', label: 'Puntual', valor: (e) => Number(e.dias_puntuales) || 0 },
     { id: 'tarde', label: 'Llegó tarde', valor: (e) => Number(e.dias_tarde) || 0 },
-    { id: 'ausente', label: 'Ausente', valor: (e) => Number(e.ausencias) || 0 }
+    { id: 'ausente', label: 'Ausente', valor: (e) => Number(e.ausencias) || 0 },
+    // Días que no asistió por una novedad de RRHH (§71): no son ausencias.
+    { id: 'novedad', label: 'Novedad RRHH', valor: (e) => Number(e.dias_novedad) || 0 }
 ];
 
 // Horas trabajadas incluyen capacitación y horas extra: "disponible" es el resto, para no contarlas dos veces.

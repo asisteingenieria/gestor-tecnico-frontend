@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
     Loader2, Users, RefreshCw, Search, ChevronUp, ChevronDown,
     User, Headphones, Wifi, Coffee, Bath, Utensils, GraduationCap, Unplug, Play, CheckCircle2, Clock,
-    CalendarDays, Activity, Timer
+    CalendarDays, Activity, Timer, ClipboardList
 } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import { escucharAsistencia } from '../../utils/socketAsistencia';
 import { datosPausa } from '../../utils/pausasAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
+import NovedadChip from './NovedadChip';
+import { etiquetaNovedad, noAsistioPorNovedad } from '../../utils/novedadesAsistencia';
 
 // Monitor del equipo del coordinador (jefe inmediato), con el diseño de Downloads/Dashboard.png: mosaicos de
 // colores con los totales, leyenda y una tabla con el horario, el estado en pastilla, el tiempo total desde el
@@ -30,6 +32,8 @@ function estadoMonitor(emp) {
     }
     if (emp.estado === 'en_pausa') return { clave: 'desconectado', label: 'Desconectado', corre: true };
     if (emp.estado === 'finalizada') return { clave: 'finalizado', label: 'Finalizado', corre: false };
+    // Novedad de RRHH que cubre hoy (incapacidad, vacaciones, licencia…, §71): ni ausente ni "No ha llegado".
+    if (noAsistioPorNovedad(emp)) return { clave: 'novedad', label: etiquetaNovedad(emp.novedad.tipo), corre: false };
     if (emp.estado === 'ausente') return { clave: 'ausente', label: 'Ausente', corre: false };
     // Sin entrada con su turno ya empezado (lo decide el servidor, §62); si no, aún no le toca, descansa o no tiene horario.
     if (emp.no_ha_llegado) return { clave: 'no_llego', label: 'No ha llegado', corre: false };
@@ -52,10 +56,11 @@ const MOSAICOS = [
     { id: 'desconectado', label: 'Desconectados', leyenda: 'Desconectados', icono: Unplug, estados: ['desconectado'] },
     { id: 'sin_iniciar', label: 'Sin iniciar', leyenda: 'Sin iniciar', icono: Play, estados: ['sin_iniciar'] },
     { id: 'finalizado', label: 'Finalizados', leyenda: 'Finalizados', icono: CheckCircle2, estados: ['finalizado'] },
-    { id: 'no_llego', label: 'No han llegado', leyenda: 'No ha llegado', icono: Clock, estados: ['no_llego', 'ausente'] }
+    { id: 'no_llego', label: 'No han llegado', leyenda: 'No ha llegado', icono: Clock, estados: ['no_llego', 'ausente'] },
+    { id: 'novedad', label: 'Con novedad', leyenda: 'Novedad RRHH', icono: ClipboardList, estados: ['novedad'] }
 ];
 
-const ORDEN_ESTADO = { conectado: 0, capacitacion: 1, break: 2, pausa: 2, bano: 3, almuerzo: 4, desconectado: 5, no_llego: 6, ausente: 6, sin_iniciar: 7, finalizado: 8 };
+const ORDEN_ESTADO = { conectado: 0, capacitacion: 1, break: 2, pausa: 2, bano: 3, almuerzo: 4, desconectado: 5, no_llego: 6, ausente: 6, novedad: 7, sin_iniciar: 8, finalizado: 9 };
 
 // "08:01:46" en hora de Bogotá.
 function hora24(iso) {
@@ -326,6 +331,7 @@ const MonitorEquipo = () => {
                                             <span>
                                                 <i className="ai-monitor-avatar" aria-hidden="true"><User size={16} strokeWidth={2.4} /></i>
                                                 {(emp.nombre || '').toUpperCase()}
+                                                <NovedadChip novedad={emp.novedad} />
                                             </span>
                                         </td>
                                         <td className="ai-monitor-centro">{textoHorario(emp.turno)}</td>
