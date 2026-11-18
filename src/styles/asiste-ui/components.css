@@ -398,6 +398,8 @@
 .ai-st--desconectado { --st-tile: #6f7d92; --st-ink: #fff;    --st-bar: #b4bdca; --st-pill: #e6eaf0; --st-dot: #6f7d92; --st-icon: #fff; }
 .ai-st--sin_iniciar  { --st-tile: #eef1f5; --st-ink: #0f2b5b; --st-bar: #b9c2cf; --st-pill: #eef1f5; --st-dot: #b9c2cf; --st-icon: #0f2b5b; }
 .ai-st--finalizado   { --st-tile: #258a45; --st-ink: #fff;    --st-bar: #ffffff; --st-pill: #dcefe2; --st-dot: #258a45; --st-icon: #fff; }
+/* Novedad de RRHH (§71): ciruela, validado junto a puntual/tarde/ausente en claro y oscuro. */
+.ai-st--novedad      { --st-tile: #a8338f; --st-ink: #fff;    --st-bar: #e3a3d4; --st-pill: #f6e1f1; --st-dot: #a8338f; --st-icon: #fff; }
 .ai-st--no_llego     { --st-tile: #fde0e0; --st-ink: #0f2b5b; --st-bar: #e0302a; --st-pill: #fde0e0; --st-dot: #e0302a; --st-icon: #e0302a; }
 [data-theme="dark"] .ai-st--break        { --st-tile: #5a4313; --st-ink: #fde9c4; --st-icon: #fde9c4; --st-pill: #4a3810; }
 [data-theme="dark"] .ai-st--bano         { --st-tile: #12505e; --st-ink: #c4f0fb; --st-icon: #c4f0fb; --st-pill: #10414d; }
@@ -409,6 +411,12 @@
 [data-theme="dark"] .ai-st--capacitacion { --st-pill: #33255a; }
 [data-theme="dark"] .ai-st--desconectado { --st-pill: #2f3846; }
 [data-theme="dark"] .ai-st--finalizado   { --st-pill: #173a24; }
+[data-theme="dark"] .ai-st--novedad      { --st-pill: #43183a; }
+/* Distintivo de novedad junto al nombre (NovedadChip.jsx). */
+.ai-badge.ai-nov-badge { background: #f6e1f1; color: #7d1f69; }
+[data-theme="dark"] .ai-badge.ai-nov-badge { background: #43183a; color: #f3c4e8; }
+.ai-nov-chip { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: #f6e1f1; color: #7d1f69; border: 1px solid #e3a3d4; font: 700 10.5px/16px var(--font-sans); letter-spacing: .02em; text-transform: none; white-space: nowrap; vertical-align: 1px; }
+[data-theme="dark"] .ai-nov-chip { background: #43183a; color: #f3c4e8; border-color: #7d2f6c; }
 
 /* Encabezado: ícono del equipo, título y "en vivo"; el selector Hoy/Histórico/Novedades en pastillas. */
 .ai-monitor-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -484,11 +492,11 @@
    del skill dataviz) en claro y en oscuro; el ámbar tiene su propio tono en oscuro. Advertencia de contraste
    del ámbar y del celeste en claro: la cubren el detalle al pasar el mouse y la vista de tabla. */
 :root, [data-theme="light"] {
-  --gm-puntual: #0f9d74; --gm-tarde: #e8890c; --gm-ausente: #c8221c;
+  --gm-puntual: #0f9d74; --gm-tarde: #e8890c; --gm-ausente: #c8221c; --gm-novedad: #a8338f;
   --gm-disponible: #23a047; --gm-capacitacion: #8b5ce6; --gm-break: #e8890c; --gm-bano: #1597b3; --gm-almuerzo: #c4520f; --gm-extra: #2f6fc4;
 }
 [data-theme="dark"] { --gm-tarde: #cf7f0c; --gm-break: #cf7f0c; }
-.gm-c--puntual { background: var(--gm-puntual); } .gm-c--tarde { background: var(--gm-tarde); } .gm-c--ausente { background: var(--gm-ausente); }
+.gm-c--puntual { background: var(--gm-puntual); } .gm-c--tarde { background: var(--gm-tarde); } .gm-c--ausente { background: var(--gm-ausente); } .gm-c--novedad { background: var(--gm-novedad); }
 .gm-c--disponible { background: var(--gm-disponible); } .gm-c--capacitacion { background: var(--gm-capacitacion); } .gm-c--break { background: var(--gm-break); }
 .gm-c--bano { background: var(--gm-bano); } .gm-c--almuerzo { background: var(--gm-almuerzo); } .gm-c--extra { background: var(--gm-extra); }
 .ai-monitor-panel:has(.gm-graficas) { overflow: visible; }
