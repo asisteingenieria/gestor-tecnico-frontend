@@ -1,16 +1,23 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Users, RefreshCw, Search, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+    Loader2, Users, RefreshCw, Search, ChevronUp, ChevronDown,
+    User, Headphones, Wifi, Coffee, Bath, Utensils, GraduationCap, Unplug, Play, CheckCircle2, Clock,
+    CalendarDays, Activity, Timer
+} from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import { escucharAsistencia } from '../../utils/socketAsistencia';
 import { datosPausa } from '../../utils/pausasAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 
-// Monitor del equipo del coordinador (jefe inmediato), al estilo del monitor de la planta telefónica:
-// mosaicos con los totales y una tabla Hora Login · Nombre · Estado · Tiempo con la fila del color del
-// estado. "Tiempo" es cuánto lleva en el estado actual; lo calcula el servidor (`segundos_en_estado`) y
-// aquí solo sigue contando segundo a segundo desde la última carga.
+// Monitor del equipo del coordinador (jefe inmediato), con el diseño de Downloads/Dashboard.png: mosaicos de
+// colores con los totales, leyenda y una tabla con el horario, el estado en pastilla, el tiempo total desde el
+// primer login y, por estado, el acumulado del día y cuántas veces entró. Los tiempos los calcula el servidor
+// (`segundos_en_jornada`, `segundos_en_estado`, `segundos_por_estado`, `veces_por_estado`); aquí solo siguen
+// contando segundo a segundo desde la última carga.
 const POLL_MS = 30000;
+
+const PAUSAS_CONOCIDAS = ['break', 'bano', 'almuerzo', 'capacitacion'];
 
 // Estado del monitor de cada persona: conectado, la pausa en que está, desconectado de AsisLock,
 // finalizado, sin iniciar o ausente.
@@ -29,20 +36,23 @@ function estadoMonitor(emp) {
     return { clave: 'sin_iniciar', label: 'Sin iniciar', corre: false };
 }
 
-const PAUSAS_CONOCIDAS = ['break', 'bano', 'almuerzo', 'capacitacion'];
+// Colores de cada clave de estadoMonitor (clases .ai-st--* de components.css).
+const COLOR_DE = { pausa: 'break', ausente: 'no_llego' };
+const claseColor = (clave) => `ai-st--${COLOR_DE[clave] || clave}`;
 
-// Mosaicos de arriba, uno por estado de AsisLock (asistencia.md §34) y los del día. `estados` = claves de estadoMonitor que cuenta cada uno; un clic filtra la tabla.
+// Mosaicos de arriba, uno por estado de AsisLock (asistencia.md §34) y los del día. `estados` = claves de
+// estadoMonitor que cuenta cada uno; un clic filtra la tabla. También son la leyenda.
 const MOSAICOS = [
-    { id: 'en_turno', label: 'En turno', color: 'azul', estados: ['conectado', 'break', 'bano', 'almuerzo', 'capacitacion', 'pausa', 'desconectado'] },
-    { id: 'conectado', label: 'Conectados', color: 'verde', estados: ['conectado'] },
-    { id: 'break', label: 'Break', color: 'amarillo', estados: ['break', 'pausa'] },
-    { id: 'bano', label: 'Baño', color: 'morado', estados: ['bano'] },
-    { id: 'almuerzo', label: 'Almuerzo', color: 'ocre', estados: ['almuerzo'] },
-    { id: 'capacitacion', label: 'Capacitación', color: 'celeste', estados: ['capacitacion'] },
-    { id: 'desconectado', label: 'Desconectados', color: 'naranja', estados: ['desconectado'] },
-    { id: 'sin_iniciar', label: 'Sin iniciar', color: 'gris', estados: ['sin_iniciar'] },
-    { id: 'finalizado', label: 'Finalizados', color: 'pizarra', estados: ['finalizado'] },
-    { id: 'no_llego', label: 'No han llegado', color: 'rojo', estados: ['no_llego', 'ausente'] }
+    { id: 'en_turno', label: 'En turno', leyenda: 'En turno', icono: User, estados: ['conectado', 'break', 'bano', 'almuerzo', 'capacitacion', 'pausa', 'desconectado'] },
+    { id: 'conectado', label: 'Conectados', leyenda: 'Conectados', icono: Headphones, estados: ['conectado'] },
+    { id: 'break', label: 'Break', leyenda: 'Break', icono: Coffee, estados: ['break', 'pausa'] },
+    { id: 'bano', label: 'Baño', leyenda: 'Baño', icono: Bath, estados: ['bano'] },
+    { id: 'almuerzo', label: 'Almuerzo', leyenda: 'Almuerzo', icono: Utensils, estados: ['almuerzo'] },
+    { id: 'capacitacion', label: 'Capacitación', leyenda: 'Capacitación', icono: GraduationCap, estados: ['capacitacion'] },
+    { id: 'desconectado', label: 'Desconectados', leyenda: 'Desconectados', icono: Unplug, estados: ['desconectado'] },
+    { id: 'sin_iniciar', label: 'Sin iniciar', leyenda: 'Sin iniciar', icono: Play, estados: ['sin_iniciar'] },
+    { id: 'finalizado', label: 'Finalizados', leyenda: 'Finalizados', icono: CheckCircle2, estados: ['finalizado'] },
+    { id: 'no_llego', label: 'No han llegado', leyenda: 'No ha llegado', icono: Clock, estados: ['no_llego', 'ausente'] }
 ];
 
 const ORDEN_ESTADO = { conectado: 0, capacitacion: 1, break: 2, pausa: 2, bano: 3, almuerzo: 4, desconectado: 5, no_llego: 6, ausente: 6, sin_iniciar: 7, finalizado: 8 };
@@ -61,14 +71,42 @@ function hhmmss(totalSegundos) {
     return `${dos(Math.floor(s / 3600))}:${dos(Math.floor((s % 3600) / 60))}:${dos(s % 60)}`;
 }
 
+// "12m", "3h 32m": los minutos tarde de la pastilla.
+function duracionCorta(min) {
+    const h = Math.floor(min / 60);
+    return h ? `${h}h ${String(min % 60).padStart(2, '0')}m` : `${min}m`;
+}
+
+// "08:00 – 17:00" del turno de hoy; descanso o sin horario asignado.
+function textoHorario(turno) {
+    if (!turno) return 'Sin horario';
+    if (turno.es_descanso) return 'Descanso';
+    const hm = (t) => (t || '').slice(0, 5);
+    return `${hm(turno.hora_entrada)} – ${hm(turno.hora_salida)}`;
+}
+
 // El login de AsisLock si lo hay; si no, la entrada de la jornada (portal o molinete).
 const horaLoginDe = (emp) => emp.asislock?.primer_login || emp.entrada_en || null;
 
+// Columnas por estado. `claves` = las de estadoMonitor que corren en esa columna. Mientras la persona está en
+// una pausa, su columna cuenta desde que entró esta vez (con el acumulado del día debajo); fuera de ella muestra
+// el acumulado del día y cuántas veces entró. Tiempo disponible es siempre el acumulado conectado.
+const COLUMNAS_ESTADO = [
+    { id: 'conectado', label: 'Tiempo disponible', icono: Wifi, claves: ['conectado'], soloAcumulado: true },
+    { id: 'break', label: 'Break', icono: Coffee, claves: ['break', 'pausa'] },
+    { id: 'bano', label: 'Baño', icono: Bath, claves: ['bano'] },
+    { id: 'almuerzo', label: 'Almuerzo', icono: Utensils, claves: ['almuerzo'] },
+    { id: 'capacitacion', label: 'Capacitación', icono: GraduationCap, claves: ['capacitacion'] },
+    { id: 'desconectado', label: 'Desconectado', icono: Unplug, claves: ['desconectado'] }
+];
+
 const COLUMNAS = [
-    { id: 'login', label: 'Hora Login', ancho: 120 },
-    { id: 'nombre', label: 'Nombre' },
-    { id: 'estado', label: 'Estado', ancho: 150 },
-    { id: 'tiempo', label: 'Tiempo', ancho: 110 }
+    { id: 'login', label: 'Hora Login', icono: Clock },
+    { id: 'nombre', label: 'Nombre', icono: User },
+    { id: 'horario', label: 'Horario', icono: CalendarDays },
+    { id: 'estado', label: 'Estado', icono: Activity },
+    { id: 'tiempo', label: 'Tiempo total', icono: Timer },
+    ...COLUMNAS_ESTADO
 ];
 
 const MonitorEquipo = () => {
@@ -110,7 +148,7 @@ const MonitorEquipo = () => {
     // Cada cambio de jornada del equipo llega por socket y recarga (asistencia.md §43, §57).
     useEffect(() => escucharAsistencia('asistencia:equipo', () => { cargar(true); }), [cargar]);
 
-    // Reloj de la columna Tiempo.
+    // Reloj de las columnas de tiempo.
     useEffect(() => {
         const id = setInterval(() => setAhora(Date.now()), 1000);
         return () => clearInterval(id);
@@ -125,10 +163,22 @@ const MonitorEquipo = () => {
     }, [filas]);
 
     const transcurrido = cargadoEn ? (ahora - cargadoEn) / 1000 : 0;
-    const segundosDe = useCallback(
+    // Tiempo total desde el primer login: no se detiene en las pausas, sí en la salida.
+    const totalDe = useCallback(
+        ({ emp }) => (emp.segundos_en_jornada != null ? emp.segundos_en_jornada + (emp.jornada_corre ? transcurrido : 0) : null),
+        [transcurrido]
+    );
+    // Cuánto lleva en el estado actual (desde que entró esta vez).
+    const enEstadoDe = useCallback(
         ({ emp, est }) => (est.corre && emp.segundos_en_estado != null ? emp.segundos_en_estado + transcurrido : null),
         [transcurrido]
     );
+    // Acumulado del día en un estado; el del estado actual sigue contando desde la última carga.
+    const acumuladoDe = useCallback(({ emp, est }, col) => {
+        const base = emp.segundos_por_estado?.[col.id];
+        if (base == null) return null;
+        return base + (est.corre && col.claves.includes(est.clave) ? transcurrido : 0);
+    }, [transcurrido]);
 
     const visibles = useMemo(() => {
         let lista = filas;
@@ -140,7 +190,9 @@ const MonitorEquipo = () => {
             login: (f) => horaLoginDe(f.emp) || '9',
             nombre: (f) => (f.emp.nombre || '').toUpperCase(),
             estado: (f) => ORDEN_ESTADO[f.est.clave] ?? 9,
-            tiempo: (f) => segundosDe(f) ?? -1
+            horario: (f) => (f.emp.turno && !f.emp.turno.es_descanso ? f.emp.turno.hora_entrada : '99'),
+            tiempo: (f) => totalDe(f) ?? -1,
+            ...Object.fromEntries(COLUMNAS_ESTADO.map((c) => [c.id, (f) => acumuladoDe(f, c) ?? -1]))
         }[orden.col];
         return [...lista].sort((a, b) => {
             const va = valor(a);
@@ -148,7 +200,7 @@ const MonitorEquipo = () => {
             const cmp = typeof va === 'number' ? va - vb : va.localeCompare(vb);
             return (orden.asc ? cmp : -cmp) || (a.emp.nombre || '').localeCompare(b.emp.nombre || '');
         });
-    }, [filas, filtro, busqueda, orden, segundosDe]);
+    }, [filas, filtro, busqueda, orden, totalDe, acumuladoDe]);
 
     const ordenarPor = (col) => setOrden((o) => ({ col, asc: o.col === col ? !o.asc : true }));
 
@@ -164,15 +216,21 @@ const MonitorEquipo = () => {
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Equipo</h1>
-                    <p className="ai-page-sub">{equipo.length} persona{equipo.length === 1 ? '' : 's'} a tu cargo · en vivo</p>
+            <div className="ai-monitor-head">
+                <div className="ai-monitor-titulo">
+                    <Users size={52} strokeWidth={1.6} aria-hidden="true" />
+                    <div>
+                        <h1>Equipo</h1>
+                        <p>
+                            {equipo.length} persona{equipo.length === 1 ? '' : 's'} a tu cargo ·
+                            <span className="ai-monitor-vivo" aria-hidden="true" /> en vivo
+                        </p>
+                    </div>
                 </div>
-                <div className="ai-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className="ai-monitor-acciones">
                     <SelectorVistaEquipo />
-                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => cargar(true)}>
-                        <RefreshCw size={14} strokeWidth={1.75} className={actualizando ? 'animate-spin' : ''} /> Actualizar
+                    <button type="button" className="ai-monitor-btn" onClick={() => cargar(true)}>
+                        <RefreshCw size={15} strokeWidth={2} className={actualizando ? 'animate-spin' : ''} /> Actualizar
                     </button>
                 </div>
             </div>
@@ -184,81 +242,133 @@ const MonitorEquipo = () => {
                     <button
                         key={m.id}
                         type="button"
-                        className={`ai-monitor-mosaico ai-monitor-mosaico--${m.color} ${filtro === m.id ? 'is-active' : ''}`}
+                        className={`ai-monitor-mosaico ${claseColor(m.id)} ${filtro === m.id ? 'is-active' : ''}`}
                         onClick={() => setFiltro((f) => (f === m.id ? null : m.id))}
                         aria-pressed={filtro === m.id}
                         title={filtro === m.id ? 'Quitar el filtro' : `Ver solo: ${m.label.toLowerCase()}`}
                     >
+                        <m.icono size={26} strokeWidth={2} className="ai-monitor-ic" aria-hidden="true" />
                         <span className="ai-monitor-num">{conteo[m.id]}</span>
                         <span className="ai-monitor-lbl">{m.label}</span>
                     </button>
                 ))}
             </div>
 
-            <div className="ai-panel">
-                <div className="ai-panel-body ai-row" style={{ gap: 12, flexWrap: 'wrap', paddingBottom: 12 }}>
-                    <div className="ai-input" style={{ maxWidth: 320, flex: 1 }}>
-                        <Search size={16} strokeWidth={1.75} className="ai-ic" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre o cédula"
-                            value={busqueda}
-                            onChange={(e) => setBusqueda(e.target.value)}
-                            style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
-                        />
-                    </div>
-                    {filtro && (
-                        <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => setFiltro(null)}>
-                            Ver todos ({equipo.length})
-                        </button>
-                    )}
+            <div className="ai-monitor-barra">
+                <div className="ai-input">
+                    <Search size={16} strokeWidth={1.75} className="ai-ic" />
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre o cédula..."
+                        value={busqueda}
+                        onChange={(e) => setBusqueda(e.target.value)}
+                        style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
+                    />
                 </div>
+                <div className="ai-monitor-leyenda" aria-label="Colores por estado">
+                    {MOSAICOS.map((m) => (
+                        <span key={m.id} className={claseColor(m.id)}>
+                            <i className="ai-monitor-punto" aria-hidden="true" /> {m.leyenda}
+                        </span>
+                    ))}
+                </div>
+                {filtro && (
+                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => setFiltro(null)}>
+                        Ver todos ({equipo.length})
+                    </button>
+                )}
+            </div>
 
-                {visibles.length === 0 ? (
+            {visibles.length === 0 ? (
+                <div className="ai-panel">
                     <div className="ai-empty">
                         <Users size={40} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
                         <p>{equipo.length === 0 ? 'No tienes personas a cargo.' : 'Nadie coincide con este filtro.'}</p>
                     </div>
-                ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table className="ai-monitor-tabla">
-                            <thead>
-                                <tr>
-                                    {COLUMNAS.map((c) => (
-                                        <th key={c.id} style={{ width: c.ancho }} aria-sort={orden.col === c.id ? (orden.asc ? 'ascending' : 'descending') : 'none'}>
-                                            <button type="button" onClick={() => ordenarPor(c.id)}>
-                                                {c.label}
-                                                {orden.col === c.id && (orden.asc
-                                                    ? <ChevronUp size={13} strokeWidth={2} />
-                                                    : <ChevronDown size={13} strokeWidth={2} />)}
-                                            </button>
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {visibles.map((fila) => {
-                                    const { emp, est } = fila;
-                                    const segundos = segundosDe(fila);
-                                    return (
-                                        <tr
-                                            key={emp.users_company_id}
-                                            className={`ai-monitor-fila--${est.clave}`}
-                                            onClick={() => navigate(`/asistencia/equipo/${emp.users_company_id}/trazabilidad`)}
-                                            title={`${emp.nombre} · CC ${emp.cedula} — ver el detalle de hoy`}
-                                        >
-                                            <td className="ai-monitor-centro">{hora24(horaLoginDe(emp)) || '—'}</td>
-                                            <td>{(emp.nombre || '').toUpperCase()}</td>
-                                            <td className="ai-monitor-centro">{est.label}</td>
-                                            <td className="ai-monitor-centro">{segundos != null ? hhmmss(segundos) : '—'}</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
+                </div>
+            ) : (
+                <div className="ai-monitor-tabla-wrap">
+                    <table className="ai-monitor-tabla">
+                        <thead>
+                            <tr>
+                                {COLUMNAS.map((c) => (
+                                    <th key={c.id} aria-sort={orden.col === c.id ? (orden.asc ? 'ascending' : 'descending') : 'none'}>
+                                        <button type="button" onClick={() => ordenarPor(c.id)}>
+                                            <c.icono size={17} strokeWidth={1.9} aria-hidden="true" />
+                                            {c.label}
+                                            {orden.col === c.id && (orden.asc
+                                                ? <ChevronUp size={14} strokeWidth={2.4} />
+                                                : <ChevronDown size={14} strokeWidth={2.4} />)}
+                                        </button>
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {visibles.map((fila) => {
+                                const { emp, est } = fila;
+                                const total = totalDe(fila);
+                                return (
+                                    <tr
+                                        key={emp.users_company_id}
+                                        onClick={() => navigate(`/asistencia/equipo/${emp.users_company_id}/trazabilidad`)}
+                                        title={`${emp.nombre} · CC ${emp.cedula} — ver el detalle de hoy`}
+                                    >
+                                        <td className="ai-monitor-centro ai-monitor-login">
+                                            {hora24(horaLoginDe(emp)) || '—'}
+                                            {emp.minutos_tarde > 0 && (
+                                                <span className="ai-monitor-tarde" title={`Llegó ${duracionCorta(emp.minutos_tarde)} tarde a su turno de las ${(emp.turno?.hora_entrada || '').slice(0, 5)}`}>
+                                                    Tarde +{duracionCorta(emp.minutos_tarde)}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="ai-monitor-nombre">
+                                            <span>
+                                                <i className="ai-monitor-avatar" aria-hidden="true"><User size={16} strokeWidth={2.4} /></i>
+                                                {(emp.nombre || '').toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="ai-monitor-centro">{textoHorario(emp.turno)}</td>
+                                        <td className="ai-monitor-centro">
+                                            <span className={`ai-monitor-pill ${claseColor(est.clave)}`}>
+                                                <i className="ai-monitor-punto" aria-hidden="true" /> {est.label}
+                                            </span>
+                                        </td>
+                                        <td className="ai-monitor-centro">
+                                            {total != null
+                                                ? <span className="ai-monitor-tiempo"><Timer size={16} strokeWidth={2} aria-hidden="true" />{hhmmss(total)}</span>
+                                                : '—'}
+                                        </td>
+                                        {COLUMNAS_ESTADO.map((c) => {
+                                            const acum = acumuladoDe(fila, c);
+                                            const activo = est.corre && c.claves.includes(est.clave);
+                                            const veces = c.soloAcumulado ? 0 : (emp.veces_por_estado?.[c.id] || 0);
+                                            const enCurso = activo && !c.soloAcumulado ? enEstadoDe(fila) : null;
+                                            return (
+                                                <td key={c.id} className="ai-monitor-centro">
+                                                    {activo && acum != null ? (
+                                                        <span className={`ai-monitor-pill ai-monitor-pill--acum ${claseColor(c.id)}`}
+                                                            title={enCurso != null ? 'Desde que entró esta vez' : 'Acumulado del día'}>
+                                                            {hhmmss(enCurso ?? acum)}
+                                                        </span>
+                                                    ) : (acum || veces ? hhmmss(acum ?? 0) : '—')}
+                                                    {(enCurso != null || veces > 0) && (
+                                                        <span className="ai-monitor-sub">
+                                                            {enCurso != null && <>Acum. {hhmmss(acum)}</>}
+                                                            {enCurso != null && veces > 0 && ' · '}
+                                                            {veces > 0 && <>{veces} {veces === 1 ? 'vez' : 'veces'}</>}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 };

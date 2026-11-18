@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Users, Clock, CalendarX, AlertTriangle, Download, CalendarRange, Search } from 'lucide-react';
+import {
+    Loader2, Users, Clock, CalendarX, AlertTriangle, Download, CalendarRange, Search,
+    CalendarDays, CheckCircle2, Timer, User, Bath, Coffee, Utensils, GraduationCap, Table2, BarChart3
+} from 'lucide-react';
 import { asistenciaService } from '../../services/api';
-import { nombrePropio, primeraMayuscula, iniciales } from '../../utils/formatoRRHH';
+import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import { descargarCsv } from '../../utils/csv';
 import { periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
 import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
@@ -10,6 +13,7 @@ import SelectorVistaEquipo from './SelectorVistaEquipo';
 import { useBaseEquipo } from '../../utils/rutaEquipo';
 import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
 import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
+import GraficasEquipoMes from './GraficasEquipoMes';
 import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
 
 // Histórico del equipo para el jefe (asistencia.md §35): KPIs del mes, un calendario tipo heatmap
@@ -70,6 +74,8 @@ const EquipoMensual = () => {
     const [filtroCentro, setFiltroCentro] = useState('');
     const [filtroCargo, setFiltroCargo] = useState('');
     const [agrupar, setAgrupar] = useState('centro_costo');
+    // Detalle por empleado como tabla o como gráficas (mismos datos y filtros).
+    const [vistaDetalle, setVistaDetalle] = useState('tabla');
     // Director de Tecnología (§68): su equipo o una campaña. El histórico va campaña por campaña:
     // "Todas las campañas" de la vista Hoy aquí es su equipo.
     const { verTodas, campanias, alcance: alcanceUrl, cambiarAlcance } = useAlcanceEquipo();
@@ -166,29 +172,32 @@ const EquipoMensual = () => {
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Equipo</h1>
-                    <p className="ai-page-sub">
-                        Histórico · {nombrePeriodo(periodo)}{nombreCampania ? ` · ${nombreCampania} · solo consulta` : ''}
-                        {datos ? ` · ${filtrando ? `${empleados.length} de ${todos.length}` : todos.length} ${todos.length === 1 ? 'persona' : 'personas'}` : ''}
-                    </p>
+            <div className="ai-monitor-head">
+                <div className="ai-monitor-titulo">
+                    <Users size={52} strokeWidth={1.6} aria-hidden="true" />
+                    <div>
+                        <h1>Equipo</h1>
+                        <p>
+                            Histórico · {nombrePeriodo(periodo)}{nombreCampania ? ` · ${nombreCampania} · solo consulta` : ''}
+                            {datos ? ` · ${filtrando ? `${empleados.length} de ${todos.length}` : todos.length} ${todos.length === 1 ? 'persona' : 'personas'}` : ''}
+                        </p>
+                    </div>
                 </div>
-                <div className="ai-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className="ai-monitor-acciones">
                     <SelectorVistaEquipo />
                     {verTodas && (
                         <FiltroCampaniaEquipo alcance={alcance} campanias={campanias} onChange={cambiarCampania} incluirTodas={false} />
                     )}
                     <input
-                        type="month" className="ai-input" style={{ width: 170 }} value={periodo} max={periodoActual()}
+                        type="month" className="ai-monitor-btn ai-monitor-mes" value={periodo} max={periodoActual()}
                         onChange={(e) => e.target.value && setSearchParams((prev) => {
                             const params = new URLSearchParams(prev);
                             params.set('periodo', e.target.value);
                             return params;
                         })} aria-label="Mes"
                     />
-                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportar} disabled={empleados.length === 0}>
-                        <Download size={14} strokeWidth={1.75} /> Exportar
+                    <button type="button" className="ai-monitor-btn" onClick={exportar} disabled={empleados.length === 0}>
+                        <Download size={15} strokeWidth={2} /> Exportar
                     </button>
                 </div>
             </div>
@@ -206,41 +215,46 @@ const EquipoMensual = () => {
                 </div>
             ) : (
                 <>
-                    <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
-                        <Kpi label="Puntualidad" valor={totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'} icon={<Clock size={16} strokeWidth={1.75} />} />
-                        <Kpi label="Días trabajados" valor={totales.dias_trabajados} icon={<Users size={16} strokeWidth={1.75} />} />
-                        <Kpi label="Ausencias" valor={totales.ausencias} alerta={totales.ausencias > 0} icon={<CalendarX size={16} strokeWidth={1.75} />} />
-                        <Kpi label="Días tarde" valor={totales.dias_tarde} icon={<AlertTriangle size={16} strokeWidth={1.75} />} />
-                        <Kpi label="Horas extra" valor={hFmt(totales.minutos_extra)} icon={<Clock size={16} strokeWidth={1.75} />} />
+                    {/* KPIs del mes en mosaicos, con los colores de los estados de la vista Hoy. */}
+                    <div className="ai-monitor-mosaicos">
+                        <Mosaico color="conectado" icono={CheckCircle2} valor={totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'} label="Puntualidad" />
+                        <Mosaico color="en_turno" icono={Users} valor={totales.dias_trabajados} label="Días trabajados" />
+                        <Mosaico color="bano" icono={Timer} valor={hFmt(totales.minutos_trabajados)} label="Horas trabajadas" />
+                        <Mosaico color="no_llego" icono={CalendarX} valor={totales.ausencias} label="Ausencias" />
+                        <Mosaico color="almuerzo" icono={AlertTriangle} valor={totales.dias_tarde} label="Días tarde" />
+                        <Mosaico color="capacitacion" icono={Clock} valor={hFmt(totales.minutos_extra)} label="Horas extra" />
                     </div>
 
-                    <div className="ai-panel">
-                        <div className="ai-row" style={{ padding: '12px 16px', gap: 8, flexWrap: 'wrap', borderBottom: '1px solid var(--border)' }}>
-                            <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 280 }}>
-                                <Search size={14} strokeWidth={1.75} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-subtle)' }} />
-                                <input className="ai-input" style={{ paddingLeft: 30 }} placeholder="Buscar por nombre o cédula" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-                            </div>
-                            <select className="ai-input" style={{ width: 'auto', maxWidth: 240 }} value={filtroCentro} onChange={(e) => setFiltroCentro(e.target.value)} aria-label="Centro de costo">
-                                <option value="">Todos los centros de costo ({centros.length})</option>
-                                {centros.map((c) => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                            <select className="ai-input" style={{ width: 'auto', maxWidth: 240 }} value={filtroCargo} onChange={(e) => setFiltroCargo(e.target.value)} aria-label="Cargo">
-                                <option value="">Todos los cargos ({cargos.length})</option>
-                                {cargos.map((c) => <option key={c} value={c}>{primeraMayuscula(c)}</option>)}
-                            </select>
-                            <span className="ai-muted" style={{ fontSize: 12, marginLeft: 'auto' }}>Agrupar por</span>
-                            <div className="ai-seg">
-                                {AGRUPAR.map((a) => (
-                                    <span key={a.id} className={agrupar === a.id ? 'is-active' : ''} style={{ cursor: 'pointer' }} onClick={() => setAgrupar(a.id)}>{a.label}</span>
-                                ))}
-                            </div>
+                    <div className="ai-monitor-barra">
+                        <div className="ai-input">
+                            <Search size={16} strokeWidth={1.75} className="ai-ic" />
+                            <input
+                                type="text" placeholder="Buscar por nombre o cédula..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+                                style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
+                            />
                         </div>
+                        <select className="ai-input ai-monitor-select" value={filtroCentro} onChange={(e) => setFiltroCentro(e.target.value)} aria-label="Centro de costo">
+                            <option value="">Todos los centros de costo ({centros.length})</option>
+                            {centros.map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <select className="ai-input ai-monitor-select" value={filtroCargo} onChange={(e) => setFiltroCargo(e.target.value)} aria-label="Cargo">
+                            <option value="">Todos los cargos ({cargos.length})</option>
+                            {cargos.map((c) => <option key={c} value={c}>{primeraMayuscula(c)}</option>)}
+                        </select>
+                        <span className="ai-muted" style={{ fontSize: 12, marginLeft: 'auto' }}>Agrupar por</span>
+                        <div className="ai-seg">
+                            {AGRUPAR.map((a) => (
+                                <span key={a.id} className={agrupar === a.id ? 'is-active' : ''} style={{ cursor: 'pointer' }} onClick={() => setAgrupar(a.id)}>{a.label}</span>
+                            ))}
+                        </div>
+                    </div>
 
-                        <div className="ai-panel-head">
-                            <h3 className="ai-panel-title">Calendario del mes</h3>
-                            <div className="ai-row" style={{ gap: 12, flexWrap: 'wrap' }}>
+                    <div className="ai-monitor-panel">
+                        <div className="ai-monitor-panel-head">
+                            <h3><CalendarDays size={18} strokeWidth={2} aria-hidden="true" /> Calendario del mes</h3>
+                            <div className="ai-monitor-leyenda" style={{ borderLeft: 0, paddingLeft: 0 }}>
                                 {LEYENDA.map((k) => (
-                                    <span key={k} className="ai-row" style={{ gap: 5, fontSize: 12, color: 'var(--ink-muted)' }}>
+                                    <span key={k}>
                                         <i style={{ width: 12, height: 12, borderRadius: 3, background: CELDA[k].bg, display: 'inline-block' }} />
                                         {CELDA[k].label}
                                     </span>
@@ -250,19 +264,19 @@ const EquipoMensual = () => {
                         {empleados.length === 0 ? (
                             <div className="ai-empty"><p>Nadie coincide con los filtros.</p></div>
                         ) : (
-                            <div style={{ overflowX: 'auto' }}>
+                            <div style={{ overflowX: 'auto', padding: '4px 12px 12px' }}>
                                 <table className="ai-mes-grid" style={{ borderCollapse: 'separate', borderSpacing: 2, fontSize: 11 }}>
                                     <thead>
                                         <tr>
-                                            <th style={{ position: 'sticky', left: 0, background: 'var(--surface-100)', textAlign: 'left', zIndex: 1, minWidth: 190 }}>Empleado</th>
+                                            <th style={{ position: 'sticky', left: 0, background: 'var(--surface-100)', textAlign: 'left', zIndex: 1, minWidth: 190, color: 'var(--mon-ink)' }}>Empleado</th>
                                             {dias.map((d) => {
                                                 const esHoy = d.fecha === hoy;
                                                 return (
                                                     <th key={d.d} title={esHoy ? 'Hoy' : undefined} style={{
                                                         width: 20, textAlign: 'center', borderRadius: 4,
-                                                        color: esHoy ? '#fff' : d.finde ? 'var(--ink-subtle)' : 'var(--ink-muted)',
+                                                        color: esHoy ? '#fff' : d.finde ? 'var(--ink-subtle)' : 'var(--mon-ink)',
                                                         background: esHoy ? AZUL : undefined,
-                                                        fontWeight: d.finde && !esHoy ? 400 : 600
+                                                        fontWeight: d.finde && !esHoy ? 400 : 700
                                                     }}>{d.d}</th>
                                                 );
                                             })}
@@ -273,10 +287,10 @@ const EquipoMensual = () => {
                                             <React.Fragment key={g.nombre || 'todos'}>
                                                 {g.nombre && (
                                                     <tr>
-                                                        <td colSpan={dias.length + 1} style={{ padding: '8px 6px 4px', background: 'var(--surface-200)', borderRadius: 4 }}>
-                                                            <span style={{ position: 'sticky', left: 6, fontWeight: 700, fontSize: 11, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--primary)' }}>
+                                                        <td colSpan={dias.length + 1} className="ai-monitor-grupo" style={{ borderRadius: 6 }}>
+                                                            <span style={{ position: 'sticky', left: 6 }}>
                                                                 {agrupar === 'cargo' ? primeraMayuscula(g.nombre) : g.nombre}
-                                                                <span className="ai-muted" style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}> · {g.empleados.length} {g.empleados.length === 1 ? 'persona' : 'personas'}</span>
+                                                                <span className="ai-monitor-grupo-n"> · {g.empleados.length} {g.empleados.length === 1 ? 'persona' : 'personas'}</span>
                                                             </span>
                                                         </td>
                                                     </tr>
@@ -286,9 +300,9 @@ const EquipoMensual = () => {
                                                     const sub = detalle(e);
                                                     return (
                                                         <tr key={e.users_company_id}>
-                                                            <td style={{ position: 'sticky', left: 0, background: 'var(--surface-100)', zIndex: 1, whiteSpace: 'nowrap', maxWidth: 210, overflow: 'hidden', textOverflow: 'ellipsis', padding: '2px 6px 2px 0' }}
+                                                            <td style={{ position: 'sticky', left: 0, background: 'var(--surface-100)', zIndex: 1, whiteSpace: 'nowrap', maxWidth: 210, overflow: 'hidden', textOverflow: 'ellipsis', padding: '2px 6px 2px 0', color: 'var(--mon-ink)' }}
                                                                 title={[nombrePropio(e.nombre), e.cargo && primeraMayuscula(e.cargo), e.centro_costo, e.jefe_area && `Jefe: ${nombrePropio(e.jefe_area)}`].filter(Boolean).join(' · ')}>
-                                                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{nombrePropio(e.nombre)}</div>
+                                                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 700 }}>{nombrePropio(e.nombre)}</div>
                                                                 {sub && <div className="ai-muted" style={{ fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>}
                                                             </td>
                                                             {dias.map((d) => {
@@ -304,7 +318,7 @@ const EquipoMensual = () => {
                                                                             to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad?fecha=${d.fecha}${sufijoAlcance(alcance, '&')}`}
                                                                             title={titulo}
                                                                             style={{
-                                                                                display: 'block', width: 18, height: 18, borderRadius: 3,
+                                                                                display: 'block', width: 18, height: 18, borderRadius: 4,
                                                                                 background: cfg ? cfg.bg : 'transparent',
                                                                                 border: cfg ? 'none' : '1px dashed var(--border)', margin: '0 auto',
                                                                                 boxShadow: d.fecha === hoy ? `0 0 0 1.5px ${AZUL}` : undefined
@@ -326,82 +340,110 @@ const EquipoMensual = () => {
                     </div>
 
                     {empleados.length > 0 && (
-                        <div className="ai-panel">
-                            <div className="ai-panel-head"><h3 className="ai-panel-title">Detalle por empleado</h3></div>
-                            <div style={{ overflowX: 'auto' }}>
-                                <table className="ai-table ai-table--dense">
-                                    <thead>
-                                        <tr>
-                                            <th>Empleado</th>
-                                            <th className="ai-num">Días trab.</th>
-                                            <th className="ai-num">Ausencias</th>
-                                            <th className="ai-num">Días tarde</th>
-                                            <th className="ai-num">Puntualidad</th>
-                                            <th className="ai-num">H. trabajadas</th>
-                                            <th className="ai-num">H. extra</th>
-                                            <th className="ai-num" title="Baño">Baño</th>
-                                            <th className="ai-num" title="Break">Break</th>
-                                            <th className="ai-num" title="Almuerzo">Almuerzo</th>
-                                            <th className="ai-num" title="Capacitación (cuenta como laborada)">Capac.</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {grupos.map((g) => (
-                                            <React.Fragment key={g.nombre || 'todos'}>
-                                                {g.nombre && (
-                                                    <tr>
-                                                        <td colSpan={11} style={{ background: 'var(--surface-200)', fontWeight: 700, fontSize: 11, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--primary)', padding: '6px 16px' }}>
-                                                            {agrupar === 'cargo' ? primeraMayuscula(g.nombre) : g.nombre}
-                                                            <span className="ai-muted" style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}> · {g.empleados.length}</span>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                                {g.empleados.map((e) => (
-                                                    <tr key={e.users_company_id}>
-                                                        <td>
-                                                            <Link to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`} className="ai-row" style={{ gap: 8, textDecoration: 'none', color: 'inherit' }}>
-                                                                <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(e.nombre)}</span>
-                                                                <span>
-                                                                    <div style={{ fontWeight: 600 }}>{nombrePropio(e.nombre)}</div>
-                                                                    <div className="ai-muted" style={{ fontSize: 12 }}>
-                                                                        CC {e.documento}{detalle(e) ? ` · ${detalle(e)}` : ''}
-                                                                        {e.jefe_area ? ` · Jefe: ${nombrePropio(e.jefe_area)}` : ''}
-                                                                    </div>
-                                                                </span>
-                                                            </Link>
-                                                        </td>
-                                                        <td className="ai-num" style={{ fontWeight: 600 }}>{e.dias_trabajados}</td>
-                                                        <td className="ai-num" style={{ color: e.ausencias > 0 ? 'var(--danger)' : 'inherit' }}>{e.ausencias}</td>
-                                                        <td className="ai-num" style={{ color: e.dias_tarde > 0 ? '#b45309' : 'inherit' }}>{e.dias_tarde}{e.minutos_tarde > 0 ? ` (${e.minutos_tarde}m)` : ''}</td>
-                                                        <td className="ai-num">{e.porcentaje_puntualidad != null ? `${e.porcentaje_puntualidad}%` : '—'}</td>
-                                                        <td className="ai-num" style={{ fontWeight: 600 }}>{hFmt(e.minutos_trabajados)}</td>
-                                                        <td className="ai-num">{hFmt(e.minutos_extra)}</td>
-                                                        <td className="ai-num ai-muted">{hFmt(e.minutos_bano)}</td>
-                                                        <td className="ai-num ai-muted">{hFmt(e.minutos_break)}</td>
-                                                        <td className="ai-num ai-muted">{hFmt(e.minutos_almuerzo)}</td>
-                                                        <td className="ai-num ai-muted">{hFmt(e.minutos_capacitacion)}</td>
-                                                    </tr>
-                                                ))}
-                                            </React.Fragment>
-                                        ))}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr style={{ fontWeight: 600 }}>
-                                            <td>Total ({totales.empleados})</td>
-                                            <td className="ai-num">{totales.dias_trabajados}</td>
-                                            <td className="ai-num">{totales.ausencias}</td>
-                                            <td className="ai-num">{totales.dias_tarde}</td>
-                                            <td className="ai-num">{totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'}</td>
-                                            <td className="ai-num">{hFmt(totales.minutos_trabajados)}</td>
-                                            <td className="ai-num">{hFmt(totales.minutos_extra)}</td>
-                                            <td className="ai-num">{hFmt(totales.minutos_bano)}</td>
-                                            <td className="ai-num">{hFmt(totales.minutos_break)}</td>
-                                            <td className="ai-num">{hFmt(totales.minutos_almuerzo)}</td>
-                                            <td className="ai-num">{hFmt(totales.minutos_capacitacion)}</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                        <div className="ai-monitor-detalle-head">
+                            <h3><User size={18} strokeWidth={2} aria-hidden="true" /> Detalle por empleado</h3>
+                            <div className="ai-seg" role="tablist" aria-label="Ver el detalle como">
+                                {[{ id: 'tabla', label: 'Tabla', icono: Table2 }, { id: 'grafica', label: 'Gráfica', icono: BarChart3 }].map((v) => (
+                                    <span
+                                        key={v.id} role="tab" tabIndex={0} aria-selected={vistaDetalle === v.id}
+                                        className={vistaDetalle === v.id ? 'is-active' : ''} style={{ cursor: 'pointer' }}
+                                        onClick={() => setVistaDetalle(v.id)}
+                                        onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') setVistaDetalle(v.id); }}
+                                    >
+                                        {React.createElement(v.icono, { size: 14, strokeWidth: 1.9 })} {v.label}
+                                    </span>
+                                ))}
                             </div>
+                        </div>
+                    )}
+
+                    {empleados.length > 0 && vistaDetalle === 'grafica' && (
+                        <div className="ai-monitor-panel">
+                            <GraficasEquipoMes
+                                empleados={empleados}
+                                hrefDe={(e) => `${baseEquipo}/equipo/${e.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`}
+                            />
+                        </div>
+                    )}
+
+                    {empleados.length > 0 && vistaDetalle === 'tabla' && (
+                        <div className="ai-monitor-tabla-wrap">
+                            <table className="ai-monitor-tabla ai-monitor-tabla--fija">
+                                <thead>
+                                    <tr>
+                                        {COLUMNAS_DETALLE.map((c) => (
+                                            <th key={c.id} title={c.title}>
+                                                <span className="ai-monitor-th"><c.icono size={17} strokeWidth={1.9} aria-hidden="true" />{c.label}</span>
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {grupos.map((g) => (
+                                        <React.Fragment key={g.nombre || 'todos'}>
+                                            {g.nombre && (
+                                                <tr className="ai-monitor-fila-grupo">
+                                                    <td colSpan={COLUMNAS_DETALLE.length} className="ai-monitor-grupo">
+                                                        {agrupar === 'cargo' ? primeraMayuscula(g.nombre) : g.nombre}
+                                                        <span className="ai-monitor-grupo-n"> · {g.empleados.length}</span>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {g.empleados.map((e) => (
+                                                <tr key={e.users_company_id}>
+                                                    <td className="ai-monitor-nombre">
+                                                        <Link to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}>
+                                                            <i className="ai-monitor-avatar" aria-hidden="true"><User size={16} strokeWidth={2.4} /></i>
+                                                            <span>
+                                                                <div>{nombrePropio(e.nombre).toUpperCase()}</div>
+                                                                <div className="ai-muted" style={{ fontSize: 11.5, fontWeight: 500 }}>
+                                                                    CC {e.documento}{detalle(e) ? ` · ${detalle(e)}` : ''}
+                                                                    {e.jefe_area ? ` · Jefe: ${nombrePropio(e.jefe_area)}` : ''}
+                                                                </div>
+                                                            </span>
+                                                        </Link>
+                                                    </td>
+                                                    <td className="ai-monitor-centro" style={{ fontWeight: 700 }}>{e.dias_trabajados}</td>
+                                                    <td className="ai-monitor-centro">
+                                                        {e.ausencias > 0 ? <Pastilla color="no_llego">{e.ausencias}</Pastilla> : 0}
+                                                    </td>
+                                                    <td className="ai-monitor-centro">
+                                                        {e.dias_tarde > 0
+                                                            ? <Pastilla color="almuerzo">{e.dias_tarde}{e.minutos_tarde > 0 ? ` · ${e.minutos_tarde}m` : ''}</Pastilla>
+                                                            : 0}
+                                                    </td>
+                                                    <td className="ai-monitor-centro">
+                                                        {e.porcentaje_puntualidad != null
+                                                            ? <Pastilla color={e.porcentaje_puntualidad >= 90 ? 'conectado' : e.porcentaje_puntualidad >= 70 ? 'break' : 'no_llego'}>{e.porcentaje_puntualidad}%</Pastilla>
+                                                            : '—'}
+                                                    </td>
+                                                    <td className="ai-monitor-centro" style={{ fontWeight: 700 }}>{hFmt(e.minutos_trabajados)}</td>
+                                                    <td className="ai-monitor-centro">{hFmt(e.minutos_extra)}</td>
+                                                    <td className="ai-monitor-centro">{hFmt(e.minutos_bano)}</td>
+                                                    <td className="ai-monitor-centro">{hFmt(e.minutos_break)}</td>
+                                                    <td className="ai-monitor-centro">{hFmt(e.minutos_almuerzo)}</td>
+                                                    <td className="ai-monitor-centro">{hFmt(e.minutos_capacitacion)}</td>
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td>Total ({totales.empleados})</td>
+                                        <td className="ai-monitor-centro">{totales.dias_trabajados}</td>
+                                        <td className="ai-monitor-centro">{totales.ausencias}</td>
+                                        <td className="ai-monitor-centro">{totales.dias_tarde}</td>
+                                        <td className="ai-monitor-centro">{totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'}</td>
+                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_trabajados)}</td>
+                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_extra)}</td>
+                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_bano)}</td>
+                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_break)}</td>
+                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_almuerzo)}</td>
+                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_capacitacion)}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     )}
                 </>
@@ -410,11 +452,32 @@ const EquipoMensual = () => {
     );
 };
 
-const Kpi = ({ label, valor, icon, alerta }) => (
-    <div className="ai-kpi" style={alerta ? { borderColor: 'var(--danger)' } : undefined}>
-        <div className="ai-kpi-head"><span className="ai-kpi-label">{label}</span><span className="ai-kpi-icon">{icon}</span></div>
-        <div className="ai-kpi-value">{valor}</div>
+// Columnas del detalle por empleado, con su ícono como en la tabla de la vista Hoy.
+const COLUMNAS_DETALLE = [
+    { id: 'empleado', label: 'Empleado', icono: User },
+    { id: 'dias', label: 'Días trab.', icono: CalendarDays },
+    { id: 'ausencias', label: 'Ausencias', icono: CalendarX },
+    { id: 'tarde', label: 'Días tarde', icono: AlertTriangle },
+    { id: 'puntualidad', label: 'Puntualidad', icono: CheckCircle2 },
+    { id: 'trabajadas', label: 'H. trabajadas', icono: Timer },
+    { id: 'extra', label: 'H. extra', icono: Clock },
+    { id: 'bano', label: 'Baño', icono: Bath },
+    { id: 'break', label: 'Break', icono: Coffee },
+    { id: 'almuerzo', label: 'Almuerzo', icono: Utensils },
+    { id: 'capacitacion', label: 'Capac.', icono: GraduationCap, title: 'Capacitación (cuenta como laborada)' }
+];
+
+// KPI del mes con el estilo de los mosaicos de la vista Hoy (colores .ai-st--*); no filtra.
+const Mosaico = ({ color, icono, valor, label }) => (
+    <div className={`ai-monitor-mosaico ai-monitor-mosaico--estatico ai-st--${color}`}>
+        {React.createElement(icono, { size: 26, strokeWidth: 2, className: "ai-monitor-ic", "aria-hidden": "true" })}
+        <span className="ai-monitor-num">{valor}</span>
+        <span className="ai-monitor-lbl">{label}</span>
     </div>
+);
+
+const Pastilla = ({ color, children }) => (
+    <span className={`ai-monitor-pill ai-monitor-pill--acum ai-st--${color}`} style={{ minWidth: 44 }}>{children}</span>
 );
 
 export default EquipoMensual;
