@@ -400,6 +400,8 @@
 .ai-st--finalizado   { --st-tile: #258a45; --st-ink: #fff;    --st-bar: #ffffff; --st-pill: #dcefe2; --st-dot: #258a45; --st-icon: #fff; }
 /* Novedad de RRHH (§71): ciruela, validado junto a puntual/tarde/ausente en claro y oscuro. */
 .ai-st--novedad      { --st-tile: #a8338f; --st-ink: #fff;    --st-bar: #e3a3d4; --st-pill: #f6e1f1; --st-dot: #a8338f; --st-icon: #fff; }
+/* Descanso (§73): rayas cian; la textura lo separa del Baño (cian sólido). Validado con los colores del calendario. */
+.ai-st--descanso     { --st-tile: repeating-linear-gradient(135deg, #0891b2 0 9px, #0e7490 9px 18px); --st-ink: #fff; --st-bar: #a5f3fc; --st-pill: repeating-linear-gradient(135deg, #cffafe 0 5px, #ecfeff 5px 10px); --st-dot: #06b6d4; --st-icon: #fff; }
 .ai-st--no_llego     { --st-tile: #fde0e0; --st-ink: #0f2b5b; --st-bar: #e0302a; --st-pill: #fde0e0; --st-dot: #e0302a; --st-icon: #e0302a; }
 [data-theme="dark"] .ai-st--break        { --st-tile: #5a4313; --st-ink: #fde9c4; --st-icon: #fde9c4; --st-pill: #4a3810; }
 [data-theme="dark"] .ai-st--bano         { --st-tile: #12505e; --st-ink: #c4f0fb; --st-icon: #c4f0fb; --st-pill: #10414d; }
@@ -412,8 +414,11 @@
 [data-theme="dark"] .ai-st--desconectado { --st-pill: #2f3846; }
 [data-theme="dark"] .ai-st--finalizado   { --st-pill: #173a24; }
 [data-theme="dark"] .ai-st--novedad      { --st-pill: #43183a; }
+[data-theme="dark"] .ai-st--descanso     { --st-pill: repeating-linear-gradient(135deg, #134e5e 0 5px, #0f3b47 5px 10px); }
 /* Distintivo de novedad junto al nombre (NovedadChip.jsx). */
 .ai-badge.ai-nov-badge { background: #f6e1f1; color: #7d1f69; }
+.ai-badge.ai-desc-badge { background: repeating-linear-gradient(135deg, #cffafe 0 5px, #ecfeff 5px 10px); color: #0e7490; }
+[data-theme="dark"] .ai-badge.ai-desc-badge { background: repeating-linear-gradient(135deg, #134e5e 0 5px, #0f3b47 5px 10px); color: #a5f3fc; }
 [data-theme="dark"] .ai-badge.ai-nov-badge { background: #43183a; color: #f3c4e8; }
 .ai-nov-chip { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: #f6e1f1; color: #7d1f69; border: 1px solid #e3a3d4; font: 700 10.5px/16px var(--font-sans); letter-spacing: .02em; text-transform: none; white-space: nowrap; vertical-align: 1px; }
 [data-theme="dark"] .ai-nov-chip { background: #43183a; color: #f3c4e8; border-color: #7d2f6c; }

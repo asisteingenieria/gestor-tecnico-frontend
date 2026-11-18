@@ -26,6 +26,8 @@ export const CELDA = {
     curso_puntual: { bg: mitades(VERDE), label: 'En turno · llegó puntual' },
     curso_tarde: { bg: mitades(AMARILLO), label: 'En turno · llegó tarde' },
     pendiente: { bg: 'var(--border)', label: 'Pendiente' },
+    // Día de descanso de su malla (§73): rayas cian, para que se distinga por textura y no solo por color.
+    descanso: { bg: 'repeating-linear-gradient(135deg, #06b6d4 0 3px, #cffafe 3px 6px)', label: 'Descanso' },
     // Novedad de RRHH que cubre el día (incapacidad, vacaciones, licencia…, §71): no es ausencia.
     novedad: { bg: '#a8338f', label: 'Novedad RRHH' },
     // Sin turno (o en su día de descanso) no hay contra qué medir la llegada: ni puntual ni tarde.
@@ -37,6 +39,7 @@ export const CELDA = {
 export function claseDia(dia) {
     if (!dia) return null;
     if (dia.estado === 'novedad') return 'novedad';
+    if (dia.estado === 'descanso') return 'descanso';
     if (dia.estado === 'ausente') return 'ausente';
     if (dia.estado === 'pendiente') return 'pendiente';
     const tarde = dia.minutos_tarde > 0;

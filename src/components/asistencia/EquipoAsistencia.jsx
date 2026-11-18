@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, Search, FileText, BarChart3, ClipboardList } from 'lucide-react';
+import { Loader2, Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, Search, FileText, BarChart3, ClipboardList, Moon } from 'lucide-react';
 import { asistenciaService, financieraService } from '../../services/api';
 import { nombrePropio, iniciales, primeraMayuscula } from '../../utils/formatoRRHH';
 import { formatearDuracion } from '../../utils/tiempoAsistencia';
@@ -40,13 +40,19 @@ const ESTADO_BADGE = {
     finalizada: { label: 'Finalizada', clase: 'ai-badge--neutral' },
     ausente: { label: 'Ausente', clase: 'ai-badge--danger' },
     // Novedad de RRHH que cubre hoy (§71): no vino, pero no es ausencia ni "aún no llega".
-    novedad: { label: 'Con novedad', clase: 'ai-nov-badge' }
+    novedad: { label: 'Con novedad', clase: 'ai-nov-badge' },
+    // Día de descanso de su malla (§73): no es "Sin iniciar" ni "Aún no llega".
+    descanso: { label: 'Descanso', clase: 'ai-desc-badge' }
 };
 
 // Estado con el que se cuenta, filtra y ordena a la persona: la novedad reemplaza a 'pendiente'/'ausente'.
-const estadoVista = (emp) => (noAsistioPorNovedad(emp) ? 'novedad' : emp.estado);
+const estadoVista = (emp) => {
+    if (noAsistioPorNovedad(emp)) return 'novedad';
+    if (emp.turno?.es_descanso && emp.estado === 'pendiente') return 'descanso';
+    return emp.estado;
+};
 
-const ORDEN_ESTADO = { ausente: 0, en_pausa: 1, en_curso: 2, pendiente: 3, novedad: 4, finalizada: 5 };
+const ORDEN_ESTADO = { ausente: 0, en_pausa: 1, en_curso: 2, pendiente: 3, novedad: 4, descanso: 5, finalizada: 6 };
 
 const TABS = [
     { id: 'todos', label: 'Todos' },
@@ -54,7 +60,8 @@ const TABS = [
     { id: 'en_pausa', label: 'En pausa' },
     { id: 'pendiente', label: 'Sin iniciar' },
     { id: 'ausente', label: 'Ausentes' },
-    { id: 'novedad', label: 'Con novedad' }
+    { id: 'novedad', label: 'Con novedad' },
+    { id: 'descanso', label: 'Descanso' }
 ];
 
 const SIN_CENTRO = 'Sin centro de costo';
@@ -76,6 +83,7 @@ const otrasAlertas = (emp) => (emp.alertas || []).filter((a) => a !== 'llegada_t
 // Cuadrito de hoy. Sin turno, o en su día de descanso, no se sabe si llegó tarde: gris en vez de verde.
 function claseHoy(emp) {
     if (noAsistioPorNovedad(emp)) return 'novedad';
+    if (estadoVista(emp) === 'descanso') return 'descanso';
     const clase = claseDia(emp);
     if (!clase || clase === 'pendiente' || clase === 'ausente') return clase;
     if (emp.turno && !emp.turno.es_descanso) return clase;
@@ -89,6 +97,7 @@ function textoLlegada(emp) {
     if (clase === 'pendiente') return 'Aún no llega';
     if (clase === 'ausente') return 'Ausente';
     if (clase === 'novedad') return `Novedad · ${etiquetaNovedad(emp.novedad.tipo)}`;
+    if (clase === 'descanso') return 'Día de descanso';
     if (clase === 'curso_sin_horario') return 'Sin horario · en turno';
     if (clase === 'sin_horario') return 'Sin horario · terminó';
     const llegada = emp.minutos_tarde > 0 ? `Tarde · ${tardeExacto(emp.segundos_tarde, emp.minutos_tarde)}` : 'Puntual';
@@ -192,6 +201,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
         tarde: delCentro.filter(esTarde).length,
         ausentes: delCentro.filter((e) => estadoVista(e) === 'ausente').length,
         conNovedad: delCentro.filter((e) => estadoVista(e) === 'novedad').length,
+        descanso: delCentro.filter((e) => estadoVista(e) === 'descanso').length,
         presencial: delCentro.filter((e) => e.asislock?.modalidad === 'presencial').length,
         teletrabajo: delCentro.filter((e) => e.asislock?.modalidad === 'teletrabajo').length
     }), [delCentro]);
@@ -218,7 +228,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
             MODALIDAD_INGRESO[e.asislock?.modalidad]?.label || '',
             e.asislock?.primer_login ? formatearHora12(e.asislock.primer_login) : '',
             textoConexion(e.asislock) || '',
-            textoLlegada(e), formatearDuracion(e.minutos_trabajados), (noAsistioPorNovedad(e) ? `Novedad: ${e.novedad.tipo}` : ESTADO_BADGE[e.estado]?.label || e.estado),
+            textoLlegada(e), formatearDuracion(e.minutos_trabajados), (noAsistioPorNovedad(e) ? `Novedad: ${e.novedad.tipo}` : ESTADO_BADGE[estadoVista(e)]?.label || e.estado),
             otrasAlertas(e).map((a) => ALERTA_LABEL[a] || a).join(', ')
         ]);
         descargarCsv(
@@ -286,7 +296,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
 
             {error && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
 
-            <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
+            <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
                 <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', border: tab === 'en_curso' ? '1px solid var(--primary)' : undefined }} onClick={() => setTab('en_curso')}>
                     <div className="ai-kpi-head"><span className="ai-kpi-label">En turno</span><span className="ai-kpi-icon"><UserCheck size={16} strokeWidth={1.75} /></span></div>
                     <div className="ai-kpi-value" style={{ color: 'var(--success)' }}>{kpis.enTurno}</div>
@@ -314,6 +324,12 @@ const EquipoAsistencia = ({ financiera = false }) => {
                     <div className="ai-kpi-head"><span className="ai-kpi-label">Con novedad</span><span className="ai-kpi-icon" style={{ background: '#f6e1f1', color: '#a8338f' }}><ClipboardList size={16} strokeWidth={1.75} /></span></div>
                     <div className="ai-kpi-value" style={{ color: kpis.conNovedad > 0 ? '#a8338f' : undefined }}>{kpis.conNovedad}</div>
                     <div className="ai-kpi-foot">No cuentan como ausentes</div>
+                </button>
+                <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', borderColor: tab === 'descanso' ? 'var(--primary)' : undefined }} onClick={() => setTab('descanso')}
+                    title="Personas que hoy tienen día de descanso en su malla">
+                    <div className="ai-kpi-head"><span className="ai-kpi-label">Descanso</span><span className="ai-kpi-icon" style={{ background: '#cffafe', color: '#0e7490' }}><Moon size={16} strokeWidth={1.75} /></span></div>
+                    <div className="ai-kpi-value" style={{ color: kpis.descanso > 0 ? '#0e7490' : undefined }}>{kpis.descanso}</div>
+                    <div className="ai-kpi-foot">Día libre de su malla</div>
                 </button>
             </div>
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     Loader2, Users, RefreshCw, Search, ChevronUp, ChevronDown,
     User, Headphones, Wifi, Coffee, Bath, Utensils, GraduationCap, Unplug, Play, CheckCircle2, Clock,
-    CalendarDays, Activity, Timer, ClipboardList
+    CalendarDays, Activity, Timer, ClipboardList, Moon
 } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import { escucharAsistencia } from '../../utils/socketAsistencia';
@@ -35,6 +35,8 @@ function estadoMonitor(emp) {
     if (emp.estado === 'finalizada') return { clave: 'finalizado', label: 'Finalizado', corre: false };
     // Novedad de RRHH que cubre hoy (incapacidad, vacaciones, licencia…, §71): ni ausente ni "No ha llegado".
     if (noAsistioPorNovedad(emp)) return { clave: 'novedad', label: etiquetaNovedad(emp.novedad.tipo), corre: false };
+    // Día de descanso de su malla (§73): no es "Sin iniciar". Si trabaja igual, sale en su estado real.
+    if (emp.turno?.es_descanso && emp.estado === 'pendiente') return { clave: 'descanso', label: 'Descanso', corre: false };
     if (emp.estado === 'ausente') return { clave: 'ausente', label: 'Ausente', corre: false };
     // Sin entrada con su turno ya empezado (lo decide el servidor, §62); si no, aún no le toca, descansa o no tiene horario.
     if (emp.no_ha_llegado) return { clave: 'no_llego', label: 'No ha llegado', corre: false };
@@ -58,10 +60,11 @@ const MOSAICOS = [
     { id: 'sin_iniciar', label: 'Sin iniciar', leyenda: 'Sin iniciar', icono: Play, estados: ['sin_iniciar'] },
     { id: 'finalizado', label: 'Finalizados', leyenda: 'Finalizados', icono: CheckCircle2, estados: ['finalizado'] },
     { id: 'no_llego', label: 'No han llegado', leyenda: 'No ha llegado', icono: Clock, estados: ['no_llego', 'ausente'] },
-    { id: 'novedad', label: 'Con novedad', leyenda: 'Novedad RRHH', icono: ClipboardList, estados: ['novedad'] }
+    { id: 'novedad', label: 'Con novedad', leyenda: 'Novedad RRHH', icono: ClipboardList, estados: ['novedad'] },
+    { id: 'descanso', label: 'Descanso', leyenda: 'Descanso', icono: Moon, estados: ['descanso'] }
 ];
 
-const ORDEN_ESTADO = { conectado: 0, capacitacion: 1, break: 2, pausa: 2, bano: 3, almuerzo: 4, desconectado: 5, no_llego: 6, ausente: 6, novedad: 7, sin_iniciar: 8, finalizado: 9 };
+const ORDEN_ESTADO = { conectado: 0, capacitacion: 1, break: 2, pausa: 2, bano: 3, almuerzo: 4, desconectado: 5, no_llego: 6, ausente: 6, novedad: 7, descanso: 8, sin_iniciar: 9, finalizado: 10 };
 
 // "08:01:46" en hora de Bogotá.
 function hora24(iso) {
