@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
     Loader2, Users, Clock, CalendarX, AlertTriangle, Download, CalendarRange, Search,
-    CalendarDays, CheckCircle2, Timer, User, Bath, Coffee, Utensils, GraduationCap, Table2, BarChart3, ClipboardList
+    CalendarDays, CheckCircle2, Timer, User, Bath, Coffee, Utensils, GraduationCap, Table2, BarChart3, ClipboardList, Moon
 } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
@@ -23,7 +23,7 @@ import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hoo
 // Es la segunda vista de "Equipo"; la primera es hoy en vivo (EquipoAsistencia).
 
 const AZUL = 'var(--primary)';
-const LEYENDA = ['puntual', 'tarde', 'ausente', 'novedad', 'curso_puntual', 'curso_tarde', 'pendiente'];
+const LEYENDA = ['puntual', 'tarde', 'ausente', 'novedad', 'descanso', 'curso_puntual', 'curso_tarde', 'pendiente'];
 
 // Tipos de novedad de RRHH que tuvo la persona en el mes (para el distintivo y su title, §71).
 const tiposNovedad = (e) => [...new Set((e.dias || []).filter((d) => d.novedad).map((d) => d.novedad.tipo))];
@@ -59,6 +59,7 @@ function totalesDe(empleados) {
         dias_trabajados: diasTrabajados,
         ausencias: suma('ausencias'),
         dias_novedad: suma('dias_novedad'),
+        dias_descanso: suma('dias_descanso'),
         dias_tarde: suma('dias_tarde'),
         porcentaje_puntualidad: diasTrabajados > 0 ? Math.round((suma('dias_puntuales') / diasTrabajados) * 100) : null,
         ...Object.fromEntries(['minutos_trabajados', 'minutos_extra', 'minutos_bano', 'minutos_break', 'minutos_almuerzo', 'minutos_capacitacion']
@@ -228,6 +229,7 @@ const EquipoMensual = () => {
                         <Mosaico color="bano" icono={Timer} valor={hFmt(totales.minutos_trabajados)} label="Horas trabajadas" />
                         <Mosaico color="no_llego" icono={CalendarX} valor={totales.ausencias} label="Ausencias" />
                         <Mosaico color="novedad" icono={ClipboardList} valor={totales.dias_novedad} label="Días con novedad" />
+                        <Mosaico color="descanso" icono={Moon} valor={totales.dias_descanso || 0} label="Días de descanso" />
                         <Mosaico color="almuerzo" icono={AlertTriangle} valor={totales.dias_tarde} label="Días tarde" />
                         <Mosaico color="capacitacion" icono={Clock} valor={hFmt(totales.minutos_extra)} label="Horas extra" />
                     </div>

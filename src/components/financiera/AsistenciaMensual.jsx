@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Users, Clock, CalendarX, Download, BarChart3, Search, History, X, Timer, ClipboardList } from 'lucide-react';
+import { Loader2, Users, Clock, CalendarX, Download, BarChart3, Search, History, X, Timer, ClipboardList, Moon } from 'lucide-react';
 import { financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula, iniciales } from '../../utils/formatoRRHH';
 import { descargarCsv } from '../../utils/csv';
@@ -22,6 +22,8 @@ const CELDA = {
     ausente: { bg: 'var(--danger)', label: 'Ausente' },
     // Novedad de RRHH que cubre el día (incapacidad, vacaciones, licencia…): no es ausencia (asistencia.md §71).
     novedad: { bg: '#a8338f', label: 'Novedad RRHH' },
+    // Día de descanso de su malla (§73): rayas cian, igual que en el histórico de los jefes.
+    descanso: { bg: 'repeating-linear-gradient(135deg, #06b6d4 0 3px, #cffafe 3px 6px)', label: 'Descanso' },
     curso: { bg: 'var(--primary)', label: 'En curso' },
     pendiente: { bg: 'var(--border)', label: 'Pendiente' }
 };
@@ -29,6 +31,7 @@ const CELDA = {
 function claseDia(dia) {
     if (!dia) return null;
     if (dia.estado === 'novedad') return 'novedad';
+    if (dia.estado === 'descanso') return 'descanso';
     if (dia.estado === 'ausente') return 'ausente';
     if (dia.estado === 'pendiente') return 'pendiente';
     if (dia.estado === 'en_curso' || dia.estado === 'en_pausa') return 'curso';
@@ -332,12 +335,13 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                     ) : (
                         <>
                             {t && (
-                                <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+                                <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(8, minmax(0, 1fr))' }}>
                                     <Kpi label="Puntualidad" valor={t.porcentaje_puntualidad != null ? `${t.porcentaje_puntualidad}%` : '—'} icon={<Clock size={16} strokeWidth={1.75} />}
                                         extra={<Tendencia totales={t} anterior={fila.anterior} periodoAnterior={periodoAnterior} />} />
                                     <Kpi label="Días trabajados" valor={t.dias_trabajados} icon={<BarChart3 size={16} strokeWidth={1.75} />} />
                                     <Kpi label="Ausencias" valor={t.ausencias} alerta={t.ausencias > 0} icon={<CalendarX size={16} strokeWidth={1.75} />} />
                                     <Kpi label="Días con novedad" valor={t.dias_novedad || 0} icon={<ClipboardList size={16} strokeWidth={1.75} />} />
+                                    <Kpi label="Días de descanso" valor={t.dias_descanso || 0} icon={<Moon size={16} strokeWidth={1.75} />} />
                                     <Kpi label="Días tarde" valor={t.dias_tarde} icon={<Timer size={16} strokeWidth={1.75} />} />
                                     <Kpi label="H. trabajadas" valor={hFmt(t.minutos_trabajados)} icon={<Clock size={16} strokeWidth={1.75} />} />
                                     <Kpi label="H. extra" valor={hFmt(t.minutos_extra)} icon={<Clock size={16} strokeWidth={1.75} />} />
@@ -370,7 +374,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                 <div className="ai-panel-head">
                                     <h3 className="ai-panel-title">Calendario diario <span className="ai-muted" style={{ fontWeight: 400, fontSize: 13 }}>· clic en un día para ver su trazabilidad</span></h3>
                                     <div className="ai-row" style={{ gap: 12, flexWrap: 'wrap' }}>
-                                        {['puntual', 'tarde', 'ausente', 'novedad', 'curso', 'pendiente'].map((k) => (
+                                        {['puntual', 'tarde', 'ausente', 'novedad', 'descanso', 'curso', 'pendiente'].map((k) => (
                                             <span key={k} className="ai-row" style={{ gap: 5, fontSize: 12, color: 'var(--ink-muted)' }}>
                                                 <i style={{ width: 12, height: 12, borderRadius: 3, background: CELDA[k].bg, display: 'inline-block' }} />{CELDA[k].label}
                                             </span>
