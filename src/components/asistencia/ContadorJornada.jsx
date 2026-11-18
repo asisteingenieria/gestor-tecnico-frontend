@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatearHora12, formatearHoraTime12, formatearDuracion, minutosDesdeMedianoche } from '../../utils/tiempoAsistencia';
+import { tardeExacto } from '../../utils/llegadaAsistencia';
 
 const RADIO = 104;
 const CIRCUNFERENCIA = 2 * Math.PI * RADIO;
@@ -99,7 +100,7 @@ const ContadorJornada = ({ jornada, segundosTrabajadosHoy, segundosEnJornada }) 
                             {horaEntradaReal || '—'}
                             {jornada.hora_entrada_real && (
                                 jornada.minutos_tarde > 0
-                                    ? <span style={{ color: 'var(--warning)' }}> +{jornada.minutos_tarde} min</span>
+                                    ? <span style={{ color: 'var(--warning)' }}> +{tardeExacto(jornada.segundos_tarde, jornada.minutos_tarde)}</span>
                                     : <span style={{ color: 'var(--success)' }}> Puntual</span>
                             )}
                         </dd>

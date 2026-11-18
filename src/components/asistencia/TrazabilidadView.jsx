@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2, Clock } from 'lucide-react';
 import { formatearHora12, formatearDuracion, minutosDesdeMedianoche, minutosBogotaDe } from '../../utils/tiempoAsistencia';
+import { tardeExacto } from '../../utils/llegadaAsistencia';
 import { BadgeIngreso, RegistrosAsislock } from './IngresoAsislock';
 import MarcacionesMolinete from './MarcacionesMolinete';
 
@@ -76,7 +77,7 @@ function construirSegmentos(eventos, finAbierto) {
 function detalleEvento(ev, jornada) {
     if (ev.tipo === 'entrada') {
         return jornada.minutosTarde > 0
-            ? <span className="ai-badge ai-badge--warning">+{jornada.minutosTarde} min tarde</span>
+            ? <span className="ai-badge ai-badge--warning">+{tardeExacto(jornada.segundosTarde, jornada.minutosTarde)} tarde</span>
             : <span className="ai-badge ai-badge--success">Puntual</span>;
     }
     if (ev.tipo === 'fin_bano' || ev.tipo === 'fin_break' || ev.tipo === 'fin_almuerzo' || ev.tipo === 'fin_capacitacion' || ev.tipo === 'fin_desconexion') {
@@ -157,7 +158,7 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                         </div>
                         {jornada.hora_entrada_real && (
                             jornada.minutosTarde > 0
-                                ? <span className="ai-badge ai-badge--warning">+{jornada.minutosTarde} min</span>
+                                ? <span className="ai-badge ai-badge--warning">+{tardeExacto(jornada.segundosTarde, jornada.minutosTarde)}</span>
                                 : <span className="ai-badge ai-badge--success">Puntual</span>
                         )}
                     </span>

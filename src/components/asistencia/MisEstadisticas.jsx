@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, CalendarDays, BarChart3 } from 'lucide-react';
+import { tardeExacto } from '../../utils/llegadaAsistencia';
 import { useAuth } from '../../context/AuthContext';
 import { asistenciaService } from '../../services/api';
 import { formatearDuracion } from '../../utils/tiempoAsistencia';
@@ -193,9 +194,9 @@ const MisEstadisticas = () => {
 
                         <div className="ai-kpi">
                             <div className="ai-kpi-head">
-                                <span className="ai-kpi-label">Minutos tarde</span>
+                                <span className="ai-kpi-label">Tiempo tarde</span>
                             </div>
-                            <div className="ai-kpi-value">{stats.minutos_tarde_acumulados}</div>
+                            <div className="ai-kpi-value">{stats.minutos_tarde_acumulados > 0 ? tardeExacto(stats.segundos_tarde_acumulados, stats.minutos_tarde_acumulados) : 0}</div>
                             <div className="ai-kpi-foot">{diasConTarde} día{diasConTarde === 1 ? '' : 's'} con tardanza</div>
                         </div>
 
@@ -241,7 +242,7 @@ const MisEstadisticas = () => {
                                             let texto = null;
                                             if (esFuturo) clase = 'fut';
                                             else if (j?.estado === 'ausente') { clase = 'abs'; texto = 'Ausente'; }
-                                            else if (j && j.minutos_tarde > 0) { clase = 'late'; texto = `+${j.minutos_tarde} min`; }
+                                            else if (j && j.minutos_tarde > 0) { clase = 'late'; texto = `+${tardeExacto(j.segundos_tarde, j.minutos_tarde)}`; }
                                             else if (j && j.estado !== 'pendiente') { clase = 'ok'; texto = 'Puntual'; }
 
                                             const contenido = (
