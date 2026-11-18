@@ -11,7 +11,7 @@ import { periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
 import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 import { useBaseEquipo } from '../../utils/rutaEquipo';
-import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
+import { CELDA, claseDia, tardeExacto } from '../../utils/llegadaAsistencia';
 import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
 import GraficasEquipoMes from './GraficasEquipoMes';
 import NovedadChip from './NovedadChip';
@@ -156,13 +156,13 @@ const EquipoMensual = () => {
     const exportar = () => {
         const cuerpo = empleados.map((e, i) => [
             i + 1, e.documento, nombrePropio(e.nombre), e.centro_costo || '', e.cargo || '',
-            e.dias_trabajados, e.ausencias, e.dias_novedad || 0, tiposNovedad(e).join(' / '), e.dias_tarde, e.minutos_tarde,
+            e.dias_trabajados, e.ausencias, e.dias_novedad || 0, tiposNovedad(e).join(' / '), e.dias_tarde, e.minutos_tarde > 0 ? tardeExacto(e.segundos_tarde, e.minutos_tarde) : '',
             e.porcentaje_puntualidad ?? '', hFmt(e.minutos_trabajados), hFmt(e.minutos_extra),
             hFmt(e.minutos_bano), hFmt(e.minutos_break), hFmt(e.minutos_almuerzo), hFmt(e.minutos_capacitacion)
         ]);
         descargarCsv(
             `equipo_mensual_${periodo}.csv`,
-            ['N°', 'Documento', 'Empleado', 'Centro de costo', 'Cargo', 'Días trab.', 'Ausencias', 'Días con novedad', 'Novedades', 'Días tarde', 'Min tarde',
+            ['N°', 'Documento', 'Empleado', 'Centro de costo', 'Cargo', 'Días trab.', 'Ausencias', 'Días con novedad', 'Novedades', 'Días tarde', 'Tiempo tarde',
                 'Puntualidad %', 'H. trabajadas', 'H. extra', 'Baño', 'Break', 'Almuerzo', 'Capacitación'],
             cuerpo
         );
@@ -317,7 +317,7 @@ const EquipoMensual = () => {
                                                                 const clase = claseDia(celda);
                                                                 const cfg = clase ? CELDA[clase] : null;
                                                                 const titulo = celda
-                                                                    ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${celda.minutos_tarde} min)` : ''}${celda.novedad ? ` · ${celda.novedad.tipo}` : ''}`
+                                                                    ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${tardeExacto(celda.segundos_tarde, celda.minutos_tarde)})` : ''}${celda.novedad ? ` · ${celda.novedad.tipo}` : ''}`
                                                                     : `${d.fecha} · sin jornada`;
                                                                 return (
                                                                     <td key={d.d} style={{ padding: 0 }}>
@@ -427,7 +427,7 @@ const EquipoMensual = () => {
                                                     </td>
                                                     <td className="ai-monitor-centro">
                                                         {e.dias_tarde > 0
-                                                            ? <Pastilla color="almuerzo">{e.dias_tarde}{e.minutos_tarde > 0 ? ` · ${e.minutos_tarde}m` : ''}</Pastilla>
+                                                            ? <Pastilla color="almuerzo">{e.dias_tarde}{e.minutos_tarde > 0 ? ` · ${tardeExacto(e.segundos_tarde, e.minutos_tarde)}` : ''}</Pastilla>
                                                             : 0}
                                                     </td>
                                                     <td className="ai-monitor-centro">

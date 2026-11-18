@@ -8,6 +8,7 @@ import { periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
 import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import NovedadChip from '../asistencia/NovedadChip';
 import { etiquetaNovedad } from '../../utils/novedadesAsistencia';
+import { tardeExacto } from '../../utils/llegadaAsistencia';
 
 // Reporte de asistencia para financiera/admin (asistencia.md §35-§36): estadísticas comparativas por
 // campaña de toda la organización. "Ver detalle" abre una ventana con el detalle completo de la
@@ -286,12 +287,12 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
     const exportarEmpleados = () => {
         descargarCsv(
             `asistencia_${(nombre || 'campania').replace(/\s+/g, '_').toLowerCase()}_${periodo}.csv`,
-            ['Empleado', 'Cédula', 'Cargo', 'Centro de costo', 'Turno', 'Días trab.', 'Ausencias', 'Días con novedad', 'Novedades', 'Días tarde', 'Min. tarde', 'Puntualidad %',
+            ['Empleado', 'Cédula', 'Cargo', 'Centro de costo', 'Turno', 'Días trab.', 'Ausencias', 'Días con novedad', 'Novedades', 'Días tarde', 'Tiempo tarde', 'Puntualidad %',
                 'H. trabajadas', 'H. extra', 'Baño', 'Break', 'Almuerzo', 'Capacitación'],
             (campania?.empleados ?? []).map((e) => [
                 nombrePropio(e.nombre), e.documento, primeraMayuscula(e.cargo || ''), e.centro_costo || '', textoTurno(e.turno),
                 e.dias_trabajados, e.ausencias, e.dias_novedad || 0, tiposNovedad(e).join(' / '),
-                e.dias_tarde, e.minutos_tarde, e.porcentaje_puntualidad ?? '', hFmt(e.minutos_trabajados), hFmt(e.minutos_extra),
+                e.dias_tarde, e.minutos_tarde > 0 ? tardeExacto(e.segundos_tarde, e.minutos_tarde) : '', e.porcentaje_puntualidad ?? '', hFmt(e.minutos_trabajados), hFmt(e.minutos_extra),
                 hFmt(e.minutos_bano), hFmt(e.minutos_break), hFmt(e.minutos_almuerzo), hFmt(e.minutos_capacitacion)
             ])
         );
@@ -397,7 +398,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                                             const celda = mapa[d.fecha];
                                                             const turno = turnos[d.fecha];
                                                             const textoTurnoDia = turno ? ` · turno ${turno.es_descanso ? 'descanso' : textoTurno(turno)}` : ' · sin horario';
-                                                            const titulo = (celda ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${celda.minutos_tarde} min)` : ''}${celda.novedad ? ` · ${celda.novedad.tipo}` : ''}` : `${d.fecha} · sin jornada`) + textoTurnoDia;
+                                                            const titulo = (celda ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${tardeExacto(celda.segundos_tarde, celda.minutos_tarde)})` : ''}${celda.novedad ? ` · ${celda.novedad.tipo}` : ''}` : `${d.fecha} · sin jornada`) + textoTurnoDia;
                                                             return (
                                                                 <td key={d.d} style={{ padding: 0 }}>
                                                                     <Link to={`/recursos-humanos/trazabilidad/${e.users_company_id}?fecha=${d.fecha}`} title={titulo} aria-label={titulo}
@@ -467,7 +468,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                                     <td className="ai-num" style={{ fontWeight: 600 }}>{e.dias_trabajados}</td>
                                                     <td className="ai-num" style={{ color: e.ausencias > 0 ? 'var(--danger)' : 'inherit' }}>{e.ausencias}</td>
                                                     <td className="ai-num" title={tiposNovedad(e).join(', ') || undefined}>{e.dias_novedad > 0 ? <span style={{ color: '#a8338f', fontWeight: 600 }}>{e.dias_novedad}</span> : 0}</td>
-                                                    <td className="ai-num">{e.dias_tarde}{e.minutos_tarde > 0 ? ` (${e.minutos_tarde}m)` : ''}</td>
+                                                    <td className="ai-num">{e.dias_tarde}{e.minutos_tarde > 0 ? ` (${tardeExacto(e.segundos_tarde, e.minutos_tarde)})` : ''}</td>
                                                     <td className="ai-num">{e.porcentaje_puntualidad != null ? `${e.porcentaje_puntualidad}%` : '—'}</td>
                                                     <td className="ai-num" style={{ fontWeight: 600 }}>{hFmt(e.minutos_trabajados)}</td>
                                                     <td className="ai-num">{hFmt(e.minutos_extra)}</td>

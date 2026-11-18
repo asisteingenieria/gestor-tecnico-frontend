@@ -1,6 +1,18 @@
 // Cómo se pinta la llegada de un día, igual en "Equipo · hoy" y en el calendario del histórico:
 // mitad cómo llegó (verde puntual / amarillo tarde) y mitad azul mientras sigue en turno.
 
+/**
+ * Retraso exacto, sin redondear (asistencia.md §72): "45:41 min" o, desde una hora, "1:05:41 h". Usa los
+ * segundos que manda el servidor; si no vienen (o vienen en 0 con minutos tarde), cae a los minutos.
+ */
+export function tardeExacto(segundos, minutos) {
+    const total = Number(segundos) > 0 ? Math.floor(Number(segundos)) : Math.round((Number(minutos) || 0) * 60);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = String(total % 60).padStart(2, '0');
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s} h` : `${m}:${s} min`;
+}
+
 const VERDE = 'var(--success)';
 const AMARILLO = '#f59e0b';
 const AZUL = 'var(--primary)';

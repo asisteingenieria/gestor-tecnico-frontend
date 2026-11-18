@@ -15,7 +15,7 @@ import { useBaseEquipo } from '../../utils/rutaEquipo';
 import CuadroLlegada from './CuadroLlegada';
 import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
 import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
-import { CELDA, claseDia } from '../../utils/llegadaAsistencia';
+import { CELDA, claseDia, tardeExacto } from '../../utils/llegadaAsistencia';
 import NovedadChip from './NovedadChip';
 import { etiquetaNovedad, noAsistioPorNovedad } from '../../utils/novedadesAsistencia';
 
@@ -91,7 +91,7 @@ function textoLlegada(emp) {
     if (clase === 'novedad') return `Novedad · ${etiquetaNovedad(emp.novedad.tipo)}`;
     if (clase === 'curso_sin_horario') return 'Sin horario · en turno';
     if (clase === 'sin_horario') return 'Sin horario · terminó';
-    const llegada = emp.minutos_tarde > 0 ? `Tarde · ${formatearDuracion(emp.minutos_tarde)}` : 'Puntual';
+    const llegada = emp.minutos_tarde > 0 ? `Tarde · ${tardeExacto(emp.segundos_tarde, emp.minutos_tarde)}` : 'Puntual';
     return clase.startsWith('curso_') ? `${llegada} · en turno` : `${llegada} · terminó`;
 }
 

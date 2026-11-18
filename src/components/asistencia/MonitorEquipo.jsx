@@ -10,6 +10,7 @@ import { escucharAsistencia } from '../../utils/socketAsistencia';
 import { datosPausa } from '../../utils/pausasAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 import NovedadChip from './NovedadChip';
+import { tardeExacto } from '../../utils/llegadaAsistencia';
 import { etiquetaNovedad, noAsistioPorNovedad } from '../../utils/novedadesAsistencia';
 
 // Monitor del equipo del coordinador (jefe inmediato), con el diseño de Downloads/Dashboard.png: mosaicos de
@@ -74,12 +75,6 @@ function hhmmss(totalSegundos) {
     const s = Math.max(0, Math.floor(totalSegundos));
     const dos = (n) => String(n).padStart(2, '0');
     return `${dos(Math.floor(s / 3600))}:${dos(Math.floor((s % 3600) / 60))}:${dos(s % 60)}`;
-}
-
-// "12m", "3h 32m": los minutos tarde de la pastilla.
-function duracionCorta(min) {
-    const h = Math.floor(min / 60);
-    return h ? `${h}h ${String(min % 60).padStart(2, '0')}m` : `${min}m`;
 }
 
 // "08:00 – 17:00" del turno de hoy; descanso o sin horario asignado.
@@ -322,8 +317,8 @@ const MonitorEquipo = () => {
                                         <td className="ai-monitor-centro ai-monitor-login">
                                             {hora24(horaLoginDe(emp)) || '—'}
                                             {emp.minutos_tarde > 0 && (
-                                                <span className="ai-monitor-tarde" title={`Llegó ${duracionCorta(emp.minutos_tarde)} tarde a su turno de las ${(emp.turno?.hora_entrada || '').slice(0, 5)}`}>
-                                                    Tarde +{duracionCorta(emp.minutos_tarde)}
+                                                <span className="ai-monitor-tarde" title={`Llegó ${tardeExacto(emp.segundos_tarde, emp.minutos_tarde)} tarde a su turno de las ${(emp.turno?.hora_entrada || '').slice(0, 5)}`}>
+                                                    Tarde +{tardeExacto(emp.segundos_tarde, emp.minutos_tarde)}
                                                 </span>
                                             )}
                                         </td>
