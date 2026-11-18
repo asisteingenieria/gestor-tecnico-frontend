@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Users, Clock, CalendarX, Download, BarChart3, Search, History, X, Timer } from 'lucide-react';
+import { Loader2, Users, Clock, CalendarX, Download, BarChart3, Search, History, X, Timer, ClipboardList } from 'lucide-react';
 import { financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula, iniciales } from '../../utils/formatoRRHH';
 import { descargarCsv } from '../../utils/csv';
 import { periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
 import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
+import NovedadChip from '../asistencia/NovedadChip';
+import { etiquetaNovedad } from '../../utils/novedadesAsistencia';
 
 // Reporte de asistencia para financiera/admin (asistencia.md §35-§36): estadísticas comparativas por
 // campaña de toda la organización. "Ver detalle" abre una ventana con el detalle completo de la
@@ -17,12 +19,15 @@ const CELDA = {
     puntual: { bg: 'var(--success)', label: 'Puntual' },
     tarde: { bg: '#f59e0b', label: 'Llegó tarde' },
     ausente: { bg: 'var(--danger)', label: 'Ausente' },
+    // Novedad de RRHH que cubre el día (incapacidad, vacaciones, licencia…): no es ausencia (asistencia.md §71).
+    novedad: { bg: '#a8338f', label: 'Novedad RRHH' },
     curso: { bg: 'var(--primary)', label: 'En curso' },
     pendiente: { bg: 'var(--border)', label: 'Pendiente' }
 };
 
 function claseDia(dia) {
     if (!dia) return null;
+    if (dia.estado === 'novedad') return 'novedad';
     if (dia.estado === 'ausente') return 'ausente';
     if (dia.estado === 'pendiente') return 'pendiente';
     if (dia.estado === 'en_curso' || dia.estado === 'en_pausa') return 'curso';
@@ -35,6 +40,9 @@ function textoTurno(turno) {
     const horas = `${String(turno.hora_entrada).slice(0, 5)}–${String(turno.hora_salida).slice(0, 5)}`;
     return turno.plantilla ? `${turno.plantilla} · ${horas}` : horas;
 }
+
+// Tipos de novedad de RRHH que tuvo la persona en el mes (para el distintivo y el CSV, §71).
+const tiposNovedad = (e) => [...new Set((e.dias || []).filter((d) => d.novedad).map((d) => d.novedad.tipo))];
 
 const hFmt = (min) => `${((Number(min) || 0) / 60).toLocaleString('es-CO', { maximumFractionDigits: 1 })} h`;
 
@@ -113,12 +121,12 @@ const AsistenciaMensual = () => {
 
     const exportarComparativo = () => {
         const cuerpo = porCampania.map((c) => [
-            primeraMayuscula(c.campania), c.totales.empleados, c.totales.dias_trabajados, c.totales.ausencias,
+            primeraMayuscula(c.campania), c.totales.empleados, c.totales.dias_trabajados, c.totales.ausencias, c.totales.dias_novedad || 0,
             c.totales.dias_tarde, c.totales.porcentaje_puntualidad ?? '', hFmt(c.totales.minutos_trabajados), hFmt(c.totales.minutos_extra)
         ]);
         descargarCsv(
             `asistencia_campanias_${periodo}.csv`,
-            ['Campaña', 'Empleados', 'Días trab.', 'Ausencias', 'Días tarde', 'Puntualidad %', 'H. trabajadas', 'H. extra'],
+            ['Campaña', 'Empleados', 'Días trab.', 'Ausencias', 'Días con novedad', 'Días tarde', 'Puntualidad %', 'H. trabajadas', 'H. extra'],
             cuerpo
         );
     };
@@ -150,11 +158,12 @@ const AsistenciaMensual = () => {
                 <div className="ai-panel ai-empty"><p style={{ color: 'var(--danger)' }}>{error}</p></div>
             ) : !datos ? null : (
                 <>
-                    <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+                    <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
                         <Kpi label="Puntualidad global" valor={totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'} icon={<Clock size={16} strokeWidth={1.75} />} />
                         <Kpi label="Empleados" valor={totales.empleados} icon={<Users size={16} strokeWidth={1.75} />} />
                         <Kpi label="Días trabajados" valor={totales.dias_trabajados} icon={<BarChart3 size={16} strokeWidth={1.75} />} />
                         <Kpi label="Ausencias" valor={totales.ausencias} alerta={totales.ausencias > 0} icon={<CalendarX size={16} strokeWidth={1.75} />} />
+                        <Kpi label="Días con novedad" valor={totales.dias_novedad || 0} icon={<ClipboardList size={16} strokeWidth={1.75} />} />
                         <Kpi label="Horas extra" valor={hFmt(totales.minutos_extra)} icon={<Clock size={16} strokeWidth={1.75} />} />
                     </div>
 
@@ -175,6 +184,7 @@ const AsistenciaMensual = () => {
                                         <th className="ai-num" title={`Puntualidad vs ${nombrePeriodo(datos.periodo_anterior)}`}>Tendencia</th>
                                         <th className="ai-num">Días trab.</th>
                                         <th className="ai-num">Ausencias</th>
+                                        <th className="ai-num" title="Días que no asistieron por una novedad de RRHH (no son ausencias)">Con novedad</th>
                                         <th className="ai-num">Días tarde</th>
                                         <th className="ai-num">H. trabajadas</th>
                                         <th className="ai-num">H. extra</th>
@@ -190,6 +200,7 @@ const AsistenciaMensual = () => {
                                             <td className="ai-num"><Tendencia totales={c.totales} anterior={c.anterior} periodoAnterior={datos.periodo_anterior} /></td>
                                             <td className="ai-num">{c.totales.dias_trabajados}</td>
                                             <td className="ai-num" style={{ color: c.totales.ausencias > 0 ? 'var(--danger)' : 'inherit' }}>{c.totales.ausencias}</td>
+                                            <td className="ai-num">{c.totales.dias_novedad > 0 ? <span style={{ color: '#a8338f', fontWeight: 600 }}>{c.totales.dias_novedad}</span> : 0}</td>
                                             <td className="ai-num">{c.totales.dias_tarde}</td>
                                             <td className="ai-num">{hFmt(c.totales.minutos_trabajados)}</td>
                                             <td className="ai-num">{hFmt(c.totales.minutos_extra)}</td>
@@ -212,6 +223,7 @@ const AsistenciaMensual = () => {
                                             <td></td>
                                             <td className="ai-num">{totales.dias_trabajados}</td>
                                             <td className="ai-num">{totales.ausencias}</td>
+                                            <td className="ai-num">{totales.dias_novedad || 0}</td>
                                             <td className="ai-num">{totales.dias_tarde}</td>
                                             <td className="ai-num">{hFmt(totales.minutos_trabajados)}</td>
                                             <td className="ai-num">{hFmt(totales.minutos_extra)}</td>
@@ -274,11 +286,11 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
     const exportarEmpleados = () => {
         descargarCsv(
             `asistencia_${(nombre || 'campania').replace(/\s+/g, '_').toLowerCase()}_${periodo}.csv`,
-            ['Empleado', 'Cédula', 'Cargo', 'Centro de costo', 'Turno', 'Días trab.', 'Ausencias', 'Días tarde', 'Min. tarde', 'Puntualidad %',
+            ['Empleado', 'Cédula', 'Cargo', 'Centro de costo', 'Turno', 'Días trab.', 'Ausencias', 'Días con novedad', 'Novedades', 'Días tarde', 'Min. tarde', 'Puntualidad %',
                 'H. trabajadas', 'H. extra', 'Baño', 'Break', 'Almuerzo', 'Capacitación'],
             (campania?.empleados ?? []).map((e) => [
                 nombrePropio(e.nombre), e.documento, primeraMayuscula(e.cargo || ''), e.centro_costo || '', textoTurno(e.turno),
-                e.dias_trabajados, e.ausencias,
+                e.dias_trabajados, e.ausencias, e.dias_novedad || 0, tiposNovedad(e).join(' / '),
                 e.dias_tarde, e.minutos_tarde, e.porcentaje_puntualidad ?? '', hFmt(e.minutos_trabajados), hFmt(e.minutos_extra),
                 hFmt(e.minutos_bano), hFmt(e.minutos_break), hFmt(e.minutos_almuerzo), hFmt(e.minutos_capacitacion)
             ])
@@ -319,11 +331,12 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                     ) : (
                         <>
                             {t && (
-                                <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
+                                <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
                                     <Kpi label="Puntualidad" valor={t.porcentaje_puntualidad != null ? `${t.porcentaje_puntualidad}%` : '—'} icon={<Clock size={16} strokeWidth={1.75} />}
                                         extra={<Tendencia totales={t} anterior={fila.anterior} periodoAnterior={periodoAnterior} />} />
                                     <Kpi label="Días trabajados" valor={t.dias_trabajados} icon={<BarChart3 size={16} strokeWidth={1.75} />} />
                                     <Kpi label="Ausencias" valor={t.ausencias} alerta={t.ausencias > 0} icon={<CalendarX size={16} strokeWidth={1.75} />} />
+                                    <Kpi label="Días con novedad" valor={t.dias_novedad || 0} icon={<ClipboardList size={16} strokeWidth={1.75} />} />
                                     <Kpi label="Días tarde" valor={t.dias_tarde} icon={<Timer size={16} strokeWidth={1.75} />} />
                                     <Kpi label="H. trabajadas" valor={hFmt(t.minutos_trabajados)} icon={<Clock size={16} strokeWidth={1.75} />} />
                                     <Kpi label="H. extra" valor={hFmt(t.minutos_extra)} icon={<Clock size={16} strokeWidth={1.75} />} />
@@ -356,7 +369,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                 <div className="ai-panel-head">
                                     <h3 className="ai-panel-title">Calendario diario <span className="ai-muted" style={{ fontWeight: 400, fontSize: 13 }}>· clic en un día para ver su trazabilidad</span></h3>
                                     <div className="ai-row" style={{ gap: 12, flexWrap: 'wrap' }}>
-                                        {['puntual', 'tarde', 'ausente', 'curso', 'pendiente'].map((k) => (
+                                        {['puntual', 'tarde', 'ausente', 'novedad', 'curso', 'pendiente'].map((k) => (
                                             <span key={k} className="ai-row" style={{ gap: 5, fontSize: 12, color: 'var(--ink-muted)' }}>
                                                 <i style={{ width: 12, height: 12, borderRadius: 3, background: CELDA[k].bg, display: 'inline-block' }} />{CELDA[k].label}
                                             </span>
@@ -384,7 +397,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                                             const celda = mapa[d.fecha];
                                                             const turno = turnos[d.fecha];
                                                             const textoTurnoDia = turno ? ` · turno ${turno.es_descanso ? 'descanso' : textoTurno(turno)}` : ' · sin horario';
-                                                            const titulo = (celda ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${celda.minutos_tarde} min)` : ''}` : `${d.fecha} · sin jornada`) + textoTurnoDia;
+                                                            const titulo = (celda ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${celda.minutos_tarde} min)` : ''}${celda.novedad ? ` · ${celda.novedad.tipo}` : ''}` : `${d.fecha} · sin jornada`) + textoTurnoDia;
                                                             return (
                                                                 <td key={d.d} style={{ padding: 0 }}>
                                                                     <Link to={`/recursos-humanos/trazabilidad/${e.users_company_id}?fecha=${d.fecha}`} title={titulo} aria-label={titulo}
@@ -410,6 +423,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                                 <th>Centro de costo · turno</th>
                                                 <th className="ai-num">Días trab.</th>
                                                 <th className="ai-num">Ausencias</th>
+                                                <th className="ai-num" title="Días que no asistió por una novedad de RRHH (no son ausencias)">Con novedad</th>
                                                 <th className="ai-num">Días tarde</th>
                                                 <th className="ai-num">Puntualidad</th>
                                                 <th className="ai-num">H. trabajadas</th>
@@ -423,7 +437,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                         </thead>
                                         <tbody>
                                             {empleados.length === 0 && (
-                                                <tr><td colSpan={13} className="ai-muted" style={{ textAlign: 'center', padding: 16 }}>
+                                                <tr><td colSpan={14} className="ai-muted" style={{ textAlign: 'center', padding: 16 }}>
                                                     {busqueda ? 'Nadie coincide con la búsqueda.' : 'Esta campaña no tiene empleados en el mes.'}
                                                 </td></tr>
                                             )}
@@ -433,7 +447,15 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                                         <span className="ai-row" style={{ gap: 8 }}>
                                                             <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(e.nombre)}</span>
                                                             <span>
-                                                                <div style={{ fontWeight: 600 }}>{nombrePropio(e.nombre)}</div>
+                                                                <div style={{ fontWeight: 600 }}>
+                                                                    {nombrePropio(e.nombre)}
+                                                                    {e.dias_novedad > 0 && (
+                                                                        <NovedadChip
+                                                                            texto={`${e.dias_novedad} ${e.dias_novedad === 1 ? 'día' : 'días'} · ${[...new Set(tiposNovedad(e).map(etiquetaNovedad))].join(', ')}`}
+                                                                            titulo={`${e.dias_novedad} ${e.dias_novedad === 1 ? 'día' : 'días'} sin asistir por novedad de RRHH: ${tiposNovedad(e).join(', ')}`}
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                                 <div className="ai-muted" style={{ fontSize: 12 }}>CC {e.documento}{e.cargo ? ` · ${primeraMayuscula(e.cargo)}` : ''}</div>
                                                             </span>
                                                         </span>
@@ -444,6 +466,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                                     </td>
                                                     <td className="ai-num" style={{ fontWeight: 600 }}>{e.dias_trabajados}</td>
                                                     <td className="ai-num" style={{ color: e.ausencias > 0 ? 'var(--danger)' : 'inherit' }}>{e.ausencias}</td>
+                                                    <td className="ai-num" title={tiposNovedad(e).join(', ') || undefined}>{e.dias_novedad > 0 ? <span style={{ color: '#a8338f', fontWeight: 600 }}>{e.dias_novedad}</span> : 0}</td>
                                                     <td className="ai-num">{e.dias_tarde}{e.minutos_tarde > 0 ? ` (${e.minutos_tarde}m)` : ''}</td>
                                                     <td className="ai-num">{e.porcentaje_puntualidad != null ? `${e.porcentaje_puntualidad}%` : '—'}</td>
                                                     <td className="ai-num" style={{ fontWeight: 600 }}>{hFmt(e.minutos_trabajados)}</td>
