@@ -58,6 +58,11 @@ function colorDe(indice) {
 
 function hhmm(t) { return t ? t.slice(0, 5) : ''; }
 
+// Clave del turno de una celda: su plantilla o, si se cargó sin plantilla (mallas por Excel), su franja horaria.
+function claveTurno(h) {
+    return h.horario_plantilla_id ? String(h.horario_plantilla_id) : `h${hhmm(h.hora_entrada)}-${hhmm(h.hora_salida)}`;
+}
+
 function lunesDe(fecha) {
     const d = new Date(fecha);
     const dow = (d.getDay() + 6) % 7;
@@ -137,20 +142,24 @@ const GestionHorarios = () => {
     const conteoPorPlantilla = useMemo(() => {
         const mapa = {};
         horariosSemana.forEach((h) => {
-            if (!h.horario_plantilla_id) return;
-            mapa[h.horario_plantilla_id] = mapa[h.horario_plantilla_id] || new Set();
-            mapa[h.horario_plantilla_id].add(h.users_company_id);
+            if (h.es_descanso) return;
+            const clave = claveTurno(h);
+            mapa[clave] = mapa[clave] || new Set();
+            mapa[clave].add(h.users_company_id);
         });
         return mapa;
     }, [horariosSemana]);
 
     const plantillasVista = useMemo(() => {
-        if (!soloLectura) return plantillas;
+        if (!soloLectura) return plantillas.map((p) => ({ ...p, clave: String(p.idhorario_plantilla) }));
+        // En otra campaña: los turnos que usa esa gente en la semana, por plantilla o, sin ella, por franja horaria.
         const mapa = new Map();
         horariosSemana.forEach((h) => {
-            if (!h.horario_plantilla_id || mapa.has(h.horario_plantilla_id)) return;
-            mapa.set(h.horario_plantilla_id, {
-                idhorario_plantilla: h.horario_plantilla_id, nombre: h.plantilla || 'Turno',
+            const clave = claveTurno(h);
+            if (h.es_descanso || mapa.has(clave)) return;
+            mapa.set(clave, {
+                clave, idhorario_plantilla: h.horario_plantilla_id || clave,
+                nombre: h.plantilla || `Turno ${hhmm(h.hora_entrada)}–${hhmm(h.hora_salida)}`,
                 hora_entrada: h.hora_entrada, hora_salida: h.hora_salida, minutos_almuerzo: h.minutos_almuerzo,
                 hora_almuerzo_inicio: h.hora_almuerzo_inicio, tolerancia_entrada_min: h.tolerancia_entrada_min, centro_costo_id: null
             });
@@ -452,7 +461,7 @@ const GestionHorarios = () => {
                             const salidaMin = Number(hhmm(p.hora_salida).split(':')[0]) * 60 + Number(hhmm(p.hora_salida).split(':')[1]);
                             const cruza = salidaMin <= entradaMin;
                             const anchoMin = cruza ? 1440 - entradaMin : salidaMin - entradaMin;
-                            const personas = conteoPorPlantilla[p.idhorario_plantilla]?.size || 0;
+                            const personas = conteoPorPlantilla[p.clave]?.size || 0;
                             return (
                                 <div key={p.idhorario_plantilla} className="ai-shift">
                                     <div className="ai-shift-row">
@@ -548,9 +557,10 @@ const GestionHorarios = () => {
                                                     </td>
                                                 );
                                             }
-                                            const idx = plantillasVista.findIndex((p) => p.idhorario_plantilla === h.horario_plantilla_id);
+                                            const idx = plantillasVista.findIndex((p) => p.clave === claveTurno(h));
                                             const c = colorDe(idx >= 0 ? idx : 0);
-                                            const nombrePlantilla = plantillasVista[idx]?.nombre || h.plantilla || 'Turno';
+                                            // Sin plantilla, la franja ya va debajo: la celda dice solo "Turno".
+                                            const nombrePlantilla = h.horario_plantilla_id ? (plantillasVista[idx]?.nombre || h.plantilla || 'Turno') : 'Turno';
                                             return (
                                                 <td key={fecha} className={esHoy ? 'is-today' : ''}>
                                                     <button
