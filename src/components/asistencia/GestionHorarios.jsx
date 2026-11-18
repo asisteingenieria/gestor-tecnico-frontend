@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, CalendarClock, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Search, FileSpreadsheet } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import CargarMallaModal from './CargarMallaModal';
-import { nombrePropio } from '../../utils/formatoRRHH';
+import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
+import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
+import { useAlcanceEquipo, paramsAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
 
 const DIAS_SEMANA = [
     { valor: 1, label: 'L' }, { valor: 2, label: 'M' }, { valor: 3, label: 'X' },
@@ -74,6 +76,10 @@ function isoDow(iso) {
 }
 
 const GestionHorarios = () => {
+    // Quien ve todas las campañas (Director de Tecnología, backend asistencia.md §68/§74) entra con su equipo
+    // y con el filtro consulta los horarios de otra campaña o de todas, en solo lectura.
+    const { verTodas, campanias, alcance, cambiarAlcance } = useAlcanceEquipo();
+    const soloLectura = alcance !== '';
     const [plantillas, setPlantillas] = useState([]);
     const [equipo, setEquipo] = useState([]);
     const [horariosSemana, setHorariosSemana] = useState([]);
@@ -102,7 +108,7 @@ const GestionHorarios = () => {
     const dias = useMemo(() => Array.from({ length: 7 }, (_, i) => sumarDias(semanaInicio, i)), [semanaInicio]);
 
     const cargarSemana = async (inicio) => {
-        const { data } = await asistenciaService.getHorarios({ desde: inicio, hasta: sumarDias(inicio, 6) });
+        const { data } = await asistenciaService.getHorarios({ desde: inicio, hasta: sumarDias(inicio, 6), ...paramsAlcance(alcance) });
         setHorariosSemana(data);
     };
 
@@ -111,7 +117,7 @@ const GestionHorarios = () => {
         try {
             const [rPlantillas, rEquipo] = await Promise.all([
                 asistenciaService.getPlantillas(),
-                asistenciaService.getEquipo()
+                asistenciaService.getEquipo(paramsAlcance(alcance))
             ]);
             setPlantillas(rPlantillas.data);
             // /equipo trae todo el árbol del director (§51); horarios solo asigna a su gente directa.
@@ -125,7 +131,7 @@ const GestionHorarios = () => {
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { cargarTodo(); }, []);
+    useEffect(() => { setCentroFiltro(''); cargarTodo(); }, [alcance]);
     useEffect(() => { if (!loading) cargarSemana(semanaInicio); }, [semanaInicio]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const conteoPorPlantilla = useMemo(() => {
@@ -137,6 +143,20 @@ const GestionHorarios = () => {
         });
         return mapa;
     }, [horariosSemana]);
+
+    const plantillasVista = useMemo(() => {
+        if (!soloLectura) return plantillas;
+        const mapa = new Map();
+        horariosSemana.forEach((h) => {
+            if (!h.horario_plantilla_id || mapa.has(h.horario_plantilla_id)) return;
+            mapa.set(h.horario_plantilla_id, {
+                idhorario_plantilla: h.horario_plantilla_id, nombre: h.plantilla || 'Turno',
+                hora_entrada: h.hora_entrada, hora_salida: h.hora_salida, minutos_almuerzo: h.minutos_almuerzo,
+                hora_almuerzo_inicio: h.hora_almuerzo_inicio, tolerancia_entrada_min: h.tolerancia_entrada_min, centro_costo_id: null
+            });
+        });
+        return [...mapa.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }, [soloLectura, plantillas, horariosSemana]);
 
     const mapaCeldas = useMemo(() => {
         const mapa = {};
@@ -167,9 +187,12 @@ const GestionHorarios = () => {
         && (!q || (e.nombre || '').toLowerCase().includes(q))));
 
     // Con un centro filtrado, el panel muestra las plantillas de ese centro y las generales.
-    const plantillasVisibles = centroFiltro
-        ? plantillas.filter((p) => p.centro_costo_id == null || claveCentro(p.centro_costo_id) === centroFiltro)
-        : plantillas;
+    const plantillasVisibles = centroFiltro && !soloLectura
+        ? plantillasVista.filter((p) => p.centro_costo_id == null || claveCentro(p.centro_costo_id) === centroFiltro)
+        : plantillasVista;
+    const nombreAlcance = alcance === TODAS
+        ? 'todas las campañas'
+        : primeraMayuscula(campanias.find((c) => String(c.idcampania) === alcance)?.nombre || 'campaña');
 
     // --- Plantillas ---
     const abrirNuevaPlantilla = () => {
@@ -297,6 +320,7 @@ const GestionHorarios = () => {
 
     // --- Celda individual ---
     const abrirCelda = (empleado, fecha) => {
+        if (soloLectura) return;
         const existente = mapaCeldas[`${empleado.users_company_id}_${fecha}`] || null;
         setCelda({ empleado, fecha, existente });
         setCeldaPlantillaId(existente?.horario_plantilla_id ? String(existente.horario_plantilla_id) : '');
@@ -374,10 +398,14 @@ const GestionHorarios = () => {
         <div className="ai-content">
             <div className="ai-page-head">
                 <div>
-                    <h1 className="ai-page-title">Horarios del equipo</h1>
-                    <p className="ai-page-sub">Plantillas de turno y asignación semanal</p>
+                    <h1 className="ai-page-title">{soloLectura ? 'Horarios' : 'Horarios del equipo'}</h1>
+                    <p className="ai-page-sub">
+                        {soloLectura ? `${primeraMayuscula(nombreAlcance)} · ${equipo.length} persona${equipo.length === 1 ? '' : 's'} · solo consulta` : 'Plantillas de turno y asignación semanal'}
+                    </p>
                 </div>
-                <div className="ai-row">
+                <div className="ai-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {verTodas && <FiltroCampaniaEquipo alcance={alcance} campanias={campanias} onChange={cambiarAlcance} />}
+                    {!soloLectura && (<>
                     <button type="button" className="ai-btn ai-btn--secondary" onClick={abrirNuevaPlantilla}>
                         <Plus size={16} strokeWidth={1.75} /> Nueva plantilla
                     </button>
@@ -387,6 +415,7 @@ const GestionHorarios = () => {
                     <button type="button" className="ai-btn ai-btn--primary" onClick={abrirAsignar}>
                         <CalendarClock size={16} strokeWidth={1.75} /> Asignar horario
                     </button>
+                    </>)}
                 </div>
             </div>
 
@@ -413,12 +442,12 @@ const GestionHorarios = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(0, 1fr)', gap: 'var(--space-5)', alignItems: 'start' }}>
                 <div className="ai-panel">
                     <div className="ai-panel-head">
-                        <h3 className="ai-panel-title">Plantillas de turno</h3>
+                        <h3 className="ai-panel-title">{soloLectura ? 'Turnos de la semana' : 'Plantillas de turno'}</h3>
                         {centroFiltro && <span className="ai-muted" style={{ fontSize: 12 }}>{nombreCentro(centroFiltro)} y generales</span>}
                     </div>
                     <div className="ai-panel-body">
                         {plantillasVisibles.map((p) => {
-                            const c = colorDe(plantillas.indexOf(p));
+                            const c = colorDe(plantillasVista.indexOf(p));
                             const entradaMin = Number(hhmm(p.hora_entrada).split(':')[0]) * 60 + Number(hhmm(p.hora_entrada).split(':')[1]);
                             const salidaMin = Number(hhmm(p.hora_salida).split(':')[0]) * 60 + Number(hhmm(p.hora_salida).split(':')[1]);
                             const cruza = salidaMin <= entradaMin;
@@ -429,12 +458,14 @@ const GestionHorarios = () => {
                                     <div className="ai-shift-row">
                                         <span className="ai-swatch" style={{ background: c.ink }} />
                                         <span style={{ fontWeight: 600, fontSize: 14 }}>{p.nombre}</span>
+                                        {!soloLectura && (
                                         <span className="ai-row ai-row-actions" style={{ gap: 2 }}>
                                             <button type="button" className="ai-icon-btn" onClick={() => abrirEditarPlantilla(p)} aria-label="Editar"><Pencil size={14} strokeWidth={1.75} /></button>
                                             <button type="button" className="ai-icon-btn ai-icon-btn--danger" onClick={() => eliminarPlantilla(p.idhorario_plantilla)} aria-label="Eliminar"><Trash2 size={14} strokeWidth={1.75} /></button>
                                         </span>
+                                        )}
                                     </div>
-                                    <span className="ai-badge ai-badge--neutral" style={{ alignSelf: 'flex-start', height: 20, fontSize: 11 }}>{p.centro_costo || 'General'}</span>
+                                    {!soloLectura && <span className="ai-badge ai-badge--neutral" style={{ alignSelf: 'flex-start', height: 20, fontSize: 11 }}>{p.centro_costo || 'General'}</span>}
                                     <span className="ai-muted" style={{ fontSize: 13 }}>{hhmm(p.hora_entrada)} – {hhmm(p.hora_salida)}{cruza ? ' (cruza medianoche)' : ''}</span>
                                     <div className="ai-shift-bar">
                                         <span style={{ left: `${(entradaMin / 1440) * 100}%`, width: `${(anchoMin / 1440) * 100}%`, background: c.ink }} />
@@ -448,7 +479,7 @@ const GestionHorarios = () => {
                         {plantillasVisibles.length === 0 && (
                             <div className="ai-empty">
                                 <CalendarClock size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                                <p>{centroFiltro ? 'Sin plantillas para este centro de costo.' : 'Sin plantillas todavía.'}</p>
+                                <p>{soloLectura ? 'Sin turnos asignados esta semana.' : centroFiltro ? 'Sin plantillas para este centro de costo.' : 'Sin plantillas todavía.'}</p>
                             </div>
                         )}
                     </div>
@@ -473,7 +504,7 @@ const GestionHorarios = () => {
                             />
                         </div>
                         <div className="ai-legend">
-                            {plantillas.slice(0, 5).map((p, i) => {
+                            {plantillasVista.slice(0, 5).map((p, i) => {
                                 const c = colorDe(i);
                                 return <span key={p.idhorario_plantilla}><i style={{ background: c.ink }} /> {p.nombre}</span>;
                             })}
@@ -506,24 +537,24 @@ const GestionHorarios = () => {
                                             if (!h) {
                                                 return (
                                                     <td key={fecha} className={esHoy ? 'is-today' : ''}>
-                                                        <button type="button" className="ai-sh ai-sh--off" style={{ cursor: 'pointer', width: '100%' }} onClick={() => abrirCelda(emp, fecha)}>—</button>
+                                                        <button type="button" className="ai-sh ai-sh--off" style={{ cursor: soloLectura ? 'default' : 'pointer', width: '100%' }} onClick={() => abrirCelda(emp, fecha)}>—</button>
                                                     </td>
                                                 );
                                             }
                                             if (h.es_descanso) {
                                                 return (
                                                     <td key={fecha} className={esHoy ? 'is-today' : ''}>
-                                                        <button type="button" className="ai-sh ai-sh--off" style={{ cursor: 'pointer', width: '100%' }} onClick={() => abrirCelda(emp, fecha)}>Descanso</button>
+                                                        <button type="button" className="ai-sh ai-sh--off" style={{ cursor: soloLectura ? 'default' : 'pointer', width: '100%' }} onClick={() => abrirCelda(emp, fecha)}>Descanso</button>
                                                     </td>
                                                 );
                                             }
-                                            const idx = plantillas.findIndex((p) => p.idhorario_plantilla === h.horario_plantilla_id);
+                                            const idx = plantillasVista.findIndex((p) => p.idhorario_plantilla === h.horario_plantilla_id);
                                             const c = colorDe(idx >= 0 ? idx : 0);
-                                            const nombrePlantilla = plantillas.find((p) => p.idhorario_plantilla === h.horario_plantilla_id)?.nombre || 'Turno';
+                                            const nombrePlantilla = plantillasVista[idx]?.nombre || h.plantilla || 'Turno';
                                             return (
                                                 <td key={fecha} className={esHoy ? 'is-today' : ''}>
                                                     <button
-                                                        type="button" className="ai-sh" style={{ cursor: 'pointer', width: '100%', background: c.bg, color: c.ink, border: 0 }}
+                                                        type="button" className="ai-sh" style={{ cursor: soloLectura ? 'default' : 'pointer', width: '100%', background: c.bg, color: c.ink, border: 0 }}
                                                         onClick={() => abrirCelda(emp, fecha)}
                                                     >
                                                         {nombrePlantilla}
