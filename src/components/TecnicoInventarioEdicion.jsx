@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { assetHistoryService } from '../services/api';
+import HojaVidaModal from './HojaVidaModal';
+import MantenimientoModal from './MantenimientoModal';
+import { ALERTAS, textoAlerta } from '../utils/mantenimientoActivos';
 import {
     Search,
     Cpu,
@@ -24,8 +27,14 @@ import {
     Calendar,
     AlertTriangle,
     XCircle,
-    Package
+    Package,
+    FileText,
+    MapPin,
+    Wrench
 } from 'lucide-react';
+
+const FILTROS_ALERTA = ['rojo', 'naranja', 'al_dia', 'sin_registro'];
+const MIN_MOTIVO_BAJA = 10;
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
@@ -41,13 +50,26 @@ const TecnicoInventarioEdicion = () => {
     const [message, setMessage] = useState({ type: '', text: '' });
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [pendingChange, setPendingChange] = useState(null);
-    const [showInventarioModal, setShowInventarioModal] = useState(false);
-    const [observacionesText, setObservacionesText] = useState('');
-    const [savingObservacion, setSavingObservacion] = useState(false);
     const [observaciones, setObservaciones] = useState([]);
     const [showObservaciones, setShowObservaciones] = useState(false);
     const [loadingObservaciones, setLoadingObservaciones] = useState(false);
     const [updatingEstado, setUpdatingEstado] = useState(false);
+    const [filtroAlerta, setFiltroAlerta] = useState('');
+    const [showMantenimiento, setShowMantenimiento] = useState(false);
+    const [showHojaVida, setShowHojaVida] = useState(false);
+    const [traslado, setTraslado] = useState(null); // { puesto, site } mientras el modal está abierto
+    const [motivoBaja, setMotivoBaja] = useState(null); // texto mientras el modal de baja está abierto
+
+    const conteoAlertas = useMemo(() => {
+        const c = { rojo: 0, naranja: 0, al_dia: 0, sin_registro: 0 };
+        activos.forEach((a) => { if (a.alerta_mantenimiento) c[a.alerta_mantenimiento.nivel] += 1; });
+        return c;
+    }, [activos]);
+
+    const activosVisibles = filtroAlerta
+        ? activos.filter((a) => a.alerta_mantenimiento?.nivel === filtroAlerta)
+        : activos;
+    const alertaSeleccionado = activos.find((a) => a.id === selectedActivo?.id)?.alerta_mantenimiento || null;
 
     // Cargar activos editables
     const fetchActivos = async (search = '') => {
@@ -226,32 +248,6 @@ const TecnicoInventarioEdicion = () => {
         }
     };
 
-    // Guardar observación de inventario
-    const saveObservacion = async () => {
-        if (!observacionesText.trim()) {
-            setMessage({ type: 'error', text: 'Las observaciones no pueden estar vacías' });
-            return;
-        }
-
-        try {
-            setSavingObservacion(true);
-            const response = await assetHistoryService.crearObservacion(selectedActivo.id, observacionesText.trim());
-            setMessage({ type: 'success', text: response.data.msg });
-            setShowInventarioModal(false);
-            setObservacionesText('');
-            fetchObservaciones(selectedActivo.id);
-            setShowObservaciones(true);
-        } catch (error) {
-            console.error('Error al guardar observación:', error);
-            setMessage({
-                type: 'error',
-                text: error.response?.data?.msg || 'Error al guardar la observación'
-            });
-        } finally {
-            setSavingObservacion(false);
-        }
-    };
-
     // Cambia el estado del activo (mantenimiento, bodega, funcional, pendiente_baja)
     const handleCambiarEstado = async (nuevoEstado) => {
         try {
@@ -262,8 +258,7 @@ const TecnicoInventarioEdicion = () => {
             const mensajes = {
                 en_mantenimiento: 'Activo puesto en mantenimiento',
                 funcional: 'Activo marcado como funcional',
-                bodega: 'Activo enviado a bodega',
-                pendiente_baja: 'Solicitud de baja enviada al administrador para aprobación'
+                bodega: 'Activo enviado a bodega'
             };
             setMessage({ type: 'success', text: mensajes[nuevoEstado] || 'Estado actualizado' });
         } catch (error) {
@@ -273,24 +268,60 @@ const TecnicoInventarioEdicion = () => {
         }
     };
 
-    // Finalizar mantenimiento: guarda observaciones y cambia estado a funcional
-    const handleFinalizarMantenimiento = async () => {
-        if (!observacionesText.trim()) {
-            setMessage({ type: 'error', text: 'Debe agregar observaciones antes de finalizar el mantenimiento' });
-            return;
-        }
+    const actualizarActivoLocal = (cambios) => {
+        setSelectedActivo((prev) => ({ ...prev, ...cambios }));
+        setActivos((prev) => prev.map((a) => (a.id === selectedActivo.id ? { ...a, ...cambios } : a)));
+    };
+
+    // Mantenimiento guardado: refresca estado y alerta desde el servidor
+    const handleMantenimientoGuardado = (respuesta) => {
+        setShowMantenimiento(false);
+        actualizarActivoLocal({ estado: respuesta.data.estado });
+        setMessage({ type: 'success', text: respuesta.msg });
+        fetchActivos(searchTerm);
+    };
+
+    const handleTrasladar = async () => {
+        if (!traslado?.puesto?.trim()) return;
         try {
-            setSavingObservacion(true);
-            await assetHistoryService.crearObservacion(selectedActivo.id, observacionesText.trim());
-            await handleCambiarEstado('funcional');
-            setShowInventarioModal(false);
-            setObservacionesText('');
-            fetchObservaciones(selectedActivo.id);
-            setShowObservaciones(true);
+            setUpdatingEstado(true);
+            const res = await assetHistoryService.trasladarPuesto(selectedActivo.id, traslado.puesto.trim(), traslado.site || '');
+            actualizarActivoLocal({ puesto: res.data.data.puesto, site: res.data.data.site });
+            setTraslado(null);
+            setMessage({ type: 'success', text: res.data.msg });
         } catch (error) {
-            setMessage({ type: 'error', text: error.response?.data?.msg || 'Error al finalizar mantenimiento' });
+            setMessage({ type: 'error', text: error.response?.data?.msg || 'Error al trasladar el equipo' });
         } finally {
-            setSavingObservacion(false);
+            setUpdatingEstado(false);
+        }
+    };
+
+    const handleSolicitarBaja = async () => {
+        if ((motivoBaja || '').trim().length < MIN_MOTIVO_BAJA) return;
+        try {
+            setUpdatingEstado(true);
+            const res = await assetHistoryService.solicitarBaja(selectedActivo.id, motivoBaja.trim());
+            actualizarActivoLocal({ estado: 'pendiente_baja' });
+            setMotivoBaja(null);
+            setMessage({ type: 'success', text: res.data.msg });
+        } catch (error) {
+            setMessage({ type: 'error', text: error.response?.data?.msg || 'Error al solicitar la baja' });
+        } finally {
+            setUpdatingEstado(false);
+        }
+    };
+
+    const handleCancelarBaja = async () => {
+        if (!window.confirm(`¿Cancelar la solicitud de baja de ${selectedActivo.numero_placa}?`)) return;
+        try {
+            setUpdatingEstado(true);
+            const res = await assetHistoryService.cancelarSolicitudBaja(selectedActivo.id);
+            actualizarActivoLocal({ estado: res.data.data.estado });
+            setMessage({ type: 'success', text: res.data.msg });
+        } catch (error) {
+            setMessage({ type: 'error', text: error.response?.data?.msg || 'Error al cancelar la solicitud' });
+        } finally {
+            setUpdatingEstado(false);
         }
     };
 
@@ -358,6 +389,29 @@ const TecnicoInventarioEdicion = () => {
                         Refrescar lista
                     </button>
 
+                    {/* Alertas de mantenimiento preventivo (computadores, portátiles y servidores) */}
+                    <div className="mb-3">
+                        <p className="text-xs font-medium text-gray-500 mb-1.5">Mantenimiento preventivo (naranja: 3+ meses · rojo: 6+ meses)</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setFiltroAlerta('')}
+                                className={`px-2.5 py-1 rounded-full text-xs font-medium border ${filtroAlerta === '' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                            >
+                                Todos ({activos.length})
+                            </button>
+                            {FILTROS_ALERTA.map((nivel) => (
+                                <button
+                                    key={nivel}
+                                    onClick={() => setFiltroAlerta(filtroAlerta === nivel ? '' : nivel)}
+                                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${ALERTAS[nivel].badge} ${filtroAlerta === nivel ? 'ring-2 ring-offset-1 ring-gray-500' : ''}`}
+                                >
+                                    <span className={`h-2 w-2 rounded-full mr-1.5 ${ALERTAS[nivel].punto}`} />
+                                    {ALERTAS[nivel].corto} ({conteoAlertas[nivel]})
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* Lista de activos */}
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                         {loading ? (
@@ -365,14 +419,14 @@ const TecnicoInventarioEdicion = () => {
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto"></div>
                                 <p className="mt-2 text-gray-500">Cargando activos...</p>
                             </div>
-                        ) : activos.length === 0 ? (
+                        ) : activosVisibles.length === 0 ? (
                             <div className="text-center py-8 text-gray-500">
                                 <Cpu className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                                 <p>No se encontraron activos</p>
                                 <p className="text-sm">Busca por número de placa</p>
                             </div>
                         ) : (
-                            activos.map((activo) => (
+                            activosVisibles.map((activo) => (
                                 <button
                                     key={activo.id}
                                     onClick={() => fetchComponentes(activo.id)}
@@ -388,8 +442,17 @@ const TecnicoInventarioEdicion = () => {
                                             <div className="font-medium text-gray-900">{activo.numero_placa}</div>
                                             <div className="text-sm text-gray-500">
                                                 {getAssetTypeName(activo.tipo_activo)} • {activo.ubicacion}
+                                                {activo.puesto ? ` • Puesto ${activo.puesto}` : ''}
                                             </div>
                                         </div>
+                                        {activo.alerta_mantenimiento && (
+                                            <span
+                                                title={textoAlerta(activo.alerta_mantenimiento)}
+                                                className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${ALERTAS[activo.alerta_mantenimiento.nivel].badge}`}
+                                            >
+                                                {ALERTAS[activo.alerta_mantenimiento.nivel].corto}
+                                            </span>
+                                        )}
                                     </div>
                                 </button>
                             ))
@@ -425,6 +488,7 @@ const TecnicoInventarioEdicion = () => {
                                     {selectedActivo.site && (
                                         <p><strong>Site:</strong> {selectedActivo.site}</p>
                                     )}
+                                    <p><strong>Puesto:</strong> {selectedActivo.puesto || 'Sin puesto'}</p>
                                     {selectedActivo.asignado && (
                                         <p><strong>Asignado a:</strong> {selectedActivo.asignado}</p>
                                     )}
@@ -442,6 +506,11 @@ const TecnicoInventarioEdicion = () => {
                                             {selectedActivo.estado === 'pendiente_baja' ? 'Baja pendiente (admin)' : selectedActivo.estado || 'funcional'}
                                         </span>
                                     </p>
+                                    {alertaSeleccionado && (
+                                        <p className={`mt-2 px-2 py-1.5 rounded border text-xs ${ALERTAS[alertaSeleccionado.nivel].badge}`}>
+                                            <strong>{ALERTAS[alertaSeleccionado.nivel].label}</strong> · {textoAlerta(alertaSeleccionado)}
+                                        </p>
+                                    )}
                                     {componentes.find(c => c.campo === 'clasificacion') && (
                                         <p>
                                             <strong>Clasificación:</strong>{' '}
@@ -457,19 +526,36 @@ const TecnicoInventarioEdicion = () => {
                                 </div>
                             </div>
 
+                            {/* Hoja de vida y traslado de puesto */}
+                            <div className="grid grid-cols-2 gap-2 mb-4">
+                                <button
+                                    onClick={() => setShowHojaVida(true)}
+                                    className="flex items-center justify-center px-3 py-2 border border-emerald-300 text-emerald-700 bg-white rounded-lg hover:bg-emerald-50 text-sm font-medium"
+                                >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Hoja de vida
+                                </button>
+                                <button
+                                    onClick={() => setTraslado({ puesto: selectedActivo.puesto || '', site: selectedActivo.site || '' })}
+                                    disabled={selectedActivo.estado === 'dado_de_baja'}
+                                    className="flex items-center justify-center px-3 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm font-medium"
+                                >
+                                    <MapPin className="h-4 w-4 mr-2" />
+                                    Cambiar de puesto
+                                </button>
+                            </div>
+
                             {/* Botones de mantenimiento */}
                             {selectedActivo.estado === 'en_mantenimiento' ? (
                                 <button
-                                    onClick={() => {
-                                        setObservacionesText('');
-                                        setShowInventarioModal(true);
-                                    }}
+                                    onClick={() => setShowMantenimiento(true)}
                                     className="w-full mb-4 flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                                 >
                                     <ClipboardList className="h-5 w-5 mr-2" />
                                     Finalizar Mantenimiento
                                 </button>
                             ) : (
+                                <>
                                 <button
                                     onClick={() => handleCambiarEstado('en_mantenimiento')}
                                     disabled={updatingEstado || selectedActivo.estado === 'dado_de_baja' || selectedActivo.estado === 'bodega' || selectedActivo.estado === 'pendiente_baja'}
@@ -482,6 +568,16 @@ const TecnicoInventarioEdicion = () => {
                                     )}
                                     Iniciar Mantenimiento
                                 </button>
+                                {!['dado_de_baja', 'pendiente_baja'].includes(selectedActivo.estado) && (
+                                    <button
+                                        onClick={() => setShowMantenimiento(true)}
+                                        className="w-full -mt-2 mb-4 flex items-center justify-center px-4 py-2 border border-emerald-300 text-emerald-700 bg-white rounded-lg hover:bg-emerald-50 text-sm font-medium"
+                                    >
+                                        <Wrench className="h-4 w-4 mr-2" />
+                                        Registrar mantenimiento ya realizado
+                                    </button>
+                                )}
+                                </>
                             )}
 
                             {/* Botón de Bodega */}
@@ -515,7 +611,7 @@ const TecnicoInventarioEdicion = () => {
                                         </span>
                                     </div>
                                     <button
-                                        onClick={() => handleCambiarEstado('funcional')}
+                                        onClick={handleCancelarBaja}
                                         disabled={updatingEstado}
                                         className="w-full flex items-center justify-center px-4 py-2 border border-amber-400 text-amber-700 bg-white rounded-lg hover:bg-amber-50 disabled:opacity-50 transition-colors text-sm font-medium"
                                     >
@@ -525,7 +621,7 @@ const TecnicoInventarioEdicion = () => {
                                 </div>
                             ) : selectedActivo.estado !== 'dado_de_baja' && selectedActivo.estado !== 'en_mantenimiento' && selectedActivo.estado !== 'bodega' && (
                                 <button
-                                    onClick={() => handleCambiarEstado('pendiente_baja')}
+                                    onClick={() => setMotivoBaja('')}
                                     disabled={updatingEstado}
                                     className="w-full mb-4 flex items-center justify-center px-4 py-2 border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors text-sm font-medium"
                                 >
@@ -650,58 +746,104 @@ const TecnicoInventarioEdicion = () => {
                 </div>
             </div>
 
-            {/* Modal de Inventario */}
-            {showInventarioModal && selectedActivo && (
+            {showMantenimiento && selectedActivo && (
+                <MantenimientoModal
+                    activo={selectedActivo}
+                    onClose={() => setShowMantenimiento(false)}
+                    onGuardado={handleMantenimientoGuardado}
+                />
+            )}
+
+            {showHojaVida && selectedActivo && (
+                <HojaVidaModal activoId={selectedActivo.id} onClose={() => setShowHojaVida(false)} />
+            )}
+
+            {/* Modal de traslado de puesto */}
+            {traslado && selectedActivo && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                Finalizar Mantenimiento - {selectedActivo.numero_placa}
-                            </h3>
-                            <button
-                                onClick={() => setShowInventarioModal(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
+                            <h3 className="text-lg font-semibold text-gray-900">Cambiar de puesto · {selectedActivo.numero_placa}</h3>
+                            <button onClick={() => setTraslado(null)} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
-
                         <p className="text-sm text-gray-600 mb-3">
-                            Describa el trabajo realizado. Al guardar, el activo regresará a estado <strong>funcional</strong>.
+                            Puesto actual: <strong>{selectedActivo.puesto || 'Sin puesto'}</strong>
+                            {selectedActivo.site ? ` (${selectedActivo.site})` : ''}
                         </p>
-
-                        <textarea
-                            value={observacionesText}
-                            onChange={(e) => setObservacionesText(e.target.value)}
-                            rows={6}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-vertical"
-                            placeholder="Escriba aquí todo lo que le hizo al equipo..."
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Nuevo puesto *</label>
+                        <input
+                            type="text"
+                            value={traslado.puesto}
+                            onChange={(e) => setTraslado((t) => ({ ...t, puesto: e.target.value }))}
+                            maxLength={50}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 mb-3"
+                            placeholder="Ej: 106"
                             autoFocus
                         />
-
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Site</label>
+                        <select
+                            value={traslado.site}
+                            onChange={(e) => setTraslado((t) => ({ ...t, site: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                            <option value="">Sin site</option>
+                            <option value="Site A">Site A</option>
+                            <option value="Site B">Site B</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-3">El traslado queda registrado en la hoja de vida con su nombre y la fecha.</p>
                         <div className="flex space-x-3 mt-4">
                             <button
-                                onClick={handleFinalizarMantenimiento}
-                                disabled={savingObservacion || !observacionesText.trim()}
-                                className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                onClick={handleTrasladar}
+                                disabled={updatingEstado || !traslado.puesto.trim()}
+                                className="flex-1 flex items-center justify-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
                             >
-                                {savingObservacion ? (
-                                    <>
-                                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                                        Guardando...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="h-4 w-4 mr-2" />
-                                        Guardar y Finalizar
-                                    </>
-                                )}
+                                {updatingEstado ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                Guardar traslado
                             </button>
+                            <button onClick={() => setTraslado(null)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de solicitud de baja con observación */}
+            {motivoBaja !== null && selectedActivo && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900">Solicitar baja · {selectedActivo.numero_placa}</h3>
+                            <button onClick={() => setMotivoBaja(null)} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">
+                            La solicitud va al <strong>administrador</strong>, que la aprueba o la rechaza. Explique por qué se debe dar de baja el equipo.
+                        </p>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Observación *</label>
+                        <textarea
+                            value={motivoBaja}
+                            onChange={(e) => setMotivoBaja(e.target.value)}
+                            rows={5}
+                            maxLength={2000}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+                            placeholder="Ej: board quemada, no enciende; no hay repuesto disponible..."
+                            autoFocus
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Mínimo {MIN_MOTIVO_BAJA} caracteres.</p>
+                        <div className="flex space-x-3 mt-4">
                             <button
-                                onClick={() => setShowInventarioModal(false)}
-                                disabled={savingObservacion}
-                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                                onClick={handleSolicitarBaja}
+                                disabled={updatingEstado || motivoBaja.trim().length < MIN_MOTIVO_BAJA}
+                                className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                             >
+                                {updatingEstado ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
+                                Enviar solicitud
+                            </button>
+                            <button onClick={() => setMotivoBaja(null)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                                 Cancelar
                             </button>
                         </div>
