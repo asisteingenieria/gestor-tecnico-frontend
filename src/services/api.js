@@ -143,9 +143,16 @@ export const assetHistoryService = {
     getNoProductivos: () => api.get('/activos-tecnico/no-productivos'),
     getEnBodega: () => api.get('/activos-tecnico/en-bodega'),
     getPendientesBaja: () => api.get('/activos-tecnico/pendientes-baja'),
-    darDeBaja: (id) => api.put(`/activos-tecnico/${id}/dar-de-baja`),
-    rechazarSolicitudBaja: (id) => api.put(`/activos-tecnico/${id}/estado-mantenimiento`, { nuevoEstado: 'funcional' }),
-    actualizarEstadoMantenimiento: (id, nuevoEstado) => api.put(`/activos-tecnico/${id}/estado-mantenimiento`, { nuevoEstado })
+    // Admin: aprobar (comentario obligatorio si no hay observación del técnico) o rechazar la baja.
+    darDeBaja: (id, comentario) => api.put(`/activos-tecnico/${id}/dar-de-baja`, { comentario }),
+    rechazarSolicitudBaja: (id, comentario) => api.put(`/activos-tecnico/${id}/rechazar-baja`, { comentario }),
+    // Técnico: la baja se solicita con observación y se puede cancelar mientras está pendiente.
+    solicitarBaja: (id, motivo) => api.post(`/activos-tecnico/${id}/solicitar-baja`, { motivo }),
+    cancelarSolicitudBaja: (id) => api.post(`/activos-tecnico/${id}/cancelar-baja`),
+    actualizarEstadoMantenimiento: (id, nuevoEstado) => api.put(`/activos-tecnico/${id}/estado-mantenimiento`, { nuevoEstado }),
+    registrarMantenimiento: (id, datos) => api.post(`/activos-tecnico/${id}/mantenimientos`, datos),
+    getHojaVida: (id) => api.get(`/activos-tecnico/${id}/hoja-vida`),
+    trasladarPuesto: (id, puesto, site) => api.put(`/activos-tecnico/${id}/puesto`, { puesto, site })
 };
 
 // === SERVICIOS DE EMPLEADOS (users_company) ===

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { assetHistoryService } from '../services/api';
+import HojaVidaModal from './HojaVidaModal';
 import {
     Activity,
     Package,
@@ -24,8 +25,11 @@ import {
     AlertTriangle,
     Archive,
     CheckCircle,
-    Clock
+    Clock,
+    FileText
 } from 'lucide-react';
+
+const MIN_OBSERVACION_BAJA = 10;
 
 const FIELD_COLORS = {
     cpu_procesador: 'bg-blue-100 text-blue-800',
@@ -33,7 +37,9 @@ const FIELD_COLORS = {
     almacenamiento: 'bg-orange-100 text-orange-800',
     sistema_operativo: 'bg-green-100 text-green-800',
     clasificacion: 'bg-teal-100 text-teal-800',
-    estado: 'bg-red-100 text-red-800'
+    estado: 'bg-red-100 text-red-800',
+    puesto: 'bg-indigo-100 text-indigo-800',
+    site: 'bg-indigo-100 text-indigo-800'
 };
 
 const FIELD_OPTIONS = [
@@ -41,7 +47,10 @@ const FIELD_OPTIONS = [
     { value: 'memoria_ram', label: 'Memoria RAM' },
     { value: 'almacenamiento', label: 'Almacenamiento' },
     { value: 'sistema_operativo', label: 'Sistema Operativo' },
-    { value: 'clasificacion', label: 'Clasificación' }
+    { value: 'clasificacion', label: 'Clasificación' },
+    { value: 'estado', label: 'Estado' },
+    { value: 'puesto', label: 'Puesto (traslados)' },
+    { value: 'site', label: 'Site' }
 ];
 
 const formatDate = (dateString) => {
@@ -89,6 +98,11 @@ const AssetComponentHistory = () => {
     const [loadingPendientesBaja, setLoadingPendientesBaja] = useState(false);
     const [showPendientesBaja, setShowPendientesBaja] = useState(true);
     const [processingBajaId, setProcessingBajaId] = useState(null);
+    const [bajaObservacion, setBajaObservacion] = useState('');
+    // { activo, accion: 'aprobar' | 'rechazar' } mientras el admin resuelve una solicitud
+    const [resolucion, setResolucion] = useState(null);
+    const [comentarioResolucion, setComentarioResolucion] = useState('');
+    const [hojaVidaId, setHojaVidaId] = useState(null);
     const [bodegaFilters, setBodegaFilters] = useState({
         numeroPlaca: '',
         tipoActivo: '',
@@ -190,9 +204,10 @@ const AssetComponentHistory = () => {
         if (!bajaAsset) return;
         try {
             setProcessingBaja(true);
-            await assetHistoryService.darDeBaja(bajaAsset.id);
+            await assetHistoryService.darDeBaja(bajaAsset.id, bajaObservacion.trim());
             setBajaModalOpen(false);
             setBajaAsset(null);
+            setBajaObservacion('');
             await fetchNoProductivos();
         } catch (err) {
             console.error('Error al dar de baja:', err);
@@ -202,30 +217,31 @@ const AssetComponentHistory = () => {
         }
     };
 
-    const handleAprobarSolicitudBaja = async (activo) => {
-        if (!window.confirm(`¿Confirma dar de baja definitivamente el activo ${activo.numeroPlaca}? Esta acción es irreversible.`)) return;
-        try {
-            setProcessingBajaId(activo.id);
-            await assetHistoryService.darDeBaja(activo.id);
-            await fetchPendientesBaja();
-            await fetchNoProductivos();
-        } catch (err) {
-            console.error('Error al aprobar baja:', err);
-            alert(err.response?.data?.msg || 'Error al aprobar la baja');
-        } finally {
-            setProcessingBajaId(null);
-        }
+    const abrirResolucion = (activo, accion) => {
+        setComentarioResolucion('');
+        setResolucion({ activo, accion });
     };
 
-    const handleRechazarSolicitudBaja = async (activo) => {
-        if (!window.confirm(`¿Rechazar la solicitud de baja de ${activo.numeroPlaca}? El activo volverá a estado funcional.`)) return;
+    // Aprobar exige comentario cuando la solicitud no trae observación del técnico (solicitudes viejas).
+    const comentarioObligatorio = resolucion?.accion === 'aprobar' && !resolucion.activo.motivo;
+
+    const handleResolverSolicitudBaja = async () => {
+        if (!resolucion) return;
+        const { activo, accion } = resolucion;
+        if (comentarioObligatorio && comentarioResolucion.trim().length < MIN_OBSERVACION_BAJA) return;
         try {
             setProcessingBajaId(activo.id);
-            await assetHistoryService.rechazarSolicitudBaja(activo.id);
+            if (accion === 'aprobar') {
+                await assetHistoryService.darDeBaja(activo.id, comentarioResolucion.trim());
+            } else {
+                await assetHistoryService.rechazarSolicitudBaja(activo.id, comentarioResolucion.trim());
+            }
+            setResolucion(null);
             await fetchPendientesBaja();
+            if (accion === 'aprobar') await fetchNoProductivos();
         } catch (err) {
-            console.error('Error al rechazar solicitud:', err);
-            alert(err.response?.data?.msg || 'Error al rechazar la solicitud');
+            console.error('Error al resolver solicitud de baja:', err);
+            alert(err.response?.data?.msg || 'Error al procesar la solicitud de baja');
         } finally {
             setProcessingBajaId(null);
         }
@@ -494,6 +510,7 @@ const AssetComponentHistory = () => {
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca / Modelo</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clasificación</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observación del técnico</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Solicitado por</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha solicitud</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -523,6 +540,13 @@ const AssetComponentHistory = () => {
                                                         {activo.clasificacion || '—'}
                                                     </span>
                                                 </td>
+                                                <td className="px-4 py-3 text-sm text-gray-700 min-w-[220px] max-w-[320px]">
+                                                    {activo.motivo ? (
+                                                        <span className="whitespace-pre-wrap">{activo.motivo}</span>
+                                                    ) : (
+                                                        <span className="text-gray-400 italic">Sin observación (solicitud anterior al cambio)</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                                                     {activo.solicitadoPor || '—'}
                                                 </td>
@@ -539,7 +563,14 @@ const AssetComponentHistory = () => {
                                                             Historial
                                                         </button>
                                                         <button
-                                                            onClick={() => handleAprobarSolicitudBaja(activo)}
+                                                            onClick={() => setHojaVidaId(activo.id)}
+                                                            className="inline-flex items-center px-2.5 py-1.5 border border-emerald-300 rounded-lg text-xs font-medium text-emerald-700 bg-white hover:bg-emerald-50 transition-colors"
+                                                        >
+                                                            <FileText className="h-3.5 w-3.5 mr-1" />
+                                                            Hoja de vida
+                                                        </button>
+                                                        <button
+                                                            onClick={() => abrirResolucion(activo, 'aprobar')}
                                                             disabled={processingBajaId === activo.id}
                                                             className="inline-flex items-center px-2.5 py-1.5 border border-red-300 rounded-lg text-xs font-medium text-red-700 bg-white hover:bg-red-50 disabled:opacity-50 transition-colors"
                                                         >
@@ -551,7 +582,7 @@ const AssetComponentHistory = () => {
                                                             Aprobar Baja
                                                         </button>
                                                         <button
-                                                            onClick={() => handleRechazarSolicitudBaja(activo)}
+                                                            onClick={() => abrirResolucion(activo, 'rechazar')}
                                                             disabled={processingBajaId === activo.id}
                                                             className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
                                                         >
@@ -661,7 +692,7 @@ const AssetComponentHistory = () => {
                                                         </button>
                                                         {activo.estado !== 'dado_de_baja' && (
                                                             <button
-                                                                onClick={() => { setBajaAsset(activo); setBajaModalOpen(true); }}
+                                                                onClick={() => { setBajaAsset(activo); setBajaObservacion(""); setBajaModalOpen(true); }}
                                                                 className="inline-flex items-center px-3 py-1.5 border border-red-300 rounded-lg text-xs font-medium text-red-700 bg-white hover:bg-red-50 transition-colors"
                                                             >
                                                                 <XCircle className="h-3.5 w-3.5 mr-1" />
@@ -1074,6 +1105,16 @@ const AssetComponentHistory = () => {
                                 {bajaAsset.marcaModelo && <p className="text-sm"><span className="font-medium text-gray-700">Marca/Modelo:</span> <span className="text-gray-900">{bajaAsset.marcaModelo}</span></p>}
                                 {bajaAsset.ubicacion && <p className="text-sm"><span className="font-medium text-gray-700">Ubicacion:</span> <span className="text-gray-900">{bajaAsset.ubicacion}</span></p>}
                             </div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Observación de la baja *</label>
+                            <textarea
+                                value={bajaObservacion}
+                                onChange={(e) => setBajaObservacion(e.target.value)}
+                                rows={3}
+                                maxLength={2000}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400 text-sm"
+                                placeholder="Por qué se da de baja este equipo..."
+                            />
+                            <p className="text-xs text-gray-500 mt-1 mb-3">Mínimo {MIN_OBSERVACION_BAJA} caracteres. Queda en la hoja de vida del equipo.</p>
                             <p className="text-sm text-gray-600">
                                 ¿Esta seguro de dar de baja este equipo? Esta accion es irreversible.
                             </p>
@@ -1088,7 +1129,7 @@ const AssetComponentHistory = () => {
                             </button>
                             <button
                                 onClick={handleDarDeBaja}
-                                disabled={processingBaja}
+                                disabled={processingBaja || bajaObservacion.trim().length < MIN_OBSERVACION_BAJA}
                                 className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
                             >
                                 {processingBaja ? (
@@ -1107,6 +1148,68 @@ const AssetComponentHistory = () => {
                     </div>
                 </div>
             )}
+
+            {/* Modal para aprobar o rechazar una solicitud de baja */}
+            {resolucion && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-black/50" onClick={() => { if (!processingBajaId) setResolucion(null); }} />
+                    <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md">
+                        <div className="px-6 py-5">
+                            <h2 className="text-lg font-bold text-gray-900 mb-3">
+                                {resolucion.accion === 'aprobar' ? 'Aprobar baja' : 'Rechazar solicitud de baja'} · {resolucion.activo.numeroPlaca}
+                            </h2>
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                                <p className="text-xs font-medium text-amber-800 mb-1">
+                                    Observación de {resolucion.activo.solicitadoPor || 'el técnico'}
+                                </p>
+                                <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                                    {resolucion.activo.motivo || 'Esta solicitud se hizo antes de que la observación fuera obligatoria.'}
+                                </p>
+                            </div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {comentarioObligatorio ? 'Observación de la baja *' : 'Comentario (opcional)'}
+                            </label>
+                            <textarea
+                                value={comentarioResolucion}
+                                onChange={(e) => setComentarioResolucion(e.target.value)}
+                                rows={3}
+                                maxLength={2000}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 text-sm"
+                                placeholder={resolucion.accion === 'aprobar' ? 'Por qué se aprueba la baja...' : 'Por qué se rechaza (el técnico lo verá en la hoja de vida)...'}
+                            />
+                            {comentarioObligatorio && (
+                                <p className="text-xs text-gray-500 mt-1">Mínimo {MIN_OBSERVACION_BAJA} caracteres: todo equipo dado de baja queda con su observación.</p>
+                            )}
+                            <p className="text-sm text-gray-600 mt-3">
+                                {resolucion.accion === 'aprobar'
+                                    ? 'El equipo quedará dado de baja. Esta acción es irreversible.'
+                                    : 'El equipo volverá al estado que tenía antes de la solicitud.'}
+                            </p>
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                            <button
+                                onClick={() => setResolucion(null)}
+                                disabled={Boolean(processingBajaId)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleResolverSolicitudBaja}
+                                disabled={Boolean(processingBajaId) || (comentarioObligatorio && comentarioResolucion.trim().length < MIN_OBSERVACION_BAJA)}
+                                className={`inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 ${
+                                    resolucion.accion === 'aprobar' ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-800'
+                                }`}
+                            >
+                                {processingBajaId ? <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> : resolucion.accion === 'aprobar' ? <XCircle className="h-4 w-4 mr-1" /> : <X className="h-4 w-4 mr-1" />}
+                                {resolucion.accion === 'aprobar' ? 'Dar de baja' : 'Rechazar solicitud'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {hojaVidaId && <HojaVidaModal activoId={hojaVidaId} onClose={() => setHojaVidaId(null)} />}
 
             {/* Modal de historial por activo */}
             {modalOpen && (
