@@ -1,120 +1,152 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { vacacionesService } from '../services/api';
-import VacacionesForm from './VacacionesForm';
+import { pasivoVacacionalService } from '../services/api';
 import Pagination from './Pagination';
-import { nombrePropio, iniciales } from '../utils/formatoRRHH';
-import { CalendarClock, Plus, Search, Edit3, Trash2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import FiltroChip from './FiltroChip';
+import AjusteSaldoPasivo from './AjusteSaldoPasivo';
+import { nombrePropio, iniciales, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
+import {
+    CalendarClock, Search, AlertCircle, Download, Loader2, Users, Wallet, CalendarDays, Info, SlidersHorizontal
+} from 'lucide-react';
 
-const PAGE_SIZE = 10;
+// Pasivo vacacional calculado (claude/modulo recursoshumanos.md §58). Mismas fórmulas del Excel de Gestión Humana:
+// días trabajados = DAYS360(ingreso, fecha) + 1; acumulados = trabajados × 15 / 360; pasivo = acumulados −
+// disfrutados − compensados; total = pasivo − programadas; valor = días × salario / 30. Los disfrutados parten del
+// Excel cargado al corte y desde ahí suman las novedades de Vacaciones; los compensados también, según la modalidad
+// de la novedad (disfrutadas / compensadas / las dos, §59).
 
-const DetailField = ({ label, value }) => (
-    <div>
-        <p className="ai-overline" style={{ marginBottom: 4 }}>{label}</p>
-        <p style={{ fontSize: 13, color: 'var(--ink)' }}>{value ?? '—'}</p>
-    </div>
-);
+const PAGE_SIZE = 20;
+// "Con observación" = no venía en el Excel de corte: sus disfrutados salen solo de las novedades y RRHH lo está revisando.
+const SALDO = { con: 'Sin observación', sin: 'Con observación', ajustado: 'Ajustado por financiera' };
+// Rangos del filtro "Pasivo" (días de pasivo a la fecha): 15 días = un año de vacaciones acumulado.
+const RANGOS_PASIVO = [
+    { etiqueta: 'Más de 30 días', cumple: (d) => d > 30 },
+    { etiqueta: '15 a 30 días', cumple: (d) => d >= 15 && d <= 30 },
+    { etiqueta: 'Menos de 15 días', cumple: (d) => d >= 0 && d < 15 },
+    { etiqueta: 'Negativo', cumple: (d) => d < 0 }
+];
+const ORDENES = {
+    ingreso_desc: { etiqueta: 'Ingreso más reciente', comparar: (a, b) => String(b.fecha_ingreso || '').localeCompare(String(a.fecha_ingreso || '')) },
+    ingreso_asc: { etiqueta: 'Ingreso más antiguo', comparar: (a, b) => String(a.fecha_ingreso || '').localeCompare(String(b.fecha_ingreso || '')) },
+    pasivo_desc: { etiqueta: 'Mayor pasivo', comparar: (a, b) => (Number(b.pasivo_dias) || 0) - (Number(a.pasivo_dias) || 0) },
+    pasivo_asc: { etiqueta: 'Menor pasivo', comparar: (a, b) => (Number(a.pasivo_dias) || 0) - (Number(b.pasivo_dias) || 0) }
+};
+const AYUDA_OBSERVACION = 'Con observación: no venía en el Excel de corte de Gestión Humana. Su pasivo es el acumulado menos las novedades de Vacaciones registradas; financiera puede ajustar su saldo.';
+
+const hoyBogota = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+// Último día del mes anterior y del mes actual, para los atajos de cierre.
+const finDeMes = (desplazamiento) => {
+    const [a, m] = hoyBogota().split('-').map(Number);
+    return new Date(Date.UTC(a, m - 1 + desplazamiento + 1, 0)).toISOString().slice(0, 10);
+};
+
+const fmtDias = (n) => (n == null ? '—' : Number(n).toLocaleString('es-CO', { maximumFractionDigits: 2 }));
+const fmtMoneda = (n) => (n == null ? '—' : new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n));
+const fmtFecha = (iso) => {
+    if (!iso) return '—';
+    const [a, m, d] = iso.split('-');
+    return `${d}/${m}/${a}`;
+};
+
+async function mensajeDeError(err, porDefecto) {
+    const data = err?.response?.data;
+    if (data instanceof Blob) {
+        try { return JSON.parse(await data.text()).message; } catch { /* no era JSON */ }
+    }
+    return data?.message || porDefecto;
+}
 
 const PasivoVacacional = () => {
     const { isRecursosHumanos } = useAuth();
-    const [registros, setRegistros] = useState([]);
+    const [fecha, setFecha] = useState(hoyBogota());
+    // `conValores`: el servidor solo manda salario y valores en pesos a financiera; RRHH ve el pasivo en días.
+    const [datos, setDatos] = useState({ filas: [], totales: null, conValores: false });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [aviso, setAviso] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [showEditForm, setShowEditForm] = useState(false);
-    const [selectedRegistro, setSelectedRegistro] = useState(null);
-    const [expandedIds, setExpandedIds] = useState(new Set());
-    const [periodosPorRegistro, setPeriodosPorRegistro] = useState({});
-    const [loadingPeriodos, setLoadingPeriodos] = useState(new Set());
+    const [filtroCampanias, setFiltroCampanias] = useState(new Set());
+    const [filtroAreas, setFiltroAreas] = useState(new Set());
+    const [filtroSaldo, setFiltroSaldo] = useState(new Set());
+    const [filtroPasivo, setFiltroPasivo] = useState(new Set());
+    const [orden, setOrden] = useState('ingreso_desc');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(PAGE_SIZE);
+    const [descargando, setDescargando] = useState(false);
+    const [ajustando, setAjustando] = useState(null);
 
-    useEffect(() => {
-        fetchRegistros();
-    }, []);
-
-    useEffect(() => {
-        setPage(1);
-    }, [searchTerm]);
-
-    const fetchRegistros = async () => {
+    const cargar = async (dia = fecha) => {
         try {
             setLoading(true);
-            const response = await vacacionesService.getAll();
-            setRegistros(response.data.vacaciones);
+            const response = await pasivoVacacionalService.get({ fecha: dia });
+            setDatos({ filas: response.data.filas, totales: response.data.totales, conValores: Boolean(response.data.con_valores) });
             setError('');
         } catch (err) {
-            console.error('Error al cargar pasivo vacacional:', err);
-            setError('Error al cargar el pasivo vacacional');
+            console.error('Error al cargar el pasivo vacacional:', err);
+            setError(err?.response?.data?.message || 'Error al cargar el pasivo vacacional');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleCreate = () => {
-        setSelectedRegistro(null);
-        setShowCreateForm(true);
+    useEffect(() => {
+        if (fecha) cargar(fecha);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fecha]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [searchTerm, filtroCampanias, filtroAreas, filtroSaldo, filtroPasivo, orden, fecha]);
+
+    const opcionesCampania = useMemo(() => [...new Set(datos.filas.map(f => f.campania || 'Sin campaña'))].sort((a, b) => a.localeCompare(b, 'es')), [datos.filas]);
+    const opcionesArea = useMemo(() => [...new Set(datos.filas.map(f => f.area || 'Sin área'))].sort((a, b) => a.localeCompare(b, 'es')), [datos.filas]);
+
+    const busqueda = searchTerm.trim().toLowerCase();
+    const filtradas = datos.filas.filter(f => {
+        if (busqueda && !((f.nombre || '').toLowerCase().includes(busqueda) || String(f.numero_identificacion || '').includes(busqueda) || (f.cargo || '').toLowerCase().includes(busqueda))) return false;
+        if (filtroCampanias.size && !filtroCampanias.has(f.campania || 'Sin campaña')) return false;
+        if (filtroAreas.size && !filtroAreas.has(f.area || 'Sin área')) return false;
+        if (filtroSaldo.size && !(filtroSaldo.has(f.con_corte ? SALDO.con : SALDO.sin)
+            || (filtroSaldo.has(SALDO.ajustado) && f.origen_saldo === 'financiera'))) return false;
+        if (filtroPasivo.size && !RANGOS_PASIVO.some(r => filtroPasivo.has(r.etiqueta) && r.cumple(Number(f.pasivo_dias) || 0))) return false;
+        return true;
+    }).sort(ORDENES[orden].comparar);
+    const hayFiltros = Boolean(busqueda) || filtroCampanias.size > 0 || filtroAreas.size > 0 || filtroSaldo.size > 0 || filtroPasivo.size > 0;
+
+    const suma = (campo) => filtradas.reduce((s, f) => s + (Number(f[campo]) || 0), 0);
+    const kpi = {
+        empleados: filtradas.length,
+        pasivoDias: suma('pasivo_dias'),
+        valorPasivo: suma('valor_pasivo'),
+        programadas: suma('dias_programados'),
+        totalDias: suma('total_dias'),
+        valorTotal: suma('valor_total'),
+        sinCorte: filtradas.filter(f => !f.con_corte).length
     };
 
-    const handleEdit = (registro) => {
-        setSelectedRegistro(registro);
-        setShowEditForm(true);
-    };
+    const { conValores } = datos;
+    const totalPages = Math.max(1, Math.ceil(filtradas.length / pageSize));
+    const paginadas = filtradas.slice((page - 1) * pageSize, page * pageSize);
 
-    const handleFormSuccess = async () => {
-        await fetchRegistros();
-        setShowCreateForm(false);
-        setShowEditForm(false);
-    };
-
-    const handleDelete = async (id) => {
-        if (!window.confirm('¿Está seguro de que desea eliminar este registro de vacaciones?')) return;
+    const descargar = async () => {
+        setDescargando(true);
+        setAviso('');
         try {
-            await vacacionesService.delete(id);
-            await fetchRegistros();
+            const response = await pasivoVacacionalService.exportar({ fecha });
+            const disposicion = response.headers?.['content-disposition'] || '';
+            const nombre = disposicion.match(/filename="?([^"]+)"?/)?.[1] || `pasivo_vacacional_${fecha}.xlsx`;
+            const url = URL.createObjectURL(response.data);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            a.click();
+            URL.revokeObjectURL(url);
+            setAviso(`Se descargó el pasivo de ${response.headers?.['x-total-empleados'] ?? ''} empleados al ${fmtFecha(fecha)}.`);
         } catch (err) {
-            console.error('Error al eliminar registro de vacaciones:', err);
-            setError('Error al eliminar el registro de vacaciones');
-        }
-    };
-
-    const filtered = registros.filter(r =>
-        (r.empleado_nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (r.empleado_identificacion || '').includes(searchTerm) ||
-        (r.campania_nombre || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const fmtFecha = (v) => v ? new Date(v).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
-    const fmtMoneda = (v) => v == null ? '—' : new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
-
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-    const toggleExpand = async (registro) => {
-        const id = registro.idvacaciones;
-        const isExpanded = expandedIds.has(id);
-
-        setExpandedIds(prev => {
-            const next = new Set(prev);
-            if (isExpanded) next.delete(id); else next.add(id);
-            return next;
-        });
-
-        if (!isExpanded && !periodosPorRegistro[id]) {
-            setLoadingPeriodos(prev => new Set(prev).add(id));
-            try {
-                const response = await vacacionesService.getById(id);
-                setPeriodosPorRegistro(prev => ({ ...prev, [id]: response.data.vacaciones.periodos || [] }));
-            } catch (err) {
-                console.error('Error al cargar periodos:', err);
-            } finally {
-                setLoadingPeriodos(prev => {
-                    const next = new Set(prev);
-                    next.delete(id);
-                    return next;
-                });
-            }
+            console.error('Error al descargar el pasivo:', err);
+            setError(await mensajeDeError(err, 'No se pudo descargar el pasivo vacacional'));
+        } finally {
+            setDescargando(false);
         }
     };
 
@@ -138,12 +170,26 @@ const PasivoVacacional = () => {
                 <div className="ai-page-head">
                     <div>
                         <h1 className="ai-page-title">Pasivo vacacional</h1>
-                        <p className="ai-page-sub">Días acumulados, tomados y compensados por empleado</p>
+                        <p className="ai-page-sub">
+                            {conValores ? 'Días y valor' : 'Días'} de vacaciones pendientes por empleado, con la fórmula del Excel de Gestión Humana
+                        </p>
                     </div>
-                    <button onClick={handleCreate} className="ai-btn ai-btn--primary">
-                        <Plus size={16} />
-                        Nuevo corte
-                    </button>
+                    <div className="ai-row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <div>
+                            <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Calcular al</label>
+                            <input type="date" className="ai-input" value={fecha} onChange={(e) => e.target.value && setFecha(e.target.value)} />
+                        </div>
+                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => setFecha(finDeMes(-1))}>Cierre mes anterior</button>
+                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => setFecha(finDeMes(0))}>Cierre de este mes</button>
+                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => setFecha(hoyBogota())}>Hoy</button>
+                        {/* La descarga es solo de financiera (§58.2); RRHH consulta en pantalla. */}
+                        {conValores && (
+                            <button onClick={descargar} className="ai-btn ai-btn--secondary" disabled={descargando || loading}>
+                                {descargando ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                                {descargando ? 'Descargando…' : 'Descargar Excel'}
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {error && (
@@ -152,160 +198,189 @@ const PasivoVacacional = () => {
                         {error}
                     </div>
                 )}
+                {aviso && (
+                    <div className="ai-badge ai-badge--success" style={{ height: 'auto', padding: '10px 14px', width: 'fit-content' }}>
+                        <span className="ai-dot" />
+                        {aviso}
+                    </div>
+                )}
+
+                <div className="ai-kpi-strip" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                    <div>
+                        <span className="ai-kpi-icon"><Users size={18} strokeWidth={1.75} /></span>
+                        <div>
+                            <p className="ai-kpi-label">Empleados</p>
+                            <p className="ai-kpi-value ai-num">{kpi.empleados}</p>
+                            {kpi.sinCorte > 0 && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }} title={AYUDA_OBSERVACION}><span className="ai-num">{kpi.sinCorte}</span> con observación</p>}
+                        </div>
+                    </div>
+                    <div>
+                        <span className="ai-kpi-icon"><CalendarClock size={18} strokeWidth={1.75} /></span>
+                        <div>
+                            <p className="ai-kpi-label">Pasivo (días)</p>
+                            <p className="ai-kpi-value ai-num">{fmtDias(kpi.pasivoDias)}</p>
+                            {conValores && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>{fmtMoneda(kpi.valorPasivo)}</p>}
+                        </div>
+                    </div>
+                    <div>
+                        <span className="ai-kpi-icon"><CalendarDays size={18} strokeWidth={1.75} /></span>
+                        <div>
+                            <p className="ai-kpi-label">Vacaciones programadas</p>
+                            <p className="ai-kpi-value ai-num">{fmtDias(kpi.programadas)}</p>
+                            <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>días después del {fmtFecha(fecha)}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <span className="ai-kpi-icon"><Wallet size={18} strokeWidth={1.75} /></span>
+                        <div>
+                            <p className="ai-kpi-label">Total (pasivo − programadas)</p>
+                            {conValores ? (
+                                <>
+                                    <p className="ai-kpi-value ai-num">{fmtMoneda(kpi.valorTotal)}</p>
+                                    <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}><span className="ai-num">{fmtDias(kpi.totalDias)}</span> días</p>
+                                </>
+                            ) : (
+                                <p className="ai-kpi-value ai-num">{fmtDias(kpi.totalDias)} <span className="ai-muted" style={{ fontSize: 13, fontWeight: 400 }}>días</span></p>
+                            )}
+                        </div>
+                    </div>
+                </div>
 
                 <div className="ai-card">
                     <div className="ai-toolbar">
-                        <div className="ai-search">
+                        <div className="ai-search" style={{ flex: 1 }}>
                             <Search size={16} />
                             <input
                                 type="text"
-                                placeholder="Buscar por empleado, identificación o campaña..."
+                                placeholder="Buscar por empleado, identificación o cargo..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 style={{ border: 0, outline: 'none', background: 'transparent', flex: 1, font: 'inherit', color: 'inherit' }}
                             />
                         </div>
+                        <FiltroChip etiqueta="Campaña" opciones={opcionesCampania} seleccion={filtroCampanias} onChange={setFiltroCampanias} />
+                        <FiltroChip etiqueta="Área" opciones={opcionesArea} seleccion={filtroAreas} onChange={setFiltroAreas} />
+                        <FiltroChip etiqueta="Observación" opciones={[SALDO.sin, SALDO.con, SALDO.ajustado]} seleccion={filtroSaldo} onChange={setFiltroSaldo} />
+                        <FiltroChip etiqueta="Pasivo" opciones={RANGOS_PASIVO.map(r => r.etiqueta)} seleccion={filtroPasivo} onChange={setFiltroPasivo} />
+                        <select value={orden} onChange={(e) => setOrden(e.target.value)} className="ai-input" style={{ width: 'auto' }} title="Orden de la tabla">
+                            {Object.entries(ORDENES).map(([k, o]) => <option key={k} value={k}>Ordenar: {o.etiqueta}</option>)}
+                        </select>
+                    </div>
+                    <div className="ai-row" style={{ gap: 8, padding: '0 16px 12px', alignItems: 'center' }}>
+                        <Info size={14} style={{ color: 'var(--ink-subtle)', flexShrink: 0 }} />
+                        <span className="ai-muted" style={{ fontSize: 12 }}>
+                            Disfrutados y compensados = los del Excel al corte + novedades de Vacaciones desde el corte, según su
+                            modalidad. Programadas = novedades de Vacaciones que empiezan después de la fecha.{conValores && ' Valor = días × salario / 30.'}
+                            {hayFiltros && <> · <strong className="ai-num">{filtradas.length}</strong> de {datos.filas.length} empleados</>}
+                        </span>
                     </div>
 
                     {loading ? (
                         <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
                             <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: 'var(--primary)' }} />
                         </div>
-                    ) : filtered.length === 0 ? (
+                    ) : filtradas.length === 0 ? (
                         <div style={{ padding: 48, textAlign: 'center' }}>
                             <CalendarClock size={36} style={{ margin: '0 auto 10px', color: 'var(--ink-subtle)' }} />
-                            <p style={{ fontWeight: 600, margin: 0 }}>No hay registros</p>
-                            <p className="ai-muted" style={{ marginTop: 4 }}>Registra un corte de vacaciones para empezar.</p>
+                            <p style={{ fontWeight: 600, margin: 0 }}>Sin empleados</p>
+                            <p className="ai-muted" style={{ marginTop: 4 }}>{hayFiltros ? 'Ningún empleado coincide con los filtros.' : 'No hay empleados vigentes a esa fecha.'}</p>
                         </div>
                     ) : (
-                        <table className="ai-table ai-table--dense">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: 36 }}></th>
-                                    <th>Empleado</th>
-                                    <th>Fecha de corte</th>
-                                    <th>Días trabajados</th>
-                                    <th>Acumulados</th>
-                                    <th>Tomados</th>
-                                    <th>Compensados</th>
-                                    <th>Pasivo</th>
-                                    <th>Periodos</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginated.map((r) => {
-                                    const isExpanded = expandedIds.has(r.idvacaciones);
-                                    return (
-                                        <React.Fragment key={r.idvacaciones}>
-                                            <tr>
-                                                <td>
-                                                    <button
-                                                        onClick={() => toggleExpand(r)}
-                                                        className="ai-icon-btn"
-                                                        aria-label={isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
-                                                    >
-                                                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                                    </button>
-                                                </td>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table className="ai-table ai-table--dense">
+                                <thead>
+                                    <tr>
+                                        <th>Empleado</th>
+                                        <th>Campaña</th>
+                                        <th>Ingreso</th>
+                                        <th className="ai-num" title="DAYS360(ingreso, fecha) + 1">Trabajados</th>
+                                        <th className="ai-num" title="Trabajados × 15 / 360">Acumulados</th>
+                                        <th className="ai-num">Disfrutados</th>
+                                        <th className="ai-num">Compensados</th>
+                                        <th className="ai-num">Pasivo</th>
+                                        <th className="ai-num">Programadas</th>
+                                        <th className="ai-num">Total</th>
+                                        {conValores && <th className="ai-num">Valor pasivo</th>}
+                                        {conValores && <th aria-label="Ajustar" />}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paginadas.map((f) => {
+                                        const chip = claseCampania(f.campania);
+                                        return (
+                                            <tr key={f.users_company_id}>
                                                 <td>
                                                     <div className="ai-person">
-                                                        <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(r.empleado_nombre)}</span>
+                                                        <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(f.nombre)}</span>
                                                         <div>
-                                                            <div className="ai-person-name">{nombrePropio(r.empleado_nombre)}</div>
-                                                            <div className="ai-person-sub">{r.empleado_identificacion}</div>
+                                                            <div className="ai-person-name">{nombrePropio(f.nombre)}</div>
+                                                            <div className="ai-person-sub">
+                                                                {f.numero_identificacion}
+                                                                {!f.con_corte && (
+                                                                    <span className="ai-badge ai-badge--warning" style={{ marginLeft: 6 }} title={AYUDA_OBSERVACION}>
+                                                                        con observación
+                                                                    </span>
+                                                                )}
+                                                                {f.origen_saldo === 'financiera' && (
+                                                                    <span className="ai-badge ai-badge--info" style={{ marginLeft: 6 }} title={`Saldo ajustado por financiera al ${fmtFecha(f.fecha_corte)}${f.nota_saldo ? `: ${f.nota_saldo}` : ''}`}>
+                                                                        ajustado
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="ai-muted">{fmtFecha(r.fecha_corte)}</td>
-                                                <td className="ai-num">{r.dias_trabajados}</td>
-                                                <td className="ai-num">{r.dias_acumulados}</td>
-                                                <td className="ai-num">{r.dias_tomados}</td>
-                                                <td className="ai-num">{r.dias_compensados}</td>
-                                                <td className="ai-num" style={{ fontWeight: 600 }}>{fmtMoneda(r.pasivo_vacacional)}</td>
                                                 <td>
-                                                    <span className="ai-badge ai-badge--info">
-                                                        <span className="ai-dot" />
-                                                        {r.total_periodos}
-                                                    </span>
+                                                    {f.campania ? <span className={`ai-chip${chip ? ` ${chip}` : ''}`}>{primeraMayuscula(f.campania)}</span> : <span className="ai-muted">—</span>}
                                                 </td>
-                                                <td className="ai-td-actions">
-                                                    <div className="ai-row-actions">
-                                                        <button onClick={() => handleEdit(r)} className="ai-icon-btn" aria-label="Editar">
-                                                            <Edit3 size={16} />
+                                                <td className="ai-muted">{fmtFecha(f.fecha_ingreso)}</td>
+                                                <td className="ai-num">{f.dias_trabajados}</td>
+                                                <td className="ai-num">{fmtDias(f.dias_acumulados)}</td>
+                                                <td className="ai-num">{fmtDias(f.dias_disfrutados)}</td>
+                                                <td className="ai-num">{fmtDias(f.dias_compensados)}</td>
+                                                <td className="ai-num" style={{ fontWeight: 600, color: f.pasivo_dias < 0 ? 'var(--danger)' : undefined }}>{fmtDias(f.pasivo_dias)}</td>
+                                                <td className="ai-num">{fmtDias(f.dias_programados)}</td>
+                                                <td className="ai-num">{fmtDias(f.total_dias)}</td>
+                                                {conValores && (
+                                                    <td className="ai-num" title={f.salario ? `Salario ${fmtMoneda(f.salario)}` : 'Sin salario vigente'}>{fmtMoneda(f.valor_pasivo)}</td>
+                                                )}
+                                                {conValores && (
+                                                    <td>
+                                                        <button type="button" className="ai-icon-btn" title="Ajustar fecha de corte, disfrutados y compensados" onClick={() => setAjustando(f)}>
+                                                            <SlidersHorizontal size={16} />
                                                         </button>
-                                                        <button onClick={() => handleDelete(r.idvacaciones)} className="ai-icon-btn ai-icon-btn--danger" aria-label="Eliminar">
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {isExpanded && (
-                                                <tr>
-                                                    <td colSpan={10} style={{ background: 'var(--surface-0)' }}>
-                                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16, marginBottom: 20 }}>
-                                                            <DetailField label="Cargo" value={r.cargo_nombre} />
-                                                            <DetailField label="Campaña" value={r.campania_nombre} />
-                                                            <DetailField label="Centro de costo" value={r.centro_costo_nombre} />
-                                                        </div>
-
-                                                        <p className="ai-overline" style={{ marginBottom: 8 }}>Periodos tomados</p>
-                                                        {loadingPeriodos.has(r.idvacaciones) ? (
-                                                            <div className="ai-row ai-muted" style={{ fontSize: 13 }}>
-                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: 'var(--primary)' }} />
-                                                                Cargando periodos...
-                                                            </div>
-                                                        ) : (periodosPorRegistro[r.idvacaciones] || []).length === 0 ? (
-                                                            <p className="ai-muted" style={{ fontSize: 13, fontStyle: 'italic' }}>Sin periodos registrados.</p>
-                                                        ) : (
-                                                            <div className="ai-card">
-                                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                                                                    <thead>
-                                                                        <tr style={{ background: 'var(--surface-200)', borderBottom: '1px solid var(--border)' }}>
-                                                                            <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, color: 'var(--ink-muted)' }}>Periodo</th>
-                                                                            <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, color: 'var(--ink-muted)' }}>Fecha inicio</th>
-                                                                            <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, color: 'var(--ink-muted)' }}>Fecha final</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        {periodosPorRegistro[r.idvacaciones].map(p => (
-                                                                            <tr key={p.idperiodo_vacacional} style={{ borderTop: '1px solid var(--border)' }}>
-                                                                                <td style={{ padding: '8px 16px' }}>{p.periodo_tomado || '—'}</td>
-                                                                                <td className="ai-muted" style={{ padding: '8px 16px' }}>{fmtFecha(p.fecha_inicio)}</td>
-                                                                                <td className="ai-muted" style={{ padding: '8px 16px' }}>{fmtFecha(p.fecha_final)}</td>
-                                                                            </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
-                                                        )}
                                                     </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
 
                     <Pagination
                         page={page}
                         totalPages={totalPages}
-                        totalItems={filtered.length}
+                        totalItems={filtradas.length}
                         pageSize={pageSize}
                         onPageChange={setPage}
                         onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-                        etiqueta="registros"
+                        etiqueta="empleados"
                     />
                 </div>
             </div>
-
-            {showCreateForm && (
-                <VacacionesForm isOpen={showCreateForm} onClose={() => setShowCreateForm(false)} vacaciones={null} onSuccess={handleFormSuccess} />
-            )}
-            {showEditForm && selectedRegistro && (
-                <VacacionesForm isOpen={showEditForm} onClose={() => setShowEditForm(false)} vacaciones={selectedRegistro} onSuccess={handleFormSuccess} />
+            {ajustando && (
+                <AjusteSaldoPasivo
+                    fila={ajustando}
+                    fechaCalculo={fecha}
+                    onClose={() => setAjustando(null)}
+                    onGuardado={() => {
+                        setAviso(`Se ajustó el saldo de ${nombrePropio(ajustando.nombre)}.`);
+                        setAjustando(null);
+                        cargar(fecha);
+                    }}
+                />
             )}
         </div>
     );

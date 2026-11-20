@@ -251,6 +251,15 @@ export const vacacionesService = {
     delete: (id) => api.delete(`/users-company/vacaciones/${id}`)
 };
 
+// Pasivo vacacional calculado (§58): fórmula del Excel de Gestión Humana + saldo inicial cargado del Excel
+export const pasivoVacacionalService = {
+    get: (params = {}) => api.get('/users-company/pasivo-vacacional', { params }),
+    // Solo financiera (§58.2): descarga, ajuste del saldo inicial e historial de ajustes.
+    exportar: (params = {}) => api.get('/users-company/pasivo-vacacional/export', { params, responseType: 'blob', timeout: 120000 }),
+    ajustarSaldo: (empleadoId, datos) => api.put(`/users-company/pasivo-vacacional/${empleadoId}/saldo`, datos),
+    ajustes: (empleadoId) => api.get(`/users-company/pasivo-vacacional/${empleadoId}/ajustes`)
+};
+
 // === CONTRATACIÓN DESDE HYDRA (RRHH) ===
 // Lotes de candidatos que envía Hydra (reclutamiento). Ver conexionhydra.md §8 en el backend.
 export const contratacionHydraService = {

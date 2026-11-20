@@ -6,6 +6,7 @@ import Pagination from './Pagination';
 import { nombrePropio, iniciales, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
 import NovedadDetalleModal from './NovedadDetalleModal';
 import FiltroChip from './FiltroChip';
+import { esVacaciones, detalleVacaciones } from '../utils/camposNovedad';
 import { ClipboardList, Plus, Search, Edit3, Trash2, AlertCircle, FileCheck, FileText, Eye, Download, Loader2 } from 'lucide-react';
 
 const PAGE_SIZE = 10;
@@ -376,6 +377,9 @@ const NovedadesRRHH = () => {
                                                         <span className="ai-dot" />
                                                         {n.tipo_novedad_nombre}
                                                     </span>
+                                                    {esVacaciones(n.tipo_novedad_nombre) && (
+                                                        <div className="ai-muted" style={{ fontSize: 12, marginTop: 2 }}>{detalleVacaciones(n)}</div>
+                                                    )}
                                                     {!!n.accidente_transito && (
                                                         <span className="ai-badge ai-badge--danger" style={{ marginLeft: 6 }}>
                                                             <span className="ai-dot" />
