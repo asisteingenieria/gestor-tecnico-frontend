@@ -31,7 +31,20 @@ const ORDENES = {
     pasivo_desc: { etiqueta: 'Mayor pasivo', comparar: (a, b) => (Number(b.pasivo_dias) || 0) - (Number(a.pasivo_dias) || 0) },
     pasivo_asc: { etiqueta: 'Menor pasivo', comparar: (a, b) => (Number(a.pasivo_dias) || 0) - (Number(b.pasivo_dias) || 0) }
 };
-const AYUDA_OBSERVACION = 'Con observación: no venía en el Excel de corte de Gestión Humana. Su pasivo es el acumulado menos las novedades de Vacaciones registradas; financiera puede ajustar su saldo.';
+const AYUDA_OBSERVACION = 'Con observación: no venía en el Excel de corte de Gestión Humana y a esa fecha ya llevaba un año o más en la empresa, así que pudo tomar vacaciones que el sistema no conoce. Su pasivo es el acumulado menos las novedades de Vacaciones registradas; financiera puede ajustar su saldo.';
+
+function calcularKpi(filas) {
+    const suma = (campo) => filas.reduce((s, f) => s + (Number(f[campo]) || 0), 0);
+    return {
+        empleados: filas.length,
+        pasivoDias: suma('pasivo_dias'),
+        valorPasivo: suma('valor_pasivo'),
+        programadas: suma('dias_programados'),
+        totalDias: suma('total_dias'),
+        valorTotal: suma('valor_total'),
+        sinCorte: filas.filter(f => f.con_observacion).length
+    };
+}
 
 const hoyBogota = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 // Último día del mes anterior y del mes actual, para los atajos de cierre.
@@ -106,23 +119,16 @@ const PasivoVacacional = () => {
         if (busqueda && !((f.nombre || '').toLowerCase().includes(busqueda) || String(f.numero_identificacion || '').includes(busqueda) || (f.cargo || '').toLowerCase().includes(busqueda))) return false;
         if (filtroCampanias.size && !filtroCampanias.has(f.campania || 'Sin campaña')) return false;
         if (filtroAreas.size && !filtroAreas.has(f.area || 'Sin área')) return false;
-        if (filtroSaldo.size && !(filtroSaldo.has(f.con_corte ? SALDO.con : SALDO.sin)
+        if (filtroSaldo.size && !(filtroSaldo.has(f.con_observacion ? SALDO.sin : SALDO.con)
             || (filtroSaldo.has(SALDO.ajustado) && f.origen_saldo === 'financiera'))) return false;
         if (filtroPasivo.size && !RANGOS_PASIVO.some(r => filtroPasivo.has(r.etiqueta) && r.cumple(Number(f.pasivo_dias) || 0))) return false;
         return true;
     }).sort(ORDENES[orden].comparar);
     const hayFiltros = Boolean(busqueda) || filtroCampanias.size > 0 || filtroAreas.size > 0 || filtroSaldo.size > 0 || filtroPasivo.size > 0;
 
-    const suma = (campo) => filtradas.reduce((s, f) => s + (Number(f[campo]) || 0), 0);
-    const kpi = {
-        empleados: filtradas.length,
-        pasivoDias: suma('pasivo_dias'),
-        valorPasivo: suma('valor_pasivo'),
-        programadas: suma('dias_programados'),
-        totalDias: suma('total_dias'),
-        valorTotal: suma('valor_total'),
-        sinCorte: filtradas.filter(f => !f.con_corte).length
-    };
+    // KPI sobre la lista filtrada; con filtros, cada tarjeta muestra además el total general (§58.4, como §56.2).
+    const kpi = calcularKpi(filtradas);
+    const kpiTotal = useMemo(() => calcularKpi(datos.filas), [datos.filas]);
 
     const { conValores } = datos;
     const totalPages = Math.max(1, Math.ceil(filtradas.length / pageSize));
@@ -212,6 +218,7 @@ const PasivoVacacional = () => {
                             <p className="ai-kpi-label">Empleados</p>
                             <p className="ai-kpi-value ai-num">{kpi.empleados}</p>
                             {kpi.sinCorte > 0 && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }} title={AYUDA_OBSERVACION}><span className="ai-num">{kpi.sinCorte}</span> con observación</p>}
+                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{kpiTotal.empleados}</span> en total</p>}
                         </div>
                     </div>
                     <div>
@@ -220,6 +227,7 @@ const PasivoVacacional = () => {
                             <p className="ai-kpi-label">Pasivo (días)</p>
                             <p className="ai-kpi-value ai-num">{fmtDias(kpi.pasivoDias)}</p>
                             {conValores && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>{fmtMoneda(kpi.valorPasivo)}</p>}
+                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{fmtDias(kpiTotal.pasivoDias)}{conValores && ` · ${fmtMoneda(kpiTotal.valorPasivo)}`}</span> en total</p>}
                         </div>
                     </div>
                     <div>
@@ -228,6 +236,7 @@ const PasivoVacacional = () => {
                             <p className="ai-kpi-label">Vacaciones programadas</p>
                             <p className="ai-kpi-value ai-num">{fmtDias(kpi.programadas)}</p>
                             <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>días después del {fmtFecha(fecha)}</p>
+                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{fmtDias(kpiTotal.programadas)}</span> en total</p>}
                         </div>
                     </div>
                     <div>
@@ -242,6 +251,7 @@ const PasivoVacacional = () => {
                             ) : (
                                 <p className="ai-kpi-value ai-num">{fmtDias(kpi.totalDias)} <span className="ai-muted" style={{ fontSize: 13, fontWeight: 400 }}>días</span></p>
                             )}
+                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{conValores ? fmtMoneda(kpiTotal.valorTotal) : `${fmtDias(kpiTotal.totalDias)} días`}</span> en total</p>}
                         </div>
                     </div>
                 </div>
@@ -316,7 +326,7 @@ const PasivoVacacional = () => {
                                                             <div className="ai-person-name">{nombrePropio(f.nombre)}</div>
                                                             <div className="ai-person-sub">
                                                                 {f.numero_identificacion}
-                                                                {!f.con_corte && (
+                                                                {f.con_observacion && (
                                                                     <span className="ai-badge ai-badge--warning" style={{ marginLeft: 6 }} title={AYUDA_OBSERVACION}>
                                                                         con observación
                                                                     </span>
