@@ -31,7 +31,7 @@ const ORDENES = {
     pasivo_desc: { etiqueta: 'Mayor pasivo', comparar: (a, b) => (Number(b.pasivo_dias) || 0) - (Number(a.pasivo_dias) || 0) },
     pasivo_asc: { etiqueta: 'Menor pasivo', comparar: (a, b) => (Number(a.pasivo_dias) || 0) - (Number(b.pasivo_dias) || 0) }
 };
-const AYUDA_OBSERVACION = 'Con observación: no venía en el Excel de corte de Gestión Humana y ya trabajaba antes del mes del corte. Su pasivo es el acumulado menos las novedades de Vacaciones registradas; financiera puede ajustar su saldo. Quien ingresó en el mes del corte o después no la lleva: su cálculo ya está completo.';
+const AYUDA_OBSERVACION = 'Con observación: no venía en el Excel de corte de Gestión Humana y a esa fecha ya llevaba un año o más en la empresa, así que pudo tomar vacaciones que el sistema no conoce. Su pasivo es el acumulado menos las novedades de Vacaciones registradas; financiera puede ajustar su saldo.';
 
 function calcularKpi(filas) {
     const suma = (campo) => filas.reduce((s, f) => s + (Number(f[campo]) || 0), 0);
