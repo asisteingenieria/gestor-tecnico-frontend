@@ -7,6 +7,7 @@ import PrevisualizacionDocumento from './PrevisualizacionDocumento';
 import { usePrevisualizacion } from '../hooks/usePrevisualizacion';
 import { errorArchivoSoporte, subirSoportesPendientes } from '../utils/soportesRrhh';
 import { primeraMayuscula } from '../utils/formatoRRHH';
+import { MODALIDADES_VACACIONES, esVacaciones, esIncapacidad, esAccidenteTransito } from '../utils/camposNovedad';
 import { X, Save, ClipboardList } from 'lucide-react';
 
 const fecha = (v) => (v ? String(v).substring(0, 10) : '');
@@ -57,7 +58,8 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
     const [form, setForm] = useState({
         empleado_id: '', contrato_id: '', tipo_novedad_id: '', responsable_id: '',
         accidente_transito: false, fecha_inicial: '', fecha_final: '', fecha_retorno: '',
-        total_dias: '', resumen_diagnostico: '', origen_incapacidad: '', observaciones: '',
+        total_dias: '', modalidad_vacaciones: '', dias_disfrutados: '', dias_compensados: '',
+        resumen_diagnostico: '', origen_incapacidad: '', observaciones: '',
         fecha_recibido: '', fecha_reporte: '',
         ...Object.fromEntries(FLAGS_SOPORTE_VIEJOS.map(f => [f, false]))
     });
@@ -100,6 +102,10 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
                         fecha_final: fecha(novedad.fecha_final),
                         fecha_retorno: fecha(novedad.fecha_retorno),
                         total_dias: novedad.total_dias ?? '',
+                        // Las de Vacaciones de antes de la 107 no tienen modalidad: se abren con sus días como disfrutados.
+                        modalidad_vacaciones: novedad.modalidad_vacaciones || '',
+                        dias_disfrutados: novedad.dias_disfrutados ?? (novedad.modalidad_vacaciones ? '' : novedad.total_dias ?? ''),
+                        dias_compensados: novedad.dias_compensados ?? '',
                         resumen_diagnostico: novedad.resumen_diagnostico || '',
                         origen_incapacidad: novedad.origen_incapacidad || '',
                         observaciones: novedad.observaciones || '',
@@ -150,6 +156,17 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
     // Solo los tipos de la hoja "Novedades" (069), más el ya guardado si no lo es.
     const tiposOpciones = tiposNovedad.filter(t => Number(t.vigente) === 1 || String(t.id) === String(form.tipo_novedad_id));
     const tipoElegido = tiposNovedad.find(t => String(t.id) === String(form.tipo_novedad_id));
+    // Vacaciones: disfrutadas, compensadas en dinero o las dos (§59). Total días = la suma de las partes.
+    const vacaciones = esVacaciones(tipoElegido?.nombre);
+    const modalidad = form.modalidad_vacaciones;
+    const llevaDisfrutados = modalidad === 'disfrutadas' || modalidad === 'disfrutadas_compensadas';
+    const llevaCompensados = modalidad === 'compensadas' || modalidad === 'disfrutadas_compensadas';
+    const entero = (v) => (v === '' || v === null || v === undefined ? 0 : parseInt(v, 10) || 0);
+    const totalVacaciones = (llevaDisfrutados ? entero(form.dias_disfrutados) : 0) + (llevaCompensados ? entero(form.dias_compensados) : 0);
+    // Campos según el tipo (§59.1, misma regla que utils/camposNovedad.js del backend): origen y diagnóstico solo en
+    // incapacidades; el accidente de tránsito lo dice el tipo; las vacaciones compensadas no tienen fecha final ni retorno.
+    const incapacidad = esIncapacidad(tipoElegido?.nombre);
+    const soloCompensadas = vacaciones && modalidad === 'compensadas';
     const soportesQueAplican = tipoElegido
         ? tiposSoporte.filter(s => tipoElegido.soportes.includes(Number(s.id)))
         : [];
@@ -212,8 +229,20 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
         const payload = {
             ...form,
             total_dias: form.total_dias !== '' ? parseInt(form.total_dias, 10) : null,
-            responsable_id: form.responsable_id || null
+            responsable_id: form.responsable_id || null,
+            accidente_transito: esAccidenteTransito(tipoElegido?.nombre),
+            origen_incapacidad: incapacidad ? form.origen_incapacidad : '',
+            resumen_diagnostico: incapacidad ? form.resumen_diagnostico : '',
+            fecha_final: soloCompensadas ? '' : form.fecha_final,
+            fecha_retorno: soloCompensadas ? '' : form.fecha_retorno
         };
+        if (vacaciones) {
+            Object.assign(payload, {
+                dias_disfrutados: llevaDisfrutados ? entero(form.dias_disfrutados) : 0,
+                dias_compensados: llevaCompensados ? entero(form.dias_compensados) : 0,
+                total_dias: totalVacaciones
+            });
+        }
 
         let id = novedadId;
         try {
@@ -250,13 +279,6 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
     };
 
     if (!isOpen) return null;
-
-    const checkboxField = (label, name) => (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-            <input type="checkbox" name={name} checked={form[name]} onChange={onChange} />
-            {label}
-        </label>
-    );
 
     return (
         <div className="ai-overlay ai-scope">
@@ -332,25 +354,64 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
                                         )}
                                     </div>
                                 </div>
-                                {checkboxField('Accidente de tránsito', 'accidente_transito')}
+
+                                {vacaciones && (
+                                    <>
+                                        <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Vacaciones</p>
+                                        <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                                            <div className="ai-field">
+                                                <label className="ai-label">Modalidad <em>*</em></label>
+                                                <select name="modalidad_vacaciones" value={modalidad} onChange={onChange} required className="ai-input">
+                                                    <option value="">Seleccionar...</option>
+                                                    {Object.entries(MODALIDADES_VACACIONES).map(([valor, etiqueta]) => (
+                                                        <option key={valor} value={valor}>{etiqueta}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            {llevaDisfrutados && (
+                                                <div className="ai-field">
+                                                    <label className="ai-label">Días disfrutados <em>*</em></label>
+                                                    <input type="number" min="1" step="1" name="dias_disfrutados" value={form.dias_disfrutados} onChange={onChange} required className="ai-input" />
+                                                </div>
+                                            )}
+                                            {llevaCompensados && (
+                                                <div className="ai-field">
+                                                    <label className="ai-label">Días compensados en dinero <em>*</em></label>
+                                                    <input type="number" min="1" step="1" name="dias_compensados" value={form.dias_compensados} onChange={onChange} required className="ai-input" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>
+                                            Disfrutadas: toma los días de descanso. Compensadas: se pagan en dinero. Las dos descuentan del pasivo vacacional.
+                                        </p>
+                                    </>
+                                )}
 
                                 <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Fechas</p>
                                 <div className="ai-form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
                                     <div className="ai-field">
-                                        <label className="ai-label">Fecha inicial <em>*</em></label>
+                                        <label className="ai-label">{soloCompensadas ? 'Fecha de compensación' : 'Fecha inicial'} <em>*</em></label>
                                         <input type="date" name="fecha_inicial" value={form.fecha_inicial} onChange={onChange} required className="ai-input" />
                                     </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Fecha final</label>
-                                        <input type="date" name="fecha_final" value={form.fecha_final} onChange={onChange} className="ai-input" />
-                                    </div>
-                                    <div className="ai-field">
-                                        <label className="ai-label">Fecha de retorno</label>
-                                        <input type="date" name="fecha_retorno" value={form.fecha_retorno} onChange={onChange} className="ai-input" />
-                                    </div>
+                                    {!soloCompensadas && (
+                                        <>
+                                            <div className="ai-field">
+                                                <label className="ai-label">Fecha final</label>
+                                                <input type="date" name="fecha_final" value={form.fecha_final} onChange={onChange} className="ai-input" />
+                                            </div>
+                                            <div className="ai-field">
+                                                <label className="ai-label">Fecha de retorno</label>
+                                                <input type="date" name="fecha_retorno" value={form.fecha_retorno} onChange={onChange} className="ai-input" />
+                                            </div>
+                                        </>
+                                    )}
                                     <div className="ai-field">
                                         <label className="ai-label">Total días</label>
-                                        <input type="number" min="0" name="total_dias" value={form.total_dias} onChange={onChange} className="ai-input" />
+                                        {vacaciones ? (
+                                            <input type="number" value={modalidad ? totalVacaciones : ''} readOnly className="ai-input" title="Disfrutados + compensados" />
+                                        ) : (
+                                            <input type="number" min="0" name="total_dias" value={form.total_dias} onChange={onChange} className="ai-input" />
+                                        )}
                                     </div>
                                     <div className="ai-field">
                                         <label className="ai-label">Fecha de recibido</label>
@@ -363,14 +424,24 @@ const NovedadForm = ({ isOpen, onClose, novedad = null, onSuccess }) => {
                                 </div>
 
                                 <p className="ai-overline" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>Detalle</p>
-                                <div className="ai-field">
-                                    <label className="ai-label">Origen de la incapacidad</label>
-                                    <input type="text" name="origen_incapacidad" value={form.origen_incapacidad} onChange={onChange} className="ai-input" />
-                                </div>
-                                <div className="ai-field">
-                                    <label className="ai-label">Diagnóstico</label>
-                                    <textarea name="resumen_diagnostico" value={form.resumen_diagnostico} onChange={onChange} rows={2} className="ai-input" style={{ height: 'auto', padding: '8px 12px' }} />
-                                </div>
+                                {incapacidad && (
+                                    <>
+                                        {esAccidenteTransito(tipoElegido?.nombre) && (
+                                            <span className="ai-badge ai-badge--danger" style={{ width: 'fit-content' }}>
+                                                <span className="ai-dot" />
+                                                Accidente de tránsito
+                                            </span>
+                                        )}
+                                        <div className="ai-field">
+                                            <label className="ai-label">Origen de la incapacidad</label>
+                                            <input type="text" name="origen_incapacidad" value={form.origen_incapacidad} onChange={onChange} className="ai-input" />
+                                        </div>
+                                        <div className="ai-field">
+                                            <label className="ai-label">Diagnóstico</label>
+                                            <textarea name="resumen_diagnostico" value={form.resumen_diagnostico} onChange={onChange} rows={2} className="ai-input" style={{ height: 'auto', padding: '8px 12px' }} />
+                                        </div>
+                                    </>
+                                )}
                                 <div className="ai-field">
                                     <label className="ai-label">Observaciones</label>
                                     <textarea name="observaciones" value={form.observaciones} onChange={onChange} rows={2} className="ai-input" style={{ height: 'auto', padding: '8px 12px' }} />
