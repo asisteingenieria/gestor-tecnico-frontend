@@ -196,6 +196,8 @@ export const userCompanyService = {
 // === SERVICIOS DE NOVEDADES RRHH ===
 export const novedadRrhhService = {
     getAll: (params = {}) => api.get('/users-company/novedades', { params }),
+    // Excel del consolidado con los mismos filtros de la pantalla (§57)
+    exportar: (params = {}) => api.get('/users-company/novedades/export', { params, responseType: 'blob', timeout: 120000 }),
     getById: (id) => api.get(`/users-company/novedades/${id}`),
     create: (data) => api.post('/users-company/novedades', data),
     update: (id, data) => api.put(`/users-company/novedades/${id}`, data),
