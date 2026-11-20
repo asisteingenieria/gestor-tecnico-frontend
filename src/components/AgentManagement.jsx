@@ -21,6 +21,21 @@ import { escucharAsistencia } from '../utils/socketAsistencia';
 
 const PAGE_SIZES = [20, 25, 50];
 
+// Rango de fechas del listado de RRHH/financiera (§56.1): el mismo criterio que la descarga de empleados.
+const CAMPOS_RANGO = [
+    { valor: 'ingreso', etiqueta: 'Fecha de ingreso' },
+    { valor: 'retiro', etiqueta: 'Fecha de retiro' },
+    { valor: 'registro', etiqueta: 'Fecha de registro' }
+];
+const ETIQUETA_CAMPO_RANGO = Object.fromEntries(CAMPOS_RANGO.map(({ valor, etiqueta }) => [valor, etiqueta]));
+const ESTADOS_TEXTO_RETIRO = ['Retirado', 'Inactivo'];
+// Día de Bogotá 'YYYY-MM-DD' de un timestamp guardado en UTC.
+const diaBogota = (v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d) ? null : d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+};
+
 const formatSalario = (val) => {
     if (val == null) return '—';
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
@@ -207,6 +222,18 @@ const AgentManagement = ({ soloLectura = false }) => {
     const [fRegistro, setFRegistro] = useState('');
     const [fRetiro, setFRetiro] = useState('');
     const [perfilTabInicial, setPerfilTabInicial] = useState('Información');
+    // Rango de fechas de la vista de RRHH/financiera (§56.1). Si solo se filtran retirados/inactivos el rango
+    // va sobre la fecha de retiro, si no sobre la de ingreso, hasta que el usuario elija el tipo a mano.
+    const [rangoCampo, setRangoCampo] = useState('ingreso');
+    const [rangoManual, setRangoManual] = useState(false);
+    const [rangoDesde, setRangoDesde] = useState('');
+    const [rangoHasta, setRangoHasta] = useState('');
+
+    useEffect(() => {
+        if (rangoManual) return;
+        const soloRetiros = filtroEstados.size > 0 && [...filtroEstados].every(t => ESTADOS_TEXTO_RETIRO.includes(t));
+        setRangoCampo(soloRetiros ? 'retiro' : 'ingreso');
+    }, [filtroEstados, rangoManual]);
 
     useEffect(() => {
         fetchEmpleados();
@@ -222,7 +249,7 @@ const AgentManagement = ({ soloLectura = false }) => {
 
     useEffect(() => {
         setPage(1);
-    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, fIngreso, fRegistro, fRetiro, pageSize]);
+    }, [searchTerm, filtroCampanias, filtroEstados, filtroCargos, filtroAnalistas, filtroDocumentos, fIngreso, fRegistro, fRetiro, rangoCampo, rangoDesde, rangoHasta, pageSize]);
 
     // Excel con la jefatura de cada empleado vigente y quién le sube el horario (backend §51).
     const [descargandoJefaturas, setDescargandoJefaturas] = useState(false);
@@ -342,6 +369,15 @@ const AgentManagement = ({ soloLectura = false }) => {
     const opcionesFechaIngreso = useMemo(() => fechasUnicas(empleados, 'fecha_ingreso'), [empleados]);
     const opcionesFechaRetiro = useMemo(() => fechasUnicas(empleados, 'fecha_retiro'), [empleados]);
 
+    const hayRango = !soloLectura && Boolean(rangoDesde || rangoHasta);
+    const rangoInvalido = Boolean(rangoDesde && rangoHasta && rangoDesde > rangoHasta);
+    // Día del empleado para el rango: ingreso y retiro son DATE; registro es cuándo se creó la ficha, en Bogotá.
+    const fechaDelRango = (e) => {
+        if (rangoCampo === 'retiro') return aYMD(e.fecha_retiro);
+        if (rangoCampo === 'registro') return diaBogota(e.created_at);
+        return aYMD(e.fecha_ingreso);
+    };
+
     const filteredEmpleados = empleados.filter(e => {
         // En la vista del admin se oculta la ficha placeholder de German (dueño, cédula ficticia).
         if (soloLectura && e.numero_identificacion === '0123456789') return false;
@@ -356,17 +392,28 @@ const AgentManagement = ({ soloLectura = false }) => {
         const coincideIngreso = !soloLectura || !fIngreso || aYMD(e.fecha_ingreso) === fIngreso;
         const coincideRegistro = !soloLectura || !fRegistro || aYMD(fechaRegistro(e)) === fRegistro;
         const coincideRetiro = !soloLectura || !fRetiro || aYMD(e.fecha_retiro) === fRetiro;
-        return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos && coincideIngreso && coincideRegistro && coincideRetiro;
+        let coincideRango = true;
+        if (hayRango) {
+            const dia = fechaDelRango(e);
+            coincideRango = Boolean(dia) && (!rangoDesde || dia >= rangoDesde) && (!rangoHasta || dia <= rangoHasta);
+        }
+        return coincideTexto && coincideCampania && coincideEstado && coincideCargo && coincideAnalista && coincideDocumentos && coincideIngreso && coincideRegistro && coincideRetiro && coincideRango;
     });
 
     // KPI de personal: activos = contrato vigente (activo, periodo de prueba o suspendido); los retirados
-    // (retirado o inactivo) van en su propio indicador. En la vista del admin no cuenta la ficha placeholder.
+    // (retirado o inactivo) van en su propio indicador. Se cuentan sobre la lista FILTRADA (§56.2): con
+    // Campaña = T&T muestran los activos y retirados de T&T, y así con cualquier filtro, rango de fechas o
+    // búsqueda. Sin filtros es el total. En la vista del admin no cuenta la ficha placeholder.
+    const esActivo = (e) => ['activo', 'periodo_prueba', 'suspendido'].includes(e.estado_contrato_nombre);
+    const esRetirado = (e) => ['retirado', 'inactivo'].includes(e.estado_contrato_nombre);
     const empleadosReales = soloLectura ? empleados.filter(e => e.numero_identificacion !== '0123456789') : empleados;
-    const totalRetirados = empleadosReales.filter(e => ['retirado', 'inactivo'].includes(e.estado_contrato_nombre)).length;
-    const totalEmpleadosActivos = empleadosReales.filter(e => ['activo', 'periodo_prueba', 'suspendido'].includes(e.estado_contrato_nombre)).length;
+    const totalRetirados = filteredEmpleados.filter(esRetirado).length;
+    const totalEmpleadosActivos = filteredEmpleados.filter(esActivo).length;
+    const totalRetiradosGeneral = empleadosReales.filter(esRetirado).length;
+    const totalActivosGeneral = empleadosReales.filter(esActivo).length;
 
-    const totalConActivos = empleados.filter(e => e.total_activos > 0).length;
-    const totalActivos = empleados.reduce((sum, e) => sum + (e.total_activos || 0), 0);
+    const totalConActivos = filteredEmpleados.filter(e => e.total_activos > 0).length;
+    const totalActivos = filteredEmpleados.reduce((sum, e) => sum + (e.total_activos || 0), 0);
 
     // En la vista del admin (solo lectura) se ordena por fecha de registro (ver fechaRegistro),
     // del más reciente al más antiguo, en vez del orden alfabético que trae el backend para RRHH.
@@ -386,10 +433,26 @@ const AgentManagement = ({ soloLectura = false }) => {
         setFiltroAnalistas(new Set());
         setFiltroDocumentos(new Set());
         setFIngreso(''); setFRegistro(''); setFRetiro('');
+        limpiarRango();
     };
 
+    function limpiarRango() {
+        setRangoDesde(''); setRangoHasta(''); setRangoManual(false);
+    }
+
+    // Lo que hay en pantalla, para abrir la descarga con los mismos filtros de estado y fechas.
+    const filtrosParaDescarga = () => ({
+        estados: [...new Set(empleados
+            .filter(e => e.estado_contrato_nombre && filtroEstados.has(estadoBadge(e.estado_contrato_nombre).texto))
+            .map(e => e.estado_contrato_nombre))],
+        campoFecha: rangoCampo,
+        campoManual: rangoManual,
+        desde: rangoDesde,
+        hasta: rangoHasta
+    });
+
     const hayFiltrosFecha = fIngreso || fRegistro || fRetiro;
-    const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0 || hayFiltrosFecha;
+    const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0 || hayFiltrosFecha || hayRango;
 
     if (!isRecursosHumanos && !(soloLectura && canVerEmpleadosRrhh)) {
         return (
@@ -459,6 +522,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                         <div>
                             <p className="ai-kpi-label">Empleados activos</p>
                             <p className="ai-kpi-value ai-num">{totalEmpleadosActivos}</p>
+                            {hayFiltrosActivos && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>Según los filtros · <span className="ai-num">{totalActivosGeneral}</span> en total</p>}
                         </div>
                     </div>
                     <div>
@@ -466,6 +530,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                         <div>
                             <p className="ai-kpi-label">Retirados</p>
                             <p className="ai-kpi-value ai-num">{totalRetirados}</p>
+                            {hayFiltrosActivos && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>Según los filtros · <span className="ai-num">{totalRetiradosGeneral}</span> en total</p>}
                         </div>
                     </div>
                     {!soloLectura && (
@@ -521,6 +586,38 @@ const AgentManagement = ({ soloLectura = false }) => {
                         <FiltroChip etiqueta="Analista" opciones={opcionesAnalista} seleccion={filtroAnalistas} onChange={setFiltroAnalistas} />
                         <FiltroChip etiqueta="Documentos" opciones={OPCIONES_DOCUMENTOS} seleccion={filtroDocumentos} onChange={setFiltroDocumentos} />
                     </div>
+
+                    {!soloLectura && (
+                        <div className="ai-row" style={{ gap: 18, flexWrap: 'wrap', padding: '0 16px 12px', alignItems: 'flex-end' }}>
+                            <div>
+                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Rango sobre</label>
+                                <select className="ai-input" value={rangoCampo} onChange={(e) => { setRangoCampo(e.target.value); setRangoManual(true); }}>
+                                    {CAMPOS_RANGO.map(({ valor, etiqueta }) => <option key={valor} value={valor}>{etiqueta}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Desde</label>
+                                <input type="date" className="ai-input" value={rangoDesde} max={rangoHasta || undefined} onChange={(e) => setRangoDesde(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Hasta</label>
+                                <input type="date" className="ai-input" value={rangoHasta} min={rangoDesde || undefined} onChange={(e) => setRangoHasta(e.target.value)} />
+                            </div>
+                            {(hayRango || rangoManual) && (
+                                <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={limpiarRango}>
+                                    Limpiar fechas
+                                </button>
+                            )}
+                            {hayRango && !rangoInvalido && (
+                                <span className="ai-muted" style={{ fontSize: 13, paddingBottom: 8 }}>
+                                    <strong className="ai-num">{filteredEmpleados.length}</strong> empleado{filteredEmpleados.length === 1 ? '' : 's'} con {ETIQUETA_CAMPO_RANGO[rangoCampo].toLowerCase()} en el rango
+                                </span>
+                            )}
+                            {rangoInvalido && (
+                                <span style={{ color: 'var(--danger)', fontSize: 13, paddingBottom: 8 }}>La fecha Desde no puede ser posterior a Hasta</span>
+                            )}
+                        </div>
+                    )}
 
                     {soloLectura && (
                         <div className="ai-row" style={{ gap: 18, flexWrap: 'wrap', padding: '0 16px 12px', alignItems: 'flex-end' }}>
@@ -618,6 +715,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                                     <th>Estado</th>
                                     <th>{soloLectura ? 'Fecha de ingreso' : 'Teléfono'}</th>
                                     {soloLectura && <th>Fecha de retiro</th>}
+                                    {hayRango && <th>{ETIQUETA_CAMPO_RANGO[rangoCampo]}</th>}
                                     <th className="ai-td-actions">Acciones</th>
                                 </tr>
                             </thead>
@@ -656,6 +754,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                                             <td><span className={`ai-badge ${est.clase}`}><span className="ai-dot" />{est.texto}</span></td>
                                             <td className="ai-num">{soloLectura ? (formatearFecha(empleado.fecha_ingreso) || '—') : (empleado.telefono ? formatearTelefono(empleado.telefono) : '—')}</td>
                                             {soloLectura && <td className="ai-num">{formatearFecha(empleado.fecha_retiro) || '—'}</td>}
+                                            {hayRango && <td className="ai-num">{formatearFecha(fechaDelRango(empleado)) || '—'}</td>}
                                             <td className="ai-td-actions">
                                                 <div className="ai-row-actions">
                                                     <button className="ai-icon-btn" aria-label="Ver perfil" title="Ver perfil" onClick={() => abrirPerfil(empleado.id)}>
@@ -756,6 +855,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                 <DescargarEmpleadosModal
                     isOpen={showDescargarEmpleados}
                     onClose={() => setShowDescargarEmpleados(false)}
+                    inicial={filtrosParaDescarga()}
                 />
             )}
 
