@@ -33,6 +33,19 @@ const ORDENES = {
 };
 const AYUDA_OBSERVACION = 'Con observación: no venía en el Excel de corte de Gestión Humana y ya trabajaba antes del mes del corte. Su pasivo es el acumulado menos las novedades de Vacaciones registradas; financiera puede ajustar su saldo. Quien ingresó en el mes del corte o después no la lleva: su cálculo ya está completo.';
 
+function calcularKpi(filas) {
+    const suma = (campo) => filas.reduce((s, f) => s + (Number(f[campo]) || 0), 0);
+    return {
+        empleados: filas.length,
+        pasivoDias: suma('pasivo_dias'),
+        valorPasivo: suma('valor_pasivo'),
+        programadas: suma('dias_programados'),
+        totalDias: suma('total_dias'),
+        valorTotal: suma('valor_total'),
+        sinCorte: filas.filter(f => f.con_observacion).length
+    };
+}
+
 const hoyBogota = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 // Último día del mes anterior y del mes actual, para los atajos de cierre.
 const finDeMes = (desplazamiento) => {
@@ -113,16 +126,9 @@ const PasivoVacacional = () => {
     }).sort(ORDENES[orden].comparar);
     const hayFiltros = Boolean(busqueda) || filtroCampanias.size > 0 || filtroAreas.size > 0 || filtroSaldo.size > 0 || filtroPasivo.size > 0;
 
-    const suma = (campo) => filtradas.reduce((s, f) => s + (Number(f[campo]) || 0), 0);
-    const kpi = {
-        empleados: filtradas.length,
-        pasivoDias: suma('pasivo_dias'),
-        valorPasivo: suma('valor_pasivo'),
-        programadas: suma('dias_programados'),
-        totalDias: suma('total_dias'),
-        valorTotal: suma('valor_total'),
-        sinCorte: filtradas.filter(f => f.con_observacion).length
-    };
+    // KPI sobre la lista filtrada; con filtros, cada tarjeta muestra además el total general (§58.4, como §56.2).
+    const kpi = calcularKpi(filtradas);
+    const kpiTotal = useMemo(() => calcularKpi(datos.filas), [datos.filas]);
 
     const { conValores } = datos;
     const totalPages = Math.max(1, Math.ceil(filtradas.length / pageSize));
@@ -212,6 +218,7 @@ const PasivoVacacional = () => {
                             <p className="ai-kpi-label">Empleados</p>
                             <p className="ai-kpi-value ai-num">{kpi.empleados}</p>
                             {kpi.sinCorte > 0 && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }} title={AYUDA_OBSERVACION}><span className="ai-num">{kpi.sinCorte}</span> con observación</p>}
+                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{kpiTotal.empleados}</span> en total</p>}
                         </div>
                     </div>
                     <div>
@@ -220,6 +227,7 @@ const PasivoVacacional = () => {
                             <p className="ai-kpi-label">Pasivo (días)</p>
                             <p className="ai-kpi-value ai-num">{fmtDias(kpi.pasivoDias)}</p>
                             {conValores && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>{fmtMoneda(kpi.valorPasivo)}</p>}
+                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{fmtDias(kpiTotal.pasivoDias)}{conValores && ` · ${fmtMoneda(kpiTotal.valorPasivo)}`}</span> en total</p>}
                         </div>
                     </div>
                     <div>
@@ -228,6 +236,7 @@ const PasivoVacacional = () => {
                             <p className="ai-kpi-label">Vacaciones programadas</p>
                             <p className="ai-kpi-value ai-num">{fmtDias(kpi.programadas)}</p>
                             <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>días después del {fmtFecha(fecha)}</p>
+                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{fmtDias(kpiTotal.programadas)}</span> en total</p>}
                         </div>
                     </div>
                     <div>
@@ -242,6 +251,7 @@ const PasivoVacacional = () => {
                             ) : (
                                 <p className="ai-kpi-value ai-num">{fmtDias(kpi.totalDias)} <span className="ai-muted" style={{ fontSize: 13, fontWeight: 400 }}>días</span></p>
                             )}
+                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{conValores ? fmtMoneda(kpiTotal.valorTotal) : `${fmtDias(kpiTotal.totalDias)} días`}</span> en total</p>}
                         </div>
                     </div>
                 </div>
