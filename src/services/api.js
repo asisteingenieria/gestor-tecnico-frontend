@@ -158,6 +158,9 @@ export const userCompanyService = {
     getGastoTotal: () => api.get('/users-company/gasto-total'),
     // Excel con la jefatura de cada empleado vigente y quién le sube el horario.
     exportarJefaturas: () => api.get('/users-company/export/jefaturas', { responseType: 'blob', timeout: 60000 }),
+    // Excel de empleados con toda su información; params: estados ('activo,retirado'), campoFecha
+    // (ingreso | retiro | registro), desde y hasta (AAAA-MM-DD). Solo RRHH y financiera (§56).
+    exportarEmpleados: (params) => api.get('/users-company/export/empleados', { params, responseType: 'blob', timeout: 120000 }),
     getActivos: (id) => api.get(`/users-company/${id}/activos`),
     assignActivo: (id, activoId) => api.put(`/users-company/${id}/activos/${activoId}`),
     unassignActivo: (id, activoId) => api.delete(`/users-company/${id}/activos/${activoId}`),

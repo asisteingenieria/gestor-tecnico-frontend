@@ -8,6 +8,7 @@ import RetiroModal from './RetiroModal';
 import TraspasoForm from './TraspasoForm';
 import ConfirmarEliminarModal from './ConfirmarEliminarModal';
 import ImportEmpleadosModal from './ImportEmpleadosModal';
+import DescargarEmpleadosModal from './DescargarEmpleadosModal';
 import Pagination from './Pagination';
 import { nombrePropio, iniciales, claseCampania, formatearTelefono, primeraMayuscula } from '../utils/formatoRRHH';
 import { formatearFecha } from '../utils/fecha';
@@ -169,7 +170,11 @@ const FiltroChip = ({ etiqueta, opciones, seleccion, onChange }) => {
 // `soloLectura`: vista de consulta para el admin (Hanny Admin). Ve la lista, la ficha completa y
 // los documentos (ver/descargar), sin crear, editar, eliminar, importar, retirar ni traspasar.
 const AgentManagement = ({ soloLectura = false }) => {
-    const { isRecursosHumanos, isFinanciera, isAdmin, canVerEmpleadosRrhh } = useAuth();
+    const { user, isRecursosHumanos, isFinanciera, isAdmin, canVerEmpleadosRrhh } = useAuth();
+    // RRHH y financiera ya no descargan jefaturas: descargan el Excel de empleados (§56). Solo la vista de
+    // solo lectura (admin / ver_empleados_rrhh) conserva el de jefaturas.
+    const puedeDescargarJefaturas = !['recursosHumanos', 'financiera'].includes(user?.role);
+    const [showDescargarEmpleados, setShowDescargarEmpleados] = useState(false);
     // El gasto en salarios es de financiera/admin; recursosHumanos solo ve contratación.
     const puedeVerGasto = isFinanciera || isAdmin;
     const [empleados, setEmpleados] = useState([]);
@@ -415,10 +420,18 @@ const AgentManagement = ({ soloLectura = false }) => {
                                 <LayoutGrid size={14} strokeWidth={1.75} /> Tarjetas
                             </span>
                         </div>
+                        {!soloLectura && (
+                            <button onClick={() => setShowDescargarEmpleados(true)} className="ai-btn ai-btn--secondary" title="Excel con toda la información de los empleados, por estado y rango de fechas">
+                                <Download size={16} strokeWidth={1.75} />
+                                Descargar empleados
+                            </button>
+                        )}
+                        {puedeDescargarJefaturas && (
                         <button onClick={descargarJefaturas} className="ai-btn ai-btn--secondary" disabled={descargandoJefaturas} title="Excel con el jefe inmediato, jefe de área, director, gestor de asistencia y quién sube el horario de cada empleado vigente">
                             <Download size={16} strokeWidth={1.75} />
                             {descargandoJefaturas ? 'Descargando…' : 'Descargar jefaturas'}
                         </button>
+                        )}
                         {soloLectura && (
                             <button onClick={() => fetchEmpleados({ silencioso: true })} className="ai-btn ai-btn--secondary" disabled={refrescando} title="Actualizar la lista">
                                 <RefreshCw size={16} strokeWidth={1.75} className={refrescando ? 'animate-spin' : undefined} />
@@ -736,6 +749,13 @@ const AgentManagement = ({ soloLectura = false }) => {
                     isOpen={showImportModal}
                     onClose={() => setShowImportModal(false)}
                     onImportado={handleFormSuccess}
+                />
+            )}
+
+            {showDescargarEmpleados && !soloLectura && (
+                <DescargarEmpleadosModal
+                    isOpen={showDescargarEmpleados}
+                    onClose={() => setShowDescargarEmpleados(false)}
                 />
             )}
 
