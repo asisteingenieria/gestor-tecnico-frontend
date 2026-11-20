@@ -1,13 +1,70 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { novedadRrhhService } from '../services/api';
 import NovedadForm from './NovedadForm';
 import Pagination from './Pagination';
 import { nombrePropio, iniciales, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
 import NovedadDetalleModal from './NovedadDetalleModal';
-import { ClipboardList, Plus, Search, Edit3, Trash2, AlertCircle, FileCheck, FileText, Eye } from 'lucide-react';
+import FiltroChip from './FiltroChip';
+import { ClipboardList, Plus, Search, Edit3, Trash2, AlertCircle, FileCheck, FileText, Eye, Download, Loader2 } from 'lucide-react';
 
 const PAGE_SIZE = 10;
+
+// Filtros y descarga del consolidado (claude/modulo recursoshumanos.md §57). La descarga manda los mismos
+// filtros al backend (utils/reporteNovedades.js), que los aplica igual, así que el Excel trae lo que se ve.
+const CAMPOS_RANGO = [
+    { valor: 'registro', etiqueta: 'Fecha de registro' },
+    { valor: 'inicial', etiqueta: 'Fecha inicial' },
+    { valor: 'final', etiqueta: 'Fecha final' }
+];
+const ETIQUETA_CAMPO_RANGO = Object.fromEntries(CAMPOS_RANGO.map(({ valor, etiqueta }) => [valor, etiqueta]));
+// Estado de los soportes: el documento del expediente (098) trae los soportes juntos y cuenta como soportada.
+const SOPORTES = [
+    { valor: 'expediente', etiqueta: 'Documento del expediente' },
+    { valor: 'completos', etiqueta: 'Soportes completos' },
+    { valor: 'pendientes', etiqueta: 'Soportes pendientes' },
+    { valor: 'no_requiere', etiqueta: 'No requiere soportes' }
+];
+const VALOR_SOPORTE = Object.fromEntries(SOPORTES.map(({ valor, etiqueta }) => [etiqueta, valor]));
+const SIN_CAMPANIA = 'Sin campaña';
+const SEPARADOR = '|';
+
+const estadoSoportes = (n) => {
+    if (Number(n.documentos_expediente) > 0) return 'expediente';
+    const requeridos = Number(n.soportes_requeridos) || 0;
+    if (requeridos === 0) return 'no_requiere';
+    return (Number(n.soportes_cargados) || 0) >= requeridos ? 'completos' : 'pendientes';
+};
+// Día 'YYYY-MM-DD': las fechas de la novedad son DATE (medianoche UTC); el registro es un instante UTC → día de Bogotá.
+const diaDate = (v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d) ? null : d.toISOString().slice(0, 10);
+};
+const diaBogota = (v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d) ? null : d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+};
+const diaDelRango = (n, campo) => (
+    campo === 'inicial' ? diaDate(n.fecha_inicial) : campo === 'final' ? diaDate(n.fecha_final) : diaBogota(n.created_at)
+);
+const fmtRegistro = (v) => {
+    if (!v) return '—';
+    const d = new Date(v);
+    return isNaN(d) ? '—' : d.toLocaleString('es-CO', {
+        timeZone: 'America/Bogota', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+};
+
+// El servidor responde los errores como JSON, pero la petición pide un blob.
+async function mensajeDeError(err) {
+    const data = err?.response?.data;
+    if (data instanceof Blob) {
+        try { return JSON.parse(await data.text()).message; } catch { /* no era JSON */ }
+    }
+    return data?.message || 'No se pudo descargar el Excel de novedades';
+}
 
 const NovedadesRRHH = () => {
     const { isRecursosHumanos } = useAuth();
@@ -21,6 +78,14 @@ const NovedadesRRHH = () => {
     const [detalle, setDetalle] = useState(null);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(PAGE_SIZE);
+    const [filtroTipos, setFiltroTipos] = useState(new Set());
+    const [filtroCampanias, setFiltroCampanias] = useState(new Set());
+    const [filtroSoportes, setFiltroSoportes] = useState(new Set());
+    const [rangoCampo, setRangoCampo] = useState('registro');
+    const [rangoDesde, setRangoDesde] = useState('');
+    const [rangoHasta, setRangoHasta] = useState('');
+    const [descargando, setDescargando] = useState(false);
+    const [avisoDescarga, setAvisoDescarga] = useState('');
 
     useEffect(() => {
         fetchNovedades();
@@ -28,7 +93,7 @@ const NovedadesRRHH = () => {
 
     useEffect(() => {
         setPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, filtroTipos, filtroCampanias, filtroSoportes, rangoCampo, rangoDesde, rangoHasta]);
 
     const fetchNovedades = async () => {
         try {
@@ -71,12 +136,83 @@ const NovedadesRRHH = () => {
         }
     };
 
-    const filtered = novedades.filter(n =>
-        (n.empleado_nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (n.empleado_identificacion || '').includes(searchTerm) ||
-        (n.tipo_novedad_nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (n.campania_nombre || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const opcionesTipo = useMemo(
+        () => [...new Set(novedades.map(n => n.tipo_novedad_nombre).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')),
+        [novedades]
     );
+    const opcionesCampania = useMemo(
+        () => [...new Set(novedades.map(n => n.campania_nombre || SIN_CAMPANIA))].sort((a, b) => a.localeCompare(b, 'es')),
+        [novedades]
+    );
+
+    const busqueda = searchTerm.trim();
+    const hayRango = Boolean(rangoDesde || rangoHasta);
+    const rangoInvalido = Boolean(rangoDesde && rangoHasta && rangoDesde > rangoHasta);
+    const soportesElegidos = [...filtroSoportes].map(e => VALOR_SOPORTE[e]);
+
+    const filtered = novedades.filter(n => {
+        const q = busqueda.toLowerCase();
+        if (q && !(
+            (n.empleado_nombre || '').toLowerCase().includes(q) ||
+            String(n.empleado_identificacion || '').includes(busqueda) ||
+            (n.tipo_novedad_nombre || '').toLowerCase().includes(q) ||
+            (n.campania_nombre || '').toLowerCase().includes(q)
+        )) return false;
+        if (filtroTipos.size && !filtroTipos.has(n.tipo_novedad_nombre)) return false;
+        if (filtroCampanias.size && !filtroCampanias.has(n.campania_nombre || SIN_CAMPANIA)) return false;
+        if (soportesElegidos.length && !soportesElegidos.includes(estadoSoportes(n))) return false;
+        if (hayRango && !rangoInvalido) {
+            const dia = diaDelRango(n, rangoCampo);
+            if (!dia || (rangoDesde && dia < rangoDesde) || (rangoHasta && dia > rangoHasta)) return false;
+        }
+        return true;
+    });
+
+    const hayFiltros = Boolean(busqueda) || filtroTipos.size > 0 || filtroCampanias.size > 0 || filtroSoportes.size > 0 || hayRango;
+    const limpiarFiltros = () => {
+        setSearchTerm('');
+        setFiltroTipos(new Set());
+        setFiltroCampanias(new Set());
+        setFiltroSoportes(new Set());
+        setRangoCampo('registro');
+        setRangoDesde('');
+        setRangoHasta('');
+    };
+
+    // Descarga lo que se ve: los mismos filtros van al backend, que los aplica con la misma regla.
+    const descargarExcel = async () => {
+        setAvisoDescarga('');
+        setError('');
+        setDescargando(true);
+        try {
+            const params = {};
+            if (busqueda) params.q = busqueda;
+            if (filtroTipos.size) params.tipos = [...filtroTipos].join(SEPARADOR);
+            if (filtroCampanias.size) params.campanias = [...filtroCampanias].join(SEPARADOR);
+            if (soportesElegidos.length) params.soportes = soportesElegidos.join(',');
+            if (hayRango) {
+                params.campoFecha = rangoCampo;
+                if (rangoDesde) params.desde = rangoDesde;
+                if (rangoHasta) params.hasta = rangoHasta;
+            }
+            const response = await novedadRrhhService.exportar(params);
+            const disposicion = response.headers?.['content-disposition'] || '';
+            const nombre = disposicion.match(/filename="?([^"]+)"?/)?.[1] || 'novedades.xlsx';
+            const total = response.headers?.['x-total-novedades'];
+            const url = URL.createObjectURL(response.data);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            a.click();
+            URL.revokeObjectURL(url);
+            setAvisoDescarga(total != null ? `Se descargaron ${total} novedad${total === '1' ? '' : 'es'}.` : 'Descarga lista.');
+        } catch (err) {
+            console.error('Error al descargar novedades:', err);
+            setError(await mensajeDeError(err));
+        } finally {
+            setDescargando(false);
+        }
+    };
 
     const fmtFecha = (v) => v ? new Date(v).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
@@ -106,10 +242,21 @@ const NovedadesRRHH = () => {
                         <h1 className="ai-page-title">Consolidado de novedades</h1>
                         <p className="ai-page-sub">Incapacidades, licencias y demás novedades de RRHH por empleado</p>
                     </div>
-                    <button onClick={handleCreate} className="ai-btn ai-btn--primary">
-                        <Plus size={16} />
-                        Nueva novedad
-                    </button>
+                    <div className="ai-row" style={{ gap: 8 }}>
+                        <button
+                            onClick={descargarExcel}
+                            className="ai-btn ai-btn--secondary"
+                            disabled={descargando || rangoInvalido}
+                            title="Excel con las novedades que se ven en la tabla, con los filtros aplicados"
+                        >
+                            {descargando ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                            {descargando ? 'Descargando…' : 'Descargar Excel'}
+                        </button>
+                        <button onClick={handleCreate} className="ai-btn ai-btn--primary">
+                            <Plus size={16} />
+                            Nueva novedad
+                        </button>
+                    </div>
                 </div>
 
                 {error && (
@@ -119,9 +266,16 @@ const NovedadesRRHH = () => {
                     </div>
                 )}
 
+                {avisoDescarga && (
+                    <div className="ai-badge ai-badge--success" style={{ height: 'auto', padding: '10px 14px', width: 'fit-content' }}>
+                        <span className="ai-dot" />
+                        {avisoDescarga}
+                    </div>
+                )}
+
                 <div className="ai-card">
                     <div className="ai-toolbar">
-                        <div className="ai-search">
+                        <div className="ai-search" style={{ flex: 1 }}>
                             <Search size={16} />
                             <input
                                 type="text"
@@ -131,6 +285,40 @@ const NovedadesRRHH = () => {
                                 style={{ border: 0, outline: 'none', background: 'transparent', flex: 1, font: 'inherit', color: 'inherit' }}
                             />
                         </div>
+                        <FiltroChip etiqueta="Tipo" opciones={opcionesTipo} seleccion={filtroTipos} onChange={setFiltroTipos} />
+                        <FiltroChip etiqueta="Campaña" opciones={opcionesCampania} seleccion={filtroCampanias} onChange={setFiltroCampanias} />
+                        <FiltroChip etiqueta="Soportes" opciones={SOPORTES.map(s => s.etiqueta)} seleccion={filtroSoportes} onChange={setFiltroSoportes} />
+                    </div>
+
+                    <div className="ai-row" style={{ gap: 18, flexWrap: 'wrap', padding: '0 16px 12px', alignItems: 'flex-end' }}>
+                        <div>
+                            <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Rango sobre</label>
+                            <select className="ai-input" value={rangoCampo} onChange={(e) => setRangoCampo(e.target.value)}>
+                                {CAMPOS_RANGO.map(({ valor, etiqueta }) => <option key={valor} value={valor}>{etiqueta}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Desde</label>
+                            <input type="date" className="ai-input" value={rangoDesde} max={rangoHasta || undefined} onChange={(e) => setRangoDesde(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Hasta</label>
+                            <input type="date" className="ai-input" value={rangoHasta} min={rangoDesde || undefined} onChange={(e) => setRangoHasta(e.target.value)} />
+                        </div>
+                        {hayFiltros && (
+                            <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={limpiarFiltros}>
+                                Limpiar filtros
+                            </button>
+                        )}
+                        {hayFiltros && !rangoInvalido && (
+                            <span className="ai-muted" style={{ fontSize: 13, paddingBottom: 8 }}>
+                                <strong className="ai-num">{filtered.length}</strong> de {novedades.length} novedades
+                                {hayRango ? ` con ${ETIQUETA_CAMPO_RANGO[rangoCampo].toLowerCase()} en el rango` : ''}
+                            </span>
+                        )}
+                        {rangoInvalido && (
+                            <span style={{ color: 'var(--danger)', fontSize: 13, paddingBottom: 8 }}>La fecha Desde no puede ser posterior a Hasta</span>
+                        )}
                     </div>
 
                     {loading ? (
@@ -141,12 +329,15 @@ const NovedadesRRHH = () => {
                         <div style={{ padding: 48, textAlign: 'center' }}>
                             <ClipboardList size={36} style={{ margin: '0 auto 10px', color: 'var(--ink-subtle)' }} />
                             <p style={{ fontWeight: 600, margin: 0 }}>No hay novedades</p>
-                            <p className="ai-muted" style={{ marginTop: 4 }}>Registra una nueva novedad para empezar.</p>
+                            <p className="ai-muted" style={{ marginTop: 4 }}>
+                                {hayFiltros ? 'Ninguna novedad coincide con los filtros.' : 'Registra una nueva novedad para empezar.'}
+                            </p>
                         </div>
                     ) : (
                         <table className="ai-table ai-table--dense">
                             <thead>
                                 <tr>
+                                    <th>Registrada</th>
                                     <th>Empleado</th>
                                     <th>Campaña</th>
                                     <th>Novedad</th>
@@ -165,6 +356,7 @@ const NovedadesRRHH = () => {
                                     const chip = claseCampania(n.campania_nombre);
                                     return (
                                             <tr key={n.idnovedad_rrhh}>
+                                                <td className="ai-muted ai-num" style={{ whiteSpace: 'nowrap' }}>{fmtRegistro(n.created_at)}</td>
                                                 <td>
                                                     <div className="ai-person">
                                                         <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(n.empleado_nombre)}</span>
