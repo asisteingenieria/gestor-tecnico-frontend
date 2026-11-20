@@ -37,12 +37,13 @@ async function mensajeDeError(err) {
     return data?.message || 'No se pudo descargar el Excel de empleados';
 }
 
-const DescargarEmpleadosModal = ({ isOpen, onClose }) => {
-    const [estados, setEstados] = useState([]);
-    const [campoFecha, setCampoFecha] = useState('ingreso');
-    const [campoManual, setCampoManual] = useState(false);
-    const [desde, setDesde] = useState('');
-    const [hasta, setHasta] = useState('');
+// `inicial`: los filtros de estado y fechas que hay en pantalla, para que la descarga salga igual a lo que se ve.
+const DescargarEmpleadosModal = ({ isOpen, onClose, inicial = {} }) => {
+    const [estados, setEstados] = useState(inicial.estados || []);
+    const [campoFecha, setCampoFecha] = useState(inicial.campoFecha || campoSugerido(inicial.estados || []));
+    const [campoManual, setCampoManual] = useState(Boolean(inicial.campoManual));
+    const [desde, setDesde] = useState(inicial.desde || '');
+    const [hasta, setHasta] = useState(inicial.hasta || '');
     const [descargando, setDescargando] = useState(false);
     const [error, setError] = useState('');
     const [resultado, setResultado] = useState('');
