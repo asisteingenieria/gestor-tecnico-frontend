@@ -31,7 +31,7 @@ const ORDENES = {
     pasivo_desc: { etiqueta: 'Mayor pasivo', comparar: (a, b) => (Number(b.pasivo_dias) || 0) - (Number(a.pasivo_dias) || 0) },
     pasivo_asc: { etiqueta: 'Menor pasivo', comparar: (a, b) => (Number(a.pasivo_dias) || 0) - (Number(b.pasivo_dias) || 0) }
 };
-const AYUDA_OBSERVACION = 'Con observación: no venía en el Excel de corte de Gestión Humana. Su pasivo es el acumulado menos las novedades de Vacaciones registradas; financiera puede ajustar su saldo.';
+const AYUDA_OBSERVACION = 'Con observación: no venía en el Excel de corte de Gestión Humana y ya trabajaba antes del mes del corte. Su pasivo es el acumulado menos las novedades de Vacaciones registradas; financiera puede ajustar su saldo. Quien ingresó en el mes del corte o después no la lleva: su cálculo ya está completo.';
 
 const hoyBogota = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 // Último día del mes anterior y del mes actual, para los atajos de cierre.
@@ -106,7 +106,7 @@ const PasivoVacacional = () => {
         if (busqueda && !((f.nombre || '').toLowerCase().includes(busqueda) || String(f.numero_identificacion || '').includes(busqueda) || (f.cargo || '').toLowerCase().includes(busqueda))) return false;
         if (filtroCampanias.size && !filtroCampanias.has(f.campania || 'Sin campaña')) return false;
         if (filtroAreas.size && !filtroAreas.has(f.area || 'Sin área')) return false;
-        if (filtroSaldo.size && !(filtroSaldo.has(f.con_corte ? SALDO.con : SALDO.sin)
+        if (filtroSaldo.size && !(filtroSaldo.has(f.con_observacion ? SALDO.sin : SALDO.con)
             || (filtroSaldo.has(SALDO.ajustado) && f.origen_saldo === 'financiera'))) return false;
         if (filtroPasivo.size && !RANGOS_PASIVO.some(r => filtroPasivo.has(r.etiqueta) && r.cumple(Number(f.pasivo_dias) || 0))) return false;
         return true;
@@ -121,7 +121,7 @@ const PasivoVacacional = () => {
         programadas: suma('dias_programados'),
         totalDias: suma('total_dias'),
         valorTotal: suma('valor_total'),
-        sinCorte: filtradas.filter(f => !f.con_corte).length
+        sinCorte: filtradas.filter(f => f.con_observacion).length
     };
 
     const { conValores } = datos;
@@ -316,7 +316,7 @@ const PasivoVacacional = () => {
                                                             <div className="ai-person-name">{nombrePropio(f.nombre)}</div>
                                                             <div className="ai-person-sub">
                                                                 {f.numero_identificacion}
-                                                                {!f.con_corte && (
+                                                                {f.con_observacion && (
                                                                     <span className="ai-badge ai-badge--warning" style={{ marginLeft: 6 }} title={AYUDA_OBSERVACION}>
                                                                         con observación
                                                                     </span>
