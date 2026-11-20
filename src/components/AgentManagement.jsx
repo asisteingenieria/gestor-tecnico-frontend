@@ -401,13 +401,19 @@ const AgentManagement = ({ soloLectura = false }) => {
     });
 
     // KPI de personal: activos = contrato vigente (activo, periodo de prueba o suspendido); los retirados
-    // (retirado o inactivo) van en su propio indicador. En la vista del admin no cuenta la ficha placeholder.
+    // (retirado o inactivo) van en su propio indicador. Se cuentan sobre la lista FILTRADA (§56.2): con
+    // Campaña = T&T muestran los activos y retirados de T&T, y así con cualquier filtro, rango de fechas o
+    // búsqueda. Sin filtros es el total. En la vista del admin no cuenta la ficha placeholder.
+    const esActivo = (e) => ['activo', 'periodo_prueba', 'suspendido'].includes(e.estado_contrato_nombre);
+    const esRetirado = (e) => ['retirado', 'inactivo'].includes(e.estado_contrato_nombre);
     const empleadosReales = soloLectura ? empleados.filter(e => e.numero_identificacion !== '0123456789') : empleados;
-    const totalRetirados = empleadosReales.filter(e => ['retirado', 'inactivo'].includes(e.estado_contrato_nombre)).length;
-    const totalEmpleadosActivos = empleadosReales.filter(e => ['activo', 'periodo_prueba', 'suspendido'].includes(e.estado_contrato_nombre)).length;
+    const totalRetirados = filteredEmpleados.filter(esRetirado).length;
+    const totalEmpleadosActivos = filteredEmpleados.filter(esActivo).length;
+    const totalRetiradosGeneral = empleadosReales.filter(esRetirado).length;
+    const totalActivosGeneral = empleadosReales.filter(esActivo).length;
 
-    const totalConActivos = empleados.filter(e => e.total_activos > 0).length;
-    const totalActivos = empleados.reduce((sum, e) => sum + (e.total_activos || 0), 0);
+    const totalConActivos = filteredEmpleados.filter(e => e.total_activos > 0).length;
+    const totalActivos = filteredEmpleados.reduce((sum, e) => sum + (e.total_activos || 0), 0);
 
     // En la vista del admin (solo lectura) se ordena por fecha de registro (ver fechaRegistro),
     // del más reciente al más antiguo, en vez del orden alfabético que trae el backend para RRHH.
@@ -516,6 +522,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                         <div>
                             <p className="ai-kpi-label">Empleados activos</p>
                             <p className="ai-kpi-value ai-num">{totalEmpleadosActivos}</p>
+                            {hayFiltrosActivos && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>Según los filtros · <span className="ai-num">{totalActivosGeneral}</span> en total</p>}
                         </div>
                     </div>
                     <div>
@@ -523,6 +530,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                         <div>
                             <p className="ai-kpi-label">Retirados</p>
                             <p className="ai-kpi-value ai-num">{totalRetirados}</p>
+                            {hayFiltrosActivos && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>Según los filtros · <span className="ai-num">{totalRetiradosGeneral}</span> en total</p>}
                         </div>
                     </div>
                     {!soloLectura && (
