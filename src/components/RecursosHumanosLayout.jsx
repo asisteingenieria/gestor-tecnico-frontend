@@ -66,6 +66,25 @@ const RecursosHumanosLayout = () => {
         : isFinanciera
             ? [NAV_FINANCIERA[0], ...NAV_ITEMS.slice(0, -1), ...NAV_FINANCIERA.slice(1), NAV_ITEMS[NAV_ITEMS.length - 1]]
             : NAV_ITEMS;
+    // Financiera tiene 11 opciones y no caben junto a la marca y el menú de usuario: van en una segunda fila
+    // que se parte en dos renglones si la pantalla es angosta, para que siempre se vean todas.
+    const navEnSegundaFila = navItems.length > 7;
+
+    const enlacesNav = navItems.map(({ to, label, icon: Icon, end, countKey }) => (
+        <NavLink
+            key={to}
+            to={to}
+            end={end}
+            title={label}
+            className={({ isActive }) => `ai-topnav-link${isActive ? ' is-active' : ''}`}
+        >
+            <Icon className="ai-ic" size={16} strokeWidth={1.75} />
+            <span className="ai-topnav-link-text">{label}</span>
+            {countKey && contadores[countKey] != null && (
+                <span className="ai-count">{contadores[countKey]}</span>
+            )}
+        </NavLink>
+    ));
 
     useEffect(() => {
         const cerrarFuera = (e) => {
@@ -100,22 +119,11 @@ const RecursosHumanosLayout = () => {
                     </div>
                 </NavLink>
 
-                <div className="ai-topnav-links" style={{ display: 'none' }} data-desktop-nav>
-                    {navItems.map(({ to, label, icon: Icon, end, countKey }) => (
-                        <NavLink
-                            key={to}
-                            to={to}
-                            end={end}
-                            className={({ isActive }) => `ai-topnav-link${isActive ? ' is-active' : ''}`}
-                        >
-                            <Icon className="ai-ic" size={16} strokeWidth={1.75} />
-                            <span className="ai-topnav-link-text">{label}</span>
-                            {countKey && contadores[countKey] != null && (
-                                <span className="ai-count">{contadores[countKey]}</span>
-                            )}
-                        </NavLink>
-                    ))}
-                </div>
+                {!navEnSegundaFila && (
+                    <div className="ai-topnav-links" style={{ display: 'none' }} data-desktop-nav>
+                        {enlacesNav}
+                    </div>
+                )}
 
                 <button
                     type="button"
@@ -185,6 +193,12 @@ const RecursosHumanosLayout = () => {
                 </div>
             </nav>
 
+            {navEnSegundaFila && (
+                <div className="ai-subnav" style={{ display: 'none' }} data-desktop-nav>
+                    {enlacesNav}
+                </div>
+            )}
+
             {mobileNavOpen && (
                 <div style={{ background: 'var(--sidebar-bg)', padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: 4 }} data-mobile-nav>
                     {navItems.map(({ to, label, icon: Icon, end, countKey }) => (
@@ -214,6 +228,11 @@ const RecursosHumanosLayout = () => {
                 [data-desktop-nav] { display: none; }
                 [data-mobile-toggle] { display: none; }
                 [data-topnav-actions] { flex: none; }
+                .ai-subnav {
+                    flex-wrap: wrap; gap: 2px 4px; padding: 0 var(--space-8);
+                    background: var(--sidebar-bg); border-top: 1px solid rgba(255,255,255,.08);
+                }
+                .ai-subnav .ai-topnav-link { height: 44px; }
                 @media (min-width: 768px) {
                     [data-desktop-nav] { display: flex !important; }
                     [data-mobile-nav] { display: none !important; }
@@ -223,7 +242,7 @@ const RecursosHumanosLayout = () => {
                     [data-topnav-actions] { display: none !important; }
                 }
                 @media (min-width: 768px) and (max-width: 1099px) {
-                    .ai-topnav-link-text { display: none; }
+                    .ai-topnav-links .ai-topnav-link-text { display: none; }
                 }
             `}</style>
         </div>
