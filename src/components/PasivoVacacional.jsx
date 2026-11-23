@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { pasivoVacacionalService } from '../services/api';
+import { pasivoVacacionalService, asistenciaService } from '../services/api';
+import SelectorVistaEquipo from './asistencia/SelectorVistaEquipo';
 import Pagination from './Pagination';
 import FiltroChip from './FiltroChip';
 import AjusteSaldoPasivo from './AjusteSaldoPasivo';
@@ -69,7 +70,9 @@ async function mensajeDeError(err, porDefecto) {
     return data?.message || porDefecto;
 }
 
-const PasivoVacacional = () => {
+// `vistaEquipo`: la pestaña "Vacaciones" del Equipo de jefes, coordinadores y directores (§58.6). Solo su gente,
+// solo en días, sin descarga, sin ajuste y sin la marca "con observación", que es de RRHH y financiera.
+const PasivoVacacional = ({ vistaEquipo = false }) => {
     const { isRecursosHumanos } = useAuth();
     const [fecha, setFecha] = useState(hoyBogota());
     // `conValores`: el servidor solo manda salario y valores en pesos a financiera; RRHH ve el pasivo en días.
@@ -91,7 +94,7 @@ const PasivoVacacional = () => {
     const cargar = async (dia = fecha) => {
         try {
             setLoading(true);
-            const response = await pasivoVacacionalService.get({ fecha: dia });
+            const response = await (vistaEquipo ? asistenciaService.getPasivoEquipo : pasivoVacacionalService.get)({ fecha: dia });
             setDatos({ filas: response.data.filas, totales: response.data.totales, conValores: Boolean(response.data.con_valores) });
             setError('');
         } catch (err) {
@@ -156,7 +159,7 @@ const PasivoVacacional = () => {
         }
     };
 
-    if (!isRecursosHumanos) {
+    if (!isRecursosHumanos && !vistaEquipo) {
         return (
             <div className="ai-scope">
                 <div className="ai-content" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -171,16 +174,19 @@ const PasivoVacacional = () => {
     }
 
     return (
-        <div className="ai-scope">
+        <div className={vistaEquipo ? undefined : 'ai-scope'}>
             <div className="ai-content">
                 <div className="ai-page-head">
                     <div>
-                        <h1 className="ai-page-title">Pasivo vacacional</h1>
+                        <h1 className="ai-page-title">{vistaEquipo ? 'Vacaciones del equipo' : 'Pasivo vacacional'}</h1>
                         <p className="ai-page-sub">
-                            {conValores ? 'Días y valor' : 'Días'} de vacaciones pendientes por empleado, con la fórmula del Excel de Gestión Humana
+                            {vistaEquipo
+                                ? 'Días de vacaciones pendientes de tu gente, con la fórmula de Gestión Humana'
+                                : <>{conValores ? 'Días y valor' : 'Días'} de vacaciones pendientes por empleado, con la fórmula del Excel de Gestión Humana</>}
                         </p>
                     </div>
                     <div className="ai-row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        {vistaEquipo && <SelectorVistaEquipo />}
                         <div>
                             <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Calcular al</label>
                             <input type="date" className="ai-input" value={fecha} onChange={(e) => e.target.value && setFecha(e.target.value)} />
@@ -217,7 +223,7 @@ const PasivoVacacional = () => {
                         <div>
                             <p className="ai-kpi-label">Empleados</p>
                             <p className="ai-kpi-value ai-num">{kpi.empleados}</p>
-                            {kpi.sinCorte > 0 && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }} title={AYUDA_OBSERVACION}><span className="ai-num">{kpi.sinCorte}</span> con observación</p>}
+                            {!vistaEquipo && kpi.sinCorte > 0 && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }} title={AYUDA_OBSERVACION}><span className="ai-num">{kpi.sinCorte}</span> con observación</p>}
                             {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{kpiTotal.empleados}</span> en total</p>}
                         </div>
                     </div>
@@ -270,7 +276,7 @@ const PasivoVacacional = () => {
                         </div>
                         <FiltroChip etiqueta="Campaña" opciones={opcionesCampania} seleccion={filtroCampanias} onChange={setFiltroCampanias} />
                         <FiltroChip etiqueta="Área" opciones={opcionesArea} seleccion={filtroAreas} onChange={setFiltroAreas} />
-                        <FiltroChip etiqueta="Observación" opciones={[SALDO.sin, SALDO.con, SALDO.ajustado]} seleccion={filtroSaldo} onChange={setFiltroSaldo} />
+                        {!vistaEquipo && <FiltroChip etiqueta="Observación" opciones={[SALDO.sin, SALDO.con, SALDO.ajustado]} seleccion={filtroSaldo} onChange={setFiltroSaldo} />}
                         <FiltroChip etiqueta="Pasivo" opciones={RANGOS_PASIVO.map(r => r.etiqueta)} seleccion={filtroPasivo} onChange={setFiltroPasivo} />
                         <select value={orden} onChange={(e) => setOrden(e.target.value)} className="ai-input" style={{ width: 'auto' }} title="Orden de la tabla">
                             {Object.entries(ORDENES).map(([k, o]) => <option key={k} value={k}>Ordenar: {o.etiqueta}</option>)}
@@ -293,7 +299,7 @@ const PasivoVacacional = () => {
                         <div style={{ padding: 48, textAlign: 'center' }}>
                             <CalendarClock size={36} style={{ margin: '0 auto 10px', color: 'var(--ink-subtle)' }} />
                             <p style={{ fontWeight: 600, margin: 0 }}>Sin empleados</p>
-                            <p className="ai-muted" style={{ marginTop: 4 }}>{hayFiltros ? 'Ningún empleado coincide con los filtros.' : 'No hay empleados vigentes a esa fecha.'}</p>
+                            <p className="ai-muted" style={{ marginTop: 4 }}>{hayFiltros ? 'Ningún empleado coincide con los filtros.' : (vistaEquipo ? 'No tienes personal a cargo vigente a esa fecha.' : 'No hay empleados vigentes a esa fecha.')}</p>
                         </div>
                     ) : (
                         <div style={{ overflowX: 'auto' }}>
@@ -326,7 +332,7 @@ const PasivoVacacional = () => {
                                                             <div className="ai-person-name">{nombrePropio(f.nombre)}</div>
                                                             <div className="ai-person-sub">
                                                                 {f.numero_identificacion}
-                                                                {f.con_observacion && (
+                                                                {!vistaEquipo && f.con_observacion && (
                                                                     <span className="ai-badge ai-badge--warning" style={{ marginLeft: 6 }} title={AYUDA_OBSERVACION}>
                                                                         con observación
                                                                     </span>
