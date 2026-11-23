@@ -22,7 +22,12 @@ async function mensajeDeError(err, porDefecto) {
     return data?.message || porDefecto;
 }
 
-const OMITIDO_TEXTO = { no_a_cargo: 'No está a tu cargo', no_encontrado: 'Cédula sin ficha en RRHH' };
+const OMITIDO_TEXTO = {
+    retirado: 'Retirado en RRHH',
+    antes_ingreso: 'Días antes de su ingreso',
+    no_a_cargo: 'No está a tu cargo',
+    no_encontrado: 'Cédula sin ficha en RRHH'
+};
 
 // 'YYYY-MM-DD' → 'mar 4 nov'. Mediodía local para que la zona horaria no corra el día.
 const fechaCorta = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -303,7 +308,7 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
                                                     <tr key={o.cedula}>
                                                         <td>{o.nombre || '—'}</td>
                                                         <td className="ai-num">{o.cedula}</td>
-                                                        <td><span className={`ai-badge ${o.estado === 'no_encontrado' ? 'ai-badge--warning' : 'ai-badge--neutral'}`}>{OMITIDO_TEXTO[o.estado]}</span></td>
+                                                        <td><span className={`ai-badge ${o.estado === 'no_encontrado' || o.estado === 'retirado' ? 'ai-badge--warning' : 'ai-badge--neutral'}`}>{OMITIDO_TEXTO[o.estado]}</span></td>
                                                         <td className="ai-num ai-muted">{o.dias}</td>
                                                     </tr>
                                                 ))}
