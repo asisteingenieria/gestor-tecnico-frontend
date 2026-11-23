@@ -29,7 +29,7 @@ const fechaCorta = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('es-C
 const hora = (h) => String(h ?? '').slice(0, 5);
 // La modalidad viene de la columna "Modelo Trabajo" de la malla (§58); solo se señala la virtual.
 const turnoTexto = (h) => (h.es_descanso
-    ? `Descanso${h.notas && h.notas !== 'Libre' ? ` · ${h.notas}` : ''}`
+    ? `Descanso${h.notas && !['Libre', 'Descanso'].includes(h.notas) ? ` · ${h.notas}` : ''}`
     : `${hora(h.hora_entrada)}–${hora(h.hora_salida)}${h.modalidad === 'virtual' ? ' · Virtual' : ''}`);
 
 function agruparPorPersona(horarios) {
@@ -184,7 +184,7 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
                         {!vista && (
                             <span style={{ fontSize: 12 }}>
                                 La plantilla de arriba, o la 01_Mallas_Operacion: Fecha, Cédula, Entrada, Salida, Almuerzo y Modelo Trabajo (las demás columnas son informativas).
-                                Para un descanso deja Entrada y Salida vacías y pon en Novedad LIBRE, INC, VACACIONES, RETIRO, SUSPENSION, LNR o LR (o 00:00 en Entrada y Salida).
+                                Para un descanso deja Entrada y Salida vacías y pon en Novedad DESCANSO (o INC, VACACIONES, RETIRO, SUSPENSION, LNR o LR si es otra ausencia).
                                 Las filas sin horario ni novedad no se cargan. Los turnos que no tengan plantilla se guardan como plantillas tuyas.
                             </span>
                         )}
