@@ -349,6 +349,8 @@ export const asistenciaService = {
     asignarHorarios: (data) => api.post('/asistencia/horarios', data),
     actualizarHorario: (id, data) => api.put(`/asistencia/horarios/${id}`, data),
     eliminarHorario: (id) => api.delete(`/asistencia/horarios/${id}`),
+    // Plantilla de cargue de la malla con el equipo directo, una fila por persona y día (backend asistencia.md §75).
+    descargarPlantillaMalla: (params = {}) => api.get('/asistencia/horarios/malla/plantilla', { params, responseType: 'blob', timeout: 60000 }),
     // Malla de horarios en Excel (backend asistencia.md §55): misma subida para la vista previa y para aplicar.
     previsualizarMalla: (archivo) => {
         const formData = new FormData();

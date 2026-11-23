@@ -1,10 +1,26 @@
 import React, { useMemo, useState } from 'react';
-import { FileSpreadsheet, X, Loader2, ChevronDown, ChevronRight, Upload } from 'lucide-react';
+import { FileSpreadsheet, X, Loader2, ChevronDown, ChevronRight, Upload, Download } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 
 // Carga de la malla de horarios en Excel (backend asistencia.md §55). El jefe sube el archivo tal
 // como sale de tab_mallas_turnos_mes (Mallas1.xlsx); se aplica de hoy en adelante y solo a su equipo
 // directo. Primero una vista previa (no escribe nada) y luego "Aplicar".
+
+// Fecha de hoy en Bogotá y días después, 'YYYY-MM-DD', para el rango de la plantilla (§75).
+const hoyBogota = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+const masDias = (iso, n) => {
+    const d = new Date(`${iso}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+};
+
+async function mensajeDeError(err, porDefecto) {
+    const data = err?.response?.data;
+    if (data instanceof Blob) {
+        try { return JSON.parse(await data.text()).message || porDefecto; } catch { /* no era JSON */ }
+    }
+    return data?.message || porDefecto;
+}
 
 const OMITIDO_TEXTO = { no_a_cargo: 'No está a tu cargo', no_encontrado: 'Cédula sin ficha en RRHH' };
 
@@ -45,6 +61,34 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
     const [error, setError] = useState(null);
     const [tab, setTab] = useState('aplicar');
     const [abiertos, setAbiertos] = useState(() => new Set());
+    // Plantilla con el equipo directo (§75): por defecto hoy y los 6 días siguientes.
+    const [desde, setDesde] = useState(hoyBogota);
+    const [hasta, setHasta] = useState(() => masDias(hoyBogota(), 6));
+    const [descargando, setDescargando] = useState(false);
+    const [avisoPlantilla, setAvisoPlantilla] = useState(null);
+
+    const descargarPlantilla = async () => {
+        setDescargando(true);
+        setError(null);
+        setAvisoPlantilla(null);
+        try {
+            const response = await asistenciaService.descargarPlantillaMalla({ desde, hasta });
+            const disposicion = response.headers?.['content-disposition'] || '';
+            const nombre = disposicion.match(/filename="?([^"]+)"?/)?.[1] || `plantilla_malla_${desde}_a_${hasta}.xlsx`;
+            const url = URL.createObjectURL(response.data);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            a.click();
+            URL.revokeObjectURL(url);
+            const personas = response.headers?.['x-total-personas'];
+            setAvisoPlantilla(`Se descargó la plantilla${personas ? ` con ${personas} personas` : ''}. Llena los horarios y súbela aquí abajo.`);
+        } catch (err) {
+            setError(await mensajeDeError(err, 'No se pudo descargar la plantilla'));
+        } finally {
+            setDescargando(false);
+        }
+    };
 
     const personas = useMemo(() => agruparPorPersona(vista?.horarios ?? []), [vista]);
     const conCambios = personas.filter((p) => p.nuevo + p.reemplaza > 0).length;
@@ -106,14 +150,42 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
                 </div>
 
                 <div className="ai-modal-body ai-stack" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                    {!vista && (
+                        <div style={{ padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>1. Descarga la plantilla de tu equipo</div>
+                            <p className="ai-muted" style={{ fontSize: 12, margin: '4px 0 10px' }}>
+                                Trae la cédula, el nombre, el cargo y el centro de costo de cada persona de tu equipo directo, una fila por día.
+                                Solo llenas Entrada, Salida, Almuerzo y el Modelo Trabajo (Presencial o Trabajo en casa). Si ya tenían horario, viene precargado.
+                            </p>
+                            <div className="ai-row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                                <div>
+                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Desde</label>
+                                    <input type="date" className="ai-input" style={{ width: 160 }} value={desde} min={hoyBogota()}
+                                        onChange={(e) => e.target.value && setDesde(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Hasta</label>
+                                    <input type="date" className="ai-input" style={{ width: 160 }} value={hasta} min={desde} max={masDias(desde, 61)}
+                                        onChange={(e) => e.target.value && setHasta(e.target.value)} />
+                                </div>
+                                <button type="button" className="ai-btn ai-btn--secondary" onClick={descargarPlantilla} disabled={descargando || !desde || !hasta || hasta < desde}>
+                                    {descargando ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                                    {descargando ? 'Generando…' : 'Descargar plantilla'}
+                                </button>
+                            </div>
+                            {avisoPlantilla && <p style={{ color: 'var(--success, #15803d)', fontSize: 12, margin: '8px 0 0' }}>{avisoPlantilla}</p>}
+                        </div>
+                    )}
+
+                    {!vista && <div style={{ fontWeight: 600, fontSize: 14 }}>2. Sube la malla llena</div>}
                     <label className="ai-drop" style={{ cursor: 'pointer', padding: vista ? '14px' : undefined }}>
                         <Upload size={22} strokeWidth={1.75} />
                         <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{archivo ? archivo.name : 'Selecciona el archivo .xlsx de la malla'}</span>
                         {!vista && (
                             <span style={{ fontSize: 12 }}>
-                                Plantilla 01_Mallas_Operacion: Fecha, Cédulaplataforma, Entrada, Salida y Tiempo de Almuerzo (las demás columnas son informativas).
-                                Para un descanso pon 00:00 en Entrada y Salida, o escribe en Entrada LIBRE, INC, VACACIONES, RETIRO, SUSPENSION, LNR o LR.
-                                Los turnos que no tengan plantilla se guardan como plantillas tuyas.
+                                La plantilla de arriba, o la 01_Mallas_Operacion: Fecha, Cédula, Entrada, Salida, Almuerzo y Modelo Trabajo (las demás columnas son informativas).
+                                Para un descanso deja Entrada y Salida vacías y pon en Novedad LIBRE, INC, VACACIONES, RETIRO, SUSPENSION, LNR o LR (o 00:00 en Entrada y Salida).
+                                Las filas sin horario ni novedad no se cargan. Los turnos que no tengan plantilla se guardan como plantillas tuyas.
                             </span>
                         )}
                         <input
@@ -142,6 +214,11 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
                                 <Kpi label="Otras personas (omitidas)" valor={vista.omitidos.length} />
                                 <Kpi label="Filas con error" valor={r.errores} tono={r.errores > 0 ? 'var(--danger)' : undefined} />
                             </div>
+                            {r.sin_diligenciar > 0 && (
+                                <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>
+                                    {r.sin_diligenciar} filas sin horario ni novedad no se cargan: esos días quedan como estaban.
+                                </p>
+                            )}
 
                             {vista.plantillas_nuevas?.length > 0 && (
                                 <div style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: 13 }}>
