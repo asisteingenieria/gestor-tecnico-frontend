@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, Search, FileText, BarChart3, ClipboardList, Moon } from 'lucide-react';
+import { Loader2, Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, Search, FileText, BarChart3, ClipboardList, Moon, LogOut } from 'lucide-react';
 import { asistenciaService, financieraService } from '../../services/api';
 import { nombrePropio, iniciales, primeraMayuscula } from '../../utils/formatoRRHH';
 import { formatearDuracion } from '../../utils/tiempoAsistencia';
@@ -37,7 +37,7 @@ const ESTADO_BADGE = {
     pendiente: { label: 'Sin iniciar', clase: 'ai-badge--neutral' },
     en_curso: { label: 'En turno', clase: 'ai-badge--success' },
     en_pausa: { label: 'En pausa', clase: 'ai-badge--info' },
-    finalizada: { label: 'Finalizada', clase: 'ai-badge--neutral' },
+    finalizada: { label: 'Terminó', clase: 'ai-badge--neutral' },
     ausente: { label: 'Ausente', clase: 'ai-badge--danger' },
     // Novedad de RRHH que cubre hoy (§71): no vino, pero no es ausencia ni "aún no llega".
     novedad: { label: 'Con novedad', clase: 'ai-nov-badge' },
@@ -54,17 +54,58 @@ const estadoVista = (emp) => {
 
 const ORDEN_ESTADO = { ausente: 0, en_pausa: 1, en_curso: 2, pendiente: 3, novedad: 4, descanso: 5, finalizada: 6 };
 
-const TABS = [
-    { id: 'todos', label: 'Todos' },
-    { id: 'en_curso', label: 'En turno' },
-    { id: 'en_pausa', label: 'En pausa' },
-    { id: 'pendiente', label: 'Sin iniciar' },
-    { id: 'ausente', label: 'Ausentes' },
-    { id: 'novedad', label: 'Con novedad' },
-    { id: 'descanso', label: 'Descanso' }
+// Los estados del día: cada persona está en uno solo, así que sus tarjetas suman siempre el total.
+// "En pausa" incluye a quien se desconectó de AsisLock y no ha vuelto (el estado de su jornada es en_pausa).
+const ESTADOS_DIA = [
+    { id: 'en_curso', label: 'En turno', color: 'var(--success)' },
+    { id: 'en_pausa', label: 'En pausa', color: 'var(--primary)' },
+    { id: 'pendiente', label: 'Sin iniciar', color: '#94a3b8' },
+    { id: 'finalizada', label: 'Terminaron', color: 'var(--ink-subtle)' },
+    { id: 'ausente', label: 'Ausentes', color: 'var(--danger)' },
+    { id: 'novedad', label: 'Con novedad', color: '#a8338f' },
+    { id: 'descanso', label: 'Descanso', color: '#0e7490' }
 ];
 
+// "Llegaron tarde" no es un estado (quien llegó tarde puede estar en turno, en pausa o ya haber terminado):
+// va al final, como filtro aparte.
+const TABS = [{ id: 'todos', label: 'Todos' }, ...ESTADOS_DIA, { id: 'tarde', label: 'Llegaron tarde' }];
+
 const SIN_CENTRO = 'Sin centro de costo';
+
+const ICONO_KPI = {
+    en_curso: <UserCheck size={16} strokeWidth={1.75} />,
+    en_pausa: <Coffee size={16} strokeWidth={1.75} />,
+    pendiente: <Clock size={16} strokeWidth={1.75} />,
+    finalizada: <LogOut size={16} strokeWidth={1.75} />,
+    ausente: <UserX size={16} strokeWidth={1.75} />,
+    novedad: <ClipboardList size={16} strokeWidth={1.75} />,
+    descanso: <Moon size={16} strokeWidth={1.75} />
+};
+
+const TITULO_KPI = {
+    en_curso: 'Conectados y trabajando en este momento',
+    en_pausa: 'En baño, break, almuerzo o capacitación, o desconectados de AsisLock sin volver',
+    pendiente: 'Todavía no se han logueado hoy',
+    finalizada: 'Ya marcaron salida o su jornada de hoy se cerró',
+    ausente: 'Tenían turno y no se loguearon (se marca al cierre del día)',
+    novedad: 'Incapacidades, vacaciones, licencias y suspensiones de RRHH que cubren hoy',
+    descanso: 'Hoy tienen día de descanso en su malla'
+};
+
+// Pie de cada tarjeta: el detalle que explica el número.
+function pieKpi(estado, k) {
+    if (estado === 'en_curso') return `${k.presencial} presencial · ${k.teletrabajo} teletrabajo`;
+    if (estado === 'en_pausa') {
+        const partes = [['baño', k.bano], ['break', k.breaks], ['almuerzo', k.almuerzo], ['capacitación', k.capacitacion], ['desconectados', k.desconectados]]
+            .filter(([, n]) => n > 0).map(([t, n]) => `${n} ${t}`);
+        return partes.length ? partes.join(' · ') : 'Nadie en pausa';
+    }
+    if (estado === 'pendiente') return 'Aún no se loguean';
+    if (estado === 'finalizada') return 'Ya salieron hoy';
+    if (estado === 'ausente') return 'Tenían turno y no vinieron';
+    if (estado === 'novedad') return 'No cuentan como ausentes';
+    return 'Día libre de su malla';
+}
 
 function esTarde(emp) {
     return emp.alertas?.includes('llegada_tarde');
@@ -191,24 +232,33 @@ const EquipoAsistencia = ({ financiera = false }) => {
         [equipo, centro]
     );
 
-    const kpis = useMemo(() => ({
-        enTurno: delCentro.filter((e) => e.estado === 'en_curso').length,
-        enPausaBano: delCentro.filter((e) => e.pausa_activa?.tipo === 'bano').length,
-        enPausaAlmuerzo: delCentro.filter((e) => e.pausa_activa?.tipo === 'almuerzo').length,
-        enPausaBreak: delCentro.filter((e) => e.pausa_activa?.tipo === 'break').length,
-        enCapacitacion: delCentro.filter((e) => e.pausa_activa?.tipo === 'capacitacion').length,
-        sinIniciar: delCentro.filter((e) => estadoVista(e) === 'pendiente').length,
-        tarde: delCentro.filter(esTarde).length,
-        ausentes: delCentro.filter((e) => estadoVista(e) === 'ausente').length,
-        conNovedad: delCentro.filter((e) => estadoVista(e) === 'novedad').length,
-        descanso: delCentro.filter((e) => estadoVista(e) === 'descanso').length,
-        presencial: delCentro.filter((e) => e.asislock?.modalidad === 'presencial').length,
-        teletrabajo: delCentro.filter((e) => e.asislock?.modalidad === 'teletrabajo').length
-    }), [delCentro]);
+    const kpis = useMemo(() => {
+        const porEstado = Object.fromEntries(ESTADOS_DIA.map((e) => [e.id, 0]));
+        for (const e of delCentro) {
+            const estado = estadoVista(e);
+            if (estado in porEstado) porEstado[estado]++;
+        }
+        const enTurno = delCentro.filter((e) => estadoVista(e) === 'en_curso');
+        const enPausa = delCentro.filter((e) => estadoVista(e) === 'en_pausa');
+        const pausa = (tipo) => enPausa.filter((e) => e.pausa_activa?.tipo === tipo).length;
+        return {
+            porEstado,
+            // Modalidad solo de quienes están en turno ahora (antes contaba a todos los del día).
+            presencial: enTurno.filter((e) => e.asislock?.modalidad === 'presencial').length,
+            teletrabajo: enTurno.filter((e) => e.asislock?.modalidad === 'teletrabajo').length,
+            bano: pausa('bano'),
+            breaks: pausa('break'),
+            almuerzo: pausa('almuerzo'),
+            capacitacion: pausa('capacitacion'),
+            desconectados: enPausa.filter((e) => !e.pausa_activa && e.desconexion_activa).length,
+            tarde: delCentro.filter(esTarde).length
+        };
+    }, [delCentro]);
 
     const filtrado = useMemo(() => {
         let lista = delCentro;
-        if (tab !== 'todos') lista = lista.filter((e) => estadoVista(e) === tab);
+        if (tab === 'tarde') lista = lista.filter(esTarde);
+        else if (tab !== 'todos') lista = lista.filter((e) => estadoVista(e) === tab);
         if (busqueda.trim()) {
             const q = busqueda.trim().toLowerCase();
             lista = lista.filter((e) => (e.nombre || '').toLowerCase().includes(q) || e.cedula?.includes(q));
@@ -296,41 +346,65 @@ const EquipoAsistencia = ({ financiera = false }) => {
 
             {error && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
 
-            <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
-                <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', border: tab === 'en_curso' ? '1px solid var(--primary)' : undefined }} onClick={() => setTab('en_curso')}>
-                    <div className="ai-kpi-head"><span className="ai-kpi-label">En turno</span><span className="ai-kpi-icon"><UserCheck size={16} strokeWidth={1.75} /></span></div>
-                    <div className="ai-kpi-value" style={{ color: 'var(--success)' }}>{kpis.enTurno}</div>
-                    <div className="ai-kpi-foot">{kpis.presencial} presencial · {kpis.teletrabajo} teletrabajo</div>
-                </button>
-                <div className="ai-kpi">
-                    <div className="ai-kpi-head"><span className="ai-kpi-label">En pausa</span><span className="ai-kpi-icon"><Coffee size={16} strokeWidth={1.75} /></span></div>
-                    <div className="ai-kpi-value">{kpis.enPausaBano + kpis.enPausaBreak + kpis.enPausaAlmuerzo + kpis.enCapacitacion}</div>
-                    <div className="ai-kpi-foot">{kpis.enPausaBano} baño · {kpis.enPausaBreak} break · {kpis.enPausaAlmuerzo} almuerzo · {kpis.enCapacitacion} capacitación</div>
+            {/* Reparto del día: una barra con los 7 estados, que suman el total de personas. */}
+            <div className="ai-panel" style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="ai-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                    <span style={{ font: '600 14px var(--font-sans)', color: 'var(--ink)' }}>
+                        {delCentro.length} persona{delCentro.length === 1 ? '' : 's'} hoy · cada una está en un solo estado
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setTab(tab === 'tarde' ? 'todos' : 'tarde')}
+                        className="ai-row"
+                        title="Ver quiénes llegaron tarde. Ya están contados en su estado actual (en turno, en pausa o terminaron)."
+                        style={{
+                            gap: 6, padding: '4px 10px', borderRadius: 999, cursor: 'pointer', font: '600 13px var(--font-sans)',
+                            border: `1px solid ${tab === 'tarde' ? 'var(--warning)' : 'var(--border)'}`,
+                            background: kpis.tarde > 0 ? 'var(--warning-soft)' : 'transparent',
+                            color: kpis.tarde > 0 ? 'var(--warning)' : 'var(--ink-muted)'
+                        }}
+                    >
+                        <AlertTriangle size={14} strokeWidth={1.75} />
+                        {kpis.tarde} llegaron tarde
+                        <span style={{ fontWeight: 400 }}>· ya incluidos en los estados</span>
+                    </button>
                 </div>
-                <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', border: tab === 'pendiente' ? '1px solid var(--primary)' : undefined }} onClick={() => setTab('pendiente')}>
-                    <div className="ai-kpi-head"><span className="ai-kpi-label">Sin iniciar</span><span className="ai-kpi-icon"><Clock size={16} strokeWidth={1.75} /></span></div>
-                    <div className="ai-kpi-value">{kpis.sinIniciar}</div>
-                </button>
-                <div className="ai-kpi" style={{ borderColor: kpis.tarde > 0 ? 'var(--warning)' : undefined }}>
-                    <div className="ai-kpi-head"><span className="ai-kpi-label">Llegaron tarde</span><span className="ai-kpi-icon" style={{ background: 'var(--warning-soft)', color: 'var(--warning)' }}><AlertTriangle size={16} strokeWidth={1.75} /></span></div>
-                    <div className="ai-kpi-value" style={{ color: kpis.tarde > 0 ? 'var(--warning)' : undefined }}>{kpis.tarde}</div>
+                <div style={{ display: 'flex', height: 10, borderRadius: 999, overflow: 'hidden', background: 'var(--surface-200)' }}>
+                    {delCentro.length > 0 && ESTADOS_DIA.map((e) => kpis.porEstado[e.id] > 0 && (
+                        <div
+                            key={e.id}
+                            title={`${e.label}: ${kpis.porEstado[e.id]}`}
+                            style={{ width: `${(kpis.porEstado[e.id] / delCentro.length) * 100}%`, background: e.color }}
+                        />
+                    ))}
                 </div>
-                <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', borderColor: kpis.ausentes > 0 ? 'var(--danger)' : (tab === 'ausente' ? 'var(--primary)' : undefined) }} onClick={() => setTab('ausente')}>
-                    <div className="ai-kpi-head"><span className="ai-kpi-label">Ausentes</span><span className="ai-kpi-icon" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}><UserX size={16} strokeWidth={1.75} /></span></div>
-                    <div className="ai-kpi-value" style={{ color: kpis.ausentes > 0 ? 'var(--danger)' : undefined }}>{kpis.ausentes}</div>
-                </button>
-                <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', borderColor: tab === 'novedad' ? 'var(--primary)' : undefined }} onClick={() => setTab('novedad')}
-                    title="Incapacidades, vacaciones, licencias y suspensiones de RRHH que cubren hoy">
-                    <div className="ai-kpi-head"><span className="ai-kpi-label">Con novedad</span><span className="ai-kpi-icon" style={{ background: '#f6e1f1', color: '#a8338f' }}><ClipboardList size={16} strokeWidth={1.75} /></span></div>
-                    <div className="ai-kpi-value" style={{ color: kpis.conNovedad > 0 ? '#a8338f' : undefined }}>{kpis.conNovedad}</div>
-                    <div className="ai-kpi-foot">No cuentan como ausentes</div>
-                </button>
-                <button type="button" className="ai-kpi" style={{ textAlign: 'left', cursor: 'pointer', borderColor: tab === 'descanso' ? 'var(--primary)' : undefined }} onClick={() => setTab('descanso')}
-                    title="Personas que hoy tienen día de descanso en su malla">
-                    <div className="ai-kpi-head"><span className="ai-kpi-label">Descanso</span><span className="ai-kpi-icon" style={{ background: '#cffafe', color: '#0e7490' }}><Moon size={16} strokeWidth={1.75} /></span></div>
-                    <div className="ai-kpi-value" style={{ color: kpis.descanso > 0 ? '#0e7490' : undefined }}>{kpis.descanso}</div>
-                    <div className="ai-kpi-foot">Día libre de su malla</div>
-                </button>
+            </div>
+
+            <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+                {ESTADOS_DIA.map((e) => {
+                    const valor = kpis.porEstado[e.id];
+                    const activa = tab === e.id;
+                    return (
+                        <button
+                            key={e.id}
+                            type="button"
+                            className="ai-kpi"
+                            onClick={() => setTab(activa ? 'todos' : e.id)}
+                            title={TITULO_KPI[e.id]}
+                            style={{ textAlign: 'left', cursor: 'pointer', borderColor: activa ? 'var(--primary)' : (e.id === 'ausente' && valor > 0 ? 'var(--danger)' : undefined), boxShadow: activa ? '0 0 0 1px var(--primary)' : undefined }}
+                        >
+                            <div className="ai-kpi-head">
+                                <span className="ai-kpi-label ai-row" style={{ gap: 6 }}>
+                                    <span style={{ width: 8, height: 8, borderRadius: 999, background: e.color, flex: 'none' }} />
+                                    {e.label}
+                                </span>
+                                <span className="ai-kpi-icon">{ICONO_KPI[e.id]}</span>
+                            </div>
+                            <div className="ai-kpi-value" style={{ color: valor > 0 && e.id !== 'pendiente' && e.id !== 'finalizada' ? e.color : undefined }}>{valor}</div>
+                            <div className="ai-kpi-foot">{pieKpi(e.id, kpis)}</div>
+                        </button>
+                    );
+                })}
             </div>
 
             <div className="ai-panel">
@@ -344,7 +418,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                             onClick={() => setTab(t.id)}
                         >
                             {t.label}
-                            <span className="ai-count">{t.id === 'todos' ? delCentro.length : delCentro.filter((e) => estadoVista(e) === t.id).length}</span>
+                            <span className="ai-count">{t.id === 'todos' ? delCentro.length : t.id === 'tarde' ? kpis.tarde : kpis.porEstado[t.id]}</span>
                         </button>
                     ))}
                 </div>
