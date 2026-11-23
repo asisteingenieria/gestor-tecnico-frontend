@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useSearchParams } from 'react-router-dom';
-import { Users, CalendarRange, ClipboardList, UserMinus } from 'lucide-react';
+import { Users, CalendarRange, ClipboardList, UserMinus, Palmtree } from 'lucide-react';
 import { useBaseEquipo } from '../../utils/rutaEquipo';
 
 // "Equipo" es una sola opción del menú con tres vistas: hoy (en vivo), el histórico mes a mes y las
@@ -10,6 +10,8 @@ const VISTAS = [
     { ruta: '/equipo', label: 'Hoy', icono: <Users size={14} strokeWidth={1.75} /> },
     { ruta: '/equipo/mes', label: 'Histórico', icono: <CalendarRange size={14} strokeWidth={1.75} /> },
     { ruta: '/equipo/novedades', label: 'Novedades', icono: <ClipboardList size={14} strokeWidth={1.75} /> },
+    // Pasivo vacacional de su gente en días (claude/modulo recursoshumanos.md §58.6).
+    { ruta: '/equipo/vacaciones', label: 'Vacaciones', icono: <Palmtree size={14} strokeWidth={1.75} /> },
     // Retiros solo para el jefe que gestiona (/operaciones); el coordinador no la ve (§61).
     { ruta: '/equipo/retiros', label: 'Retiros', icono: <UserMinus size={14} strokeWidth={1.75} />, soloGestion: true }
 ];

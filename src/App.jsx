@@ -607,6 +607,7 @@ function App() {
               <Route path="asistencia/equipo" element={<EmpleadoRoute><MonitorEquipo /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/mes" element={<EmpleadoRoute><EquipoMensual /></EmpleadoRoute>} />
               <Route path="asistencia/equipo/novedades" element={<EmpleadoRoute><NovedadesEquipo vistaEquipo /></EmpleadoRoute>} />
+              <Route path="asistencia/equipo/vacaciones" element={<EmpleadoRoute><PasivoVacacional vistaEquipo /></EmpleadoRoute>} />
               {/* Retiros de Claro: solo el jefe que gestiona, en /operaciones (§61). */}
               <Route path="asistencia/equipo/retiros" element={<Navigate to="/asistencia/equipo" replace />} />
               <Route path="asistencia/equipo/:empleadoId/trazabilidad" element={<EmpleadoRoute><TrazabilidadEmpleado /></EmpleadoRoute>} />
@@ -624,6 +625,7 @@ function App() {
               <Route path="operaciones/cambios-turno" element={<DirectorOperacionesRoute><CambiosTurno /></DirectorOperacionesRoute>} />
               <Route path="operaciones/reporte-horas-extra" element={<DirectorOperacionesRoute><ReporteHorasExtra /></DirectorOperacionesRoute>} />
               <Route path="operaciones/equipo/novedades" element={<DirectorOperacionesRoute><NovedadesEquipo vistaEquipo /></DirectorOperacionesRoute>} />
+              <Route path="operaciones/equipo/vacaciones" element={<DirectorOperacionesRoute><PasivoVacacional vistaEquipo /></DirectorOperacionesRoute>} />
               <Route path="operaciones/equipo/retiros" element={<DirectorOperacionesRoute><RetirosEquipo vistaEquipo /></DirectorOperacionesRoute>} />
             </Route>
 

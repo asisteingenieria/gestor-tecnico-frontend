@@ -316,6 +316,8 @@ export const asistenciaService = {
     getPermisosEquipo: () => api.get('/asistencia/equipo/permisos'),
     // Historial de novedades de RRHH del equipo (§56)
     getNovedadesEquipo: (params = {}) => api.get('/asistencia/novedades-equipo', { params }),
+    // Pasivo vacacional de su gente, solo en días (claude/modulo recursoshumanos.md §58.6).
+    getPasivoEquipo: (params = {}) => api.get('/asistencia/pasivo-vacacional-equipo', { params }),
     // Retiros de Claro del equipo y su fecha de retiro en la Red Maestra (backend asistencia.md §59).
     getRetirosEquipo: (params = {}) => api.get('/asistencia/retiros-equipo', { params }),
     getRetirosEquipoPendientes: () => api.get('/asistencia/retiros-equipo/pendientes'),
