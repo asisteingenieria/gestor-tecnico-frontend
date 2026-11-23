@@ -241,6 +241,11 @@ const EquipoAsistencia = ({ financiera = false }) => {
         const enTurno = delCentro.filter((e) => estadoVista(e) === 'en_curso');
         const enPausa = delCentro.filter((e) => estadoVista(e) === 'en_pausa');
         const pausa = (tipo) => enPausa.filter((e) => e.pausa_activa?.tipo === tipo).length;
+        // Cómo llegaron quienes ya entraron hoy (en turno + en pausa + terminaron). Sin turno, o con descanso,
+        // no se sabe si fue tarde.
+        const llegaron = delCentro.filter((e) => ['en_curso', 'en_pausa', 'finalizada'].includes(estadoVista(e)));
+        const tarde = llegaron.filter(esTarde).length;
+        const sinHorario = llegaron.filter((e) => !esTarde(e) && (!e.turno || e.turno.es_descanso)).length;
         return {
             porEstado,
             // Modalidad solo de quienes están en turno ahora (antes contaba a todos los del día).
@@ -251,7 +256,10 @@ const EquipoAsistencia = ({ financiera = false }) => {
             almuerzo: pausa('almuerzo'),
             capacitacion: pausa('capacitacion'),
             desconectados: enPausa.filter((e) => !e.pausa_activa && e.desconexion_activa).length,
-            tarde: delCentro.filter(esTarde).length
+            llegaron: llegaron.length,
+            tarde,
+            sinHorario,
+            aTiempo: llegaron.length - tarde - sinHorario
         };
     }, [delCentro]);
 
@@ -352,22 +360,36 @@ const EquipoAsistencia = ({ financiera = false }) => {
                     <span style={{ font: '600 14px var(--font-sans)', color: 'var(--ink)' }}>
                         {delCentro.length} persona{delCentro.length === 1 ? '' : 's'} hoy · cada una está en un solo estado
                     </span>
-                    <button
-                        type="button"
-                        onClick={() => setTab(tab === 'tarde' ? 'todos' : 'tarde')}
-                        className="ai-row"
-                        title="Ver quiénes llegaron tarde. Ya están contados en su estado actual (en turno, en pausa o terminaron)."
-                        style={{
-                            gap: 6, padding: '4px 10px', borderRadius: 999, cursor: 'pointer', font: '600 13px var(--font-sans)',
-                            border: `1px solid ${tab === 'tarde' ? 'var(--warning)' : 'var(--border)'}`,
-                            background: kpis.tarde > 0 ? 'var(--warning-soft)' : 'transparent',
-                            color: kpis.tarde > 0 ? 'var(--warning)' : 'var(--ink-muted)'
-                        }}
-                    >
-                        <AlertTriangle size={14} strokeWidth={1.75} />
-                        {kpis.tarde} llegaron tarde
-                        <span style={{ fontWeight: 400 }}>· ya incluidos en los estados</span>
-                    </button>
+                    {/* Las llegadas son un desglose de quienes ya entraron (En turno + En pausa + Terminaron), no un estado más. */}
+                    <div className="ai-row" style={{ gap: 6, flexWrap: 'wrap', font: '400 13px var(--font-sans)', color: 'var(--ink-muted)' }}>
+                        <span>
+                            De los <b style={{ color: 'var(--ink)' }}>{kpis.llegaron}</b> que llegaron hoy
+                            <span title="En turno + En pausa + Terminaron"> (en turno, en pausa y terminaron)</span>:
+                        </span>
+                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>{kpis.aTiempo} a tiempo</span>
+                        <span>·</span>
+                        <button
+                            type="button"
+                            onClick={() => setTab(tab === 'tarde' ? 'todos' : 'tarde')}
+                            className="ai-row"
+                            title="Ver quiénes llegaron tarde"
+                            style={{
+                                gap: 6, padding: '2px 10px', borderRadius: 999, cursor: 'pointer', font: '600 13px var(--font-sans)',
+                                border: `1px solid ${tab === 'tarde' ? 'var(--warning)' : 'var(--border)'}`,
+                                background: kpis.tarde > 0 ? 'var(--warning-soft)' : 'transparent',
+                                color: kpis.tarde > 0 ? 'var(--warning)' : 'var(--ink-muted)'
+                            }}
+                        >
+                            <AlertTriangle size={14} strokeWidth={1.75} />
+                            {kpis.tarde} tarde
+                        </button>
+                        {kpis.sinHorario > 0 && (
+                            <>
+                                <span>·</span>
+                                <span title="Entraron sin turno asignado hoy: no se puede saber si llegaron tarde">{kpis.sinHorario} sin horario</span>
+                            </>
+                        )}
+                    </div>
                 </div>
                 <div style={{ display: 'flex', height: 10, borderRadius: 999, overflow: 'hidden', background: 'var(--surface-200)' }}>
                     {delCentro.length > 0 && ESTADOS_DIA.map((e) => kpis.porEstado[e.id] > 0 && (
