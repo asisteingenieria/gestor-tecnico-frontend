@@ -9,6 +9,8 @@ const Login = () => {
         password: ''
     });
     const [error, setError] = useState('');
+    // Llegó aquí porque la sesión venció (utils/sesion.js, asistencia.md §81).
+    const [sesionVencida] = useState(() => new URLSearchParams(window.location.search).get('sesion') === 'vencida');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [focusedField, setFocusedField] = useState('');
@@ -111,6 +113,15 @@ const Login = () => {
                     </div>
 
                     <form className="space-y-6" onSubmit={handleSubmit}>
+                        {sesionVencida && !error && (
+                            <div className="bg-amber-500/20 border border-amber-400/50 rounded-lg p-4 backdrop-blur-sm">
+                                <div className="flex items-center">
+                                    <AlertCircle className="h-5 w-5 text-amber-300 mr-3" />
+                                    <span className="text-amber-100 text-sm font-medium">Tu sesión venció. Vuelve a iniciar sesión para continuar.</span>
+                                </div>
+                            </div>
+                        )}
+
                         {error && (
                             <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 backdrop-blur-sm">
                                 <div className="flex items-center">
