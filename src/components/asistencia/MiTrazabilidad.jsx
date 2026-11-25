@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, History } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import { formatearFecha } from '../../utils/fecha';
 import { descargarCsv } from '../../utils/csv';
 import TrazabilidadView from './TrazabilidadView';
+import { EncabezadoVista } from '../ui';
 
 function hoyIso() {
     return new Date().toISOString().slice(0, 10);
@@ -66,43 +67,42 @@ const MiTrazabilidad = () => {
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Trazabilidad</h1>
-                    <p className="ai-page-sub">{formatearFecha(fecha, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                </div>
-                <div className="ai-row">
-                    <div className="ai-datenav">
-                        <button type="button" className="ai-icon-btn" onClick={() => setFecha((f) => sumarDias(f, -1))} aria-label="Día anterior">
-                            <ChevronLeft size={16} strokeWidth={1.75} />
-                        </button>
-                        <b style={{ cursor: 'pointer' }} onClick={() => inputFechaRef.current?.showPicker?.() ?? inputFechaRef.current?.click()}>
-                            {formatearFecha(fecha, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-                        </b>
-                        <input
-                            ref={inputFechaRef}
-                            type="date"
-                            value={fecha}
-                            max={hoyIso()}
-                            onChange={(e) => setFecha(e.target.value)}
-                            style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-                        />
-                        <button
-                            type="button"
-                            className="ai-icon-btn"
-                            onClick={() => setFecha((f) => sumarDias(f, 1))}
-                            disabled={fecha >= hoyIso()}
-                            aria-label="Día siguiente"
-                        >
-                            <ChevronRight size={16} strokeWidth={1.75} />
-                        </button>
-                    </div>
-                    <button type="button" className="ai-btn ai-btn--secondary" onClick={() => setFecha(hoyIso())}>Hoy</button>
-                    <button type="button" className="ai-btn ai-btn--secondary" onClick={exportar} disabled={!datos}>
-                        <Download size={16} strokeWidth={1.75} /> Exportar
+            <EncabezadoVista
+                icono={History}
+                titulo="Trazabilidad"
+                subtitulo={formatearFecha(fecha, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                enVivo={fecha === hoyIso()}
+            >
+                <div className="ai-datenav" style={{ background: 'var(--surface-100)', borderRadius: 10, border: '1px solid var(--border)', padding: '0 4px', height: 34 }}>
+                    <button type="button" className="ai-icon-btn" onClick={() => setFecha((f) => sumarDias(f, -1))} aria-label="Día anterior">
+                        <ChevronLeft size={16} strokeWidth={1.75} />
+                    </button>
+                    <b style={{ cursor: 'pointer' }} onClick={() => inputFechaRef.current?.showPicker?.() ?? inputFechaRef.current?.click()}>
+                        {formatearFecha(fecha, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                    </b>
+                    <input
+                        ref={inputFechaRef}
+                        type="date"
+                        value={fecha}
+                        max={hoyIso()}
+                        onChange={(e) => setFecha(e.target.value)}
+                        style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                    />
+                    <button
+                        type="button"
+                        className="ai-icon-btn"
+                        onClick={() => setFecha((f) => sumarDias(f, 1))}
+                        disabled={fecha >= hoyIso()}
+                        aria-label="Día siguiente"
+                    >
+                        <ChevronRight size={16} strokeWidth={1.75} />
                     </button>
                 </div>
-            </div>
+                <button type="button" className="ai-monitor-btn" onClick={() => setFecha(hoyIso())}>Hoy</button>
+                <button type="button" className="ai-monitor-btn" onClick={exportar} disabled={!datos}>
+                    <Download size={15} strokeWidth={2} /> Exportar
+                </button>
+            </EncabezadoVista>
 
             <TrazabilidadView datos={datos} loading={loading} error={error} horario={horario} esHoy={fecha === hoyIso()} />
         </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, CalendarClock } from 'lucide-react';
+import { CalendarClock, CalendarDays, CalendarRange, Moon, Clock, Utensils } from 'lucide-react';
+import { EncabezadoVista, Mosaicos, Mosaico, PanelVista, CargandoVista, VistaVacia, TONO } from '../ui';
 import { asistenciaService } from '../../services/api';
 
 const DIAS_LABEL = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -78,50 +79,45 @@ const MiHorario = () => {
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Mi horario</h1>
-                    <p className="ai-page-sub">
-                        Tu turno asignado
-                        {contexto.centro_costo && ` · Centro de costo ${contexto.centro_costo}`}
-                        {contexto.campania && ` · ${contexto.campania}`}
-                    </p>
+            <EncabezadoVista
+                icono={CalendarClock}
+                titulo="Mi horario"
+                subtitulo={`Tu turno asignado${contexto.centro_costo ? ` · Centro de costo ${contexto.centro_costo}` : ''}${contexto.campania ? ` · ${contexto.campania}` : ''}`}
+            >
+                <div className="ai-seg" role="tablist" aria-label="Vista">
+                    {[['semana', 'Semana', CalendarDays], ['mes', 'Mes', CalendarRange]].map(([v, label, icono]) => (
+                        <span key={v} role="tab" tabIndex={0} aria-selected={vista === v} className={vista === v ? 'is-active' : ''}
+                            style={{ cursor: 'pointer' }} onClick={() => setVista(v)}
+                            onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') setVista(v); }}>
+                            {React.createElement(icono, { size: 14, strokeWidth: 1.9 })} {label}
+                        </span>
+                    ))}
                 </div>
-                <div className="ai-row">
-                    <button type="button" className={`ai-btn ai-btn--sm ${vista === 'semana' ? 'ai-btn--primary' : 'ai-btn--secondary'}`} onClick={() => setVista('semana')}>Semana</button>
-                    <button type="button" className={`ai-btn ai-btn--sm ${vista === 'mes' ? 'ai-btn--primary' : 'ai-btn--secondary'}`} onClick={() => setVista('mes')}>Mes</button>
-                </div>
-            </div>
+            </EncabezadoVista>
 
-            <div className="ai-panel">
-                <div className="ai-panel-body ai-row" style={{ gap: 20 }}>
-                    <span className="ai-kpi-icon" style={{ width: 44, height: 44 }}><CalendarClock size={20} strokeWidth={1.75} /></span>
-                    <div>
-                        <span className="ai-overline">Tu turno de hoy</span>
-                        {turnoHoy ? (
-                            turnoHoy.es_descanso ? (
-                                <div style={{ font: '600 18px var(--font-display)' }}>Descanso</div>
-                            ) : (
-                                <div style={{ font: '600 18px var(--font-display)' }}>
-                                    {turnoHoy.plantilla && <span style={{ marginRight: 10 }}>{turnoHoy.plantilla} ·</span>}
-                                    {hhmm(turnoHoy.hora_entrada)} – {hhmm(turnoHoy.hora_salida)}
-                                    <span className="ai-muted" style={{ fontSize: 13, fontWeight: 500, marginLeft: 10 }}>
-                                        Almuerzo {turnoHoy.minutos_almuerzo} min{turnoHoy.hora_almuerzo_inicio ? ` a las ${hhmm(turnoHoy.hora_almuerzo_inicio)}` : ''} · Tolerancia {turnoHoy.tolerancia_entrada_min} min
-                                    </span>
-                                </div>
-                            )
-                        ) : <div className="ai-muted">Sin horario asignado hoy</div>}
-                    </div>
-                </div>
-            </div>
+            {/* El turno de hoy, en mosaicos: horario, almuerzo y turnos/descansos del rango que se ve. */}
+            <Mosaicos>
+                <Mosaico
+                    color={!turnoHoy ? TONO.suave : turnoHoy.es_descanso ? 'descanso' : TONO.info}
+                    icono={turnoHoy?.es_descanso ? Moon : Clock}
+                    valor={!turnoHoy ? '—' : turnoHoy.es_descanso ? 'Descanso' : `${hhmm(turnoHoy.hora_entrada)} – ${hhmm(turnoHoy.hora_salida)}`}
+                    label={turnoHoy?.plantilla && !turnoHoy.es_descanso ? `Hoy · ${turnoHoy.plantilla}` : turnoHoy ? 'Tu turno de hoy' : 'Sin horario asignado hoy'}
+                />
+                <Mosaico
+                    color={TONO.alerta} icono={Utensils}
+                    valor={turnoHoy && !turnoHoy.es_descanso ? `${turnoHoy.minutos_almuerzo} min` : '—'}
+                    label="Almuerzo de hoy"
+                    detalle={turnoHoy?.hora_almuerzo_inicio && !turnoHoy.es_descanso ? `a las ${hhmm(turnoHoy.hora_almuerzo_inicio)}` : null}
+                />
+                <Mosaico color={TONO.exito} icono={CalendarDays} valor={horarios.filter((x) => !x.es_descanso).length}
+                    label={vista === 'semana' ? 'Turnos esta semana' : 'Turnos del mes'} />
+                <Mosaico color="descanso" icono={Moon} valor={horarios.filter((x) => x.es_descanso).length}
+                    label={vista === 'semana' ? 'Descansos esta semana' : 'Descansos del mes'} />
+            </Mosaicos>
 
-            {loading && (
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
-            )}
+            {loading && <CargandoVista />}
 
-            {!loading && error && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
+            {!loading && error && <VistaVacia error>{error}</VistaVacia>}
 
             {!loading && !error && vista === 'semana' && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 10 }}>
@@ -150,14 +146,16 @@ const MiHorario = () => {
             )}
 
             {!loading && !error && vista === 'mes' && (
-                <div className="ai-panel">
-                    <div className="ai-panel-head">
-                        <div className="ai-datenav">
-                            <button type="button" className="ai-icon-btn" aria-label="Mes anterior" onClick={() => setMesRef((r) => { const m = r.mes - 1; return m < 0 ? { anio: r.anio - 1, mes: 11 } : { ...r, mes: m }; })}>‹</button>
-                            <b>{MESES_LABEL[mesRef.mes]} {mesRef.anio}</b>
-                            <button type="button" className="ai-icon-btn" aria-label="Mes siguiente" onClick={() => setMesRef((r) => { const m = r.mes + 1; return m > 11 ? { anio: r.anio + 1, mes: 0 } : { ...r, mes: m }; })}>›</button>
+                <PanelVista
+                    icono={CalendarRange}
+                    titulo={`${MESES_LABEL[mesRef.mes][0].toUpperCase()}${MESES_LABEL[mesRef.mes].slice(1)} ${mesRef.anio}`}
+                    extra={(
+                        <div className="ai-row" style={{ gap: 6 }}>
+                            <button type="button" className="ai-monitor-btn" style={{ height: 30, width: 34, padding: 0, justifyContent: 'center' }} aria-label="Mes anterior" onClick={() => setMesRef((r) => { const m = r.mes - 1; return m < 0 ? { anio: r.anio - 1, mes: 11 } : { ...r, mes: m }; })}>‹</button>
+                            <button type="button" className="ai-monitor-btn" style={{ height: 30, width: 34, padding: 0, justifyContent: 'center' }} aria-label="Mes siguiente" onClick={() => setMesRef((r) => { const m = r.mes + 1; return m > 11 ? { anio: r.anio + 1, mes: 0 } : { ...r, mes: m }; })}>›</button>
                         </div>
-                    </div>
+                    )}
+                >
                     <div className="ai-panel-body">
                         <div className="ai-cal">
                             {DIAS_LABEL.map((d) => <div key={d} className="h">{d}</div>)}
@@ -177,7 +175,7 @@ const MiHorario = () => {
                             })}
                         </div>
                     </div>
-                </div>
+                </PanelVista>
             )}
         </div>
     );
