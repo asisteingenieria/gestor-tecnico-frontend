@@ -6,7 +6,7 @@ import { iniciales } from '../utils/formatoRRHH';
 import CampanaAlertas from './asistencia/CampanaAlertas';
 import {
     Users, ClipboardList, ArrowLeftRight, CalendarDays, UserPlus, Clock, FileSpreadsheet,
-    BarChart3, LayoutDashboard, Activity, Search, Repeat, ChevronDown, User, Moon, Sun, LogOut, Menu, X
+    BarChart3, LayoutDashboard, Activity, Search, Repeat, ChevronDown, User, Moon, Sun, LogOut, Menu, X, Briefcase
 } from 'lucide-react';
 import asisteMarkWhite from '../assets/asiste-ui/asiste-mark-white.png';
 
@@ -16,6 +16,8 @@ const NAV_ITEMS = [
     { to: '/recursos-humanos/novedades', label: 'Novedades', icon: ClipboardList, countKey: 'novedades' },
     { to: '/recursos-humanos/traspasos', label: 'Traspasos', icon: ArrowLeftRight },
     { to: '/recursos-humanos/vacaciones', label: 'Pasivo vacacional', icon: CalendarDays },
+    // Catálogo de cargos con sus clientes y sueldo de referencia (§61).
+    { to: '/recursos-humanos/cargos', label: 'Cargos', icon: Briefcase },
     // Su propia asistencia (asistencia.md §19): RRHH no tiene cuenta de empleado aparte.
     { to: '/asistencia', label: 'Mi asistencia', icon: Clock }
 ];
