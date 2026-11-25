@@ -3,9 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { traspasoService } from '../services/api';
 import TraspasoForm from './TraspasoForm';
 import Pagination from './Pagination';
-import { nombrePropio, iniciales } from '../utils/formatoRRHH';
+import { nombrePropio } from '../utils/formatoRRHH';
 import { SoportesResumen } from './SoportesDocumentales';
-import { ArrowLeftRight, Plus, Search, Edit3, Trash2, AlertCircle, ChevronDown, ChevronUp, FileCheck, BellRing } from 'lucide-react';
+import { ArrowLeftRight, Plus, Edit3, Trash2, AlertCircle, ChevronDown, ChevronUp, FileCheck, BellRing, FileWarning, Bell } from 'lucide-react';
+import { EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, PanelVista, Pastilla, AvatarVista, CargandoVista, VistaVacia, COLOR_ALERTA_TRASPASO, TONO } from './ui';
 
 const PAGE_SIZE = 10;
 
@@ -25,9 +26,9 @@ const CompareRow = ({ label, before, after }) => (
 );
 
 const ESTADO_ALERTA = {
-    programada: { label: 'Programada', clase: '' },
-    enviada: { label: 'Enviada, sin leer', clase: ' ai-badge--warning' },
-    leida: { label: 'Leída', clase: ' ai-badge--success' }
+    programada: { label: 'Programada', color: COLOR_ALERTA_TRASPASO.programada },
+    enviada: { label: 'Enviada, sin leer', color: COLOR_ALERTA_TRASPASO.enviada },
+    leida: { label: 'Leída', color: COLOR_ALERTA_TRASPASO.leida }
 };
 
 const Traspasos = () => {
@@ -108,6 +109,9 @@ const Traspasos = () => {
     const fmtFecha = (v) => v ? new Date(v).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
     const fmtMoneda = (v) => v == null ? '—' : new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
 
+    const docsPendientes = filtered.filter(t => (Number(t.soportes_requeridos) || 0) > (Number(t.soportes_cargados) || 0)).length;
+    const alertasSinLeer = alertas.filter(a => a.estado === 'enviada').length;
+
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
@@ -136,37 +140,36 @@ const Traspasos = () => {
     return (
         <div className="ai-scope">
             <div className="ai-content">
-                <div className="ai-page-head">
-                    <div>
-                        <h1 className="ai-page-title">Traspasos</h1>
-                        <p className="ai-page-sub">Encargos, ratificaciones, trabajo en casa y cambios de cargo o salario</p>
-                    </div>
-                    <button onClick={handleCreate} className="ai-btn ai-btn--primary">
-                        <Plus size={16} />
-                        Nuevo traspaso
+                <EncabezadoVista
+                    icono={ArrowLeftRight}
+                    titulo="Traspasos"
+                    subtitulo="Encargos, ratificaciones, trabajo en casa y cambios de cargo o salario"
+                >
+                    <button type="button" onClick={handleCreate} className="ai-monitor-btn ai-monitor-btn--primario">
+                        <Plus size={15} strokeWidth={2} /> Nuevo traspaso
                     </button>
-                </div>
+                </EncabezadoVista>
 
-                {error && (
-                    <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', width: 'fit-content' }}>
-                        <span className="ai-dot" />
-                        {error}
-                    </div>
-                )}
+                {error && <div style={{ marginBottom: 12 }}><Pastilla color={TONO.peligro} punto>{error}</Pastilla></div>}
+
+                <Mosaicos>
+                    <Mosaico color={TONO.info} icono={ArrowLeftRight} valor={filtered.length} label="Traspasos"
+                        detalle={searchTerm ? `Según la búsqueda · ${traspasos.length} en total` : null} />
+                    <Mosaico color={docsPendientes > 0 ? TONO.alerta : TONO.suave} icono={FileWarning} valor={docsPendientes} label="Con documentos pendientes" />
+                    <Mosaico color={TONO.acento} icono={Bell} valor={alertas.length} label="Alertas" />
+                    <Mosaico color={alertasSinLeer > 0 ? TONO.alerta : TONO.suave} icono={BellRing} valor={alertasSinLeer} label="Alertas sin leer" />
+                </Mosaicos>
 
                 {alertas.length > 0 && (
-                    <div className="ai-card" style={{ padding: 16 }}>
-                        <p className="ai-overline" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <BellRing size={14} /> Alertas · {alertas.length}
-                        </p>
-                        <div style={{ display: 'grid', gap: 8 }}>
+                    <PanelVista icono={BellRing} titulo={`Alertas · ${alertas.length}`}>
+                        <div style={{ display: 'grid', gap: 8, padding: '12px 16px' }}>
                             {alertas.map(a => {
                                 const estado = ESTADO_ALERTA[a.estado] || ESTADO_ALERTA.programada;
                                 return (
                                     <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
-                                        <span className={`ai-badge${estado.clase}`} style={!estado.clase ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}>
+                                        <Pastilla color={estado.color} punto minWidth={150}>
                                             {estado.label}{a.estado === 'programada' ? ` · ${fmtFecha(a.fecha_alerta)}` : ''}
-                                        </span>
+                                        </Pastilla>
                                         <span style={{ flex: 1, minWidth: 240 }}>{a.mensaje}</span>
                                         <span className="ai-muted">
                                             {a.destinatario_nombre ? `Para ${nombrePropio(a.destinatario_nombre)}` : 'Sin destinatario en el contrato'}
@@ -175,35 +178,23 @@ const Traspasos = () => {
                                 );
                             })}
                         </div>
-                    </div>
+                    </PanelVista>
                 )}
 
-                <div className="ai-card">
-                    <div className="ai-toolbar">
-                        <div className="ai-search">
-                            <Search size={16} />
-                            <input
-                                type="text"
-                                placeholder="Buscar por empleado, identificación, tipo, área o campaña nueva..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{ border: 0, outline: 'none', background: 'transparent', flex: 1, font: 'inherit', color: 'inherit' }}
-                            />
-                        </div>
-                    </div>
+                <BarraFiltros>
+                    <CampoBusqueda value={searchTerm} onChange={setSearchTerm} placeholder="Buscar por empleado, identificación, tipo, área o campaña nueva..." />
+                </BarraFiltros>
 
+                <div>
                     {loading ? (
-                        <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: 'var(--primary)' }} />
-                        </div>
+                        <CargandoVista />
                     ) : filtered.length === 0 ? (
-                        <div style={{ padding: 48, textAlign: 'center' }}>
-                            <ArrowLeftRight size={36} style={{ margin: '0 auto 10px', color: 'var(--ink-subtle)' }} />
-                            <p style={{ fontWeight: 600, margin: 0 }}>No hay traspasos</p>
-                            <p className="ai-muted" style={{ marginTop: 4 }}>Registra un nuevo traspaso para empezar.</p>
-                        </div>
+                        <VistaVacia icono={ArrowLeftRight}>
+                            {searchTerm ? 'Ningún traspaso coincide con la búsqueda.' : 'No hay traspasos. Registra un nuevo traspaso para empezar.'}
+                        </VistaVacia>
                     ) : (
-                        <table className="ai-table ai-table--dense">
+                        <div className="ai-monitor-tabla-wrap" style={{ marginBottom: 12 }}>
+                        <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                             <thead>
                                 <tr>
                                     <th style={{ width: 36 }}></th>
@@ -224,28 +215,28 @@ const Traspasos = () => {
                                     const requeridos = Number(t.soportes_requeridos) || 0;
                                     return (
                                         <React.Fragment key={t.idtraspaso}>
-                                            <tr>
+                                            <tr className="is-clicable" onClick={() => toggleExpand(t.idtraspaso)}>
                                                 <td>
                                                     <button
-                                                        onClick={() => toggleExpand(t.idtraspaso)}
+                                                        onClick={(ev) => { ev.stopPropagation(); toggleExpand(t.idtraspaso); }}
                                                         className="ai-icon-btn"
                                                         aria-label={isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
                                                     >
                                                         {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                                     </button>
                                                 </td>
-                                                <td>
-                                                    <div className="ai-person">
-                                                        <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(t.empleado_nombre)}</span>
-                                                        <div>
-                                                            <div className="ai-person-name">{nombrePropio(t.empleado_nombre)}</div>
-                                                            <div className="ai-person-sub">{t.empleado_identificacion}</div>
-                                                        </div>
-                                                    </div>
+                                                <td className="ai-monitor-nombre">
+                                                    <span>
+                                                        <AvatarVista />
+                                                        <span>
+                                                            {nombrePropio(t.empleado_nombre).toUpperCase()}
+                                                            <span className="ai-monitor-sub">CC {t.empleado_identificacion}</span>
+                                                        </span>
+                                                    </span>
                                                 </td>
                                                 <td>
                                                     {t.tipo_nombre
-                                                        ? <span className="ai-badge ai-badge--info"><span className="ai-dot" />{t.tipo_nombre}</span>
+                                                        ? <Pastilla color={TONO.info} punto>{t.tipo_nombre}</Pastilla>
                                                         : <span className="ai-muted">Sin tipo</span>}
                                                 </td>
                                                 <td className="ai-muted">{fmtFecha(t.fecha_inicio)}</td>
@@ -259,14 +250,11 @@ const Traspasos = () => {
                                                     {fmtMoneda(t.salario_anterior)} → <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{fmtMoneda(t.salario_nuevo)}</span>
                                                 </td>
                                                 <td>
-                                                    <span
-                                                        className={`ai-badge${requeridos > 0 && documentos === requeridos ? ' ai-badge--success' : documentos > 0 ? ' ai-badge--warning' : ''}`}
-                                                        style={documentos === 0 || requeridos === 0 ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
-                                                    >
+                                                    <Pastilla color={requeridos === 0 ? TONO.suave : documentos >= requeridos ? TONO.exito : documentos > 0 ? TONO.alerta : TONO.peligro}>
                                                         <FileCheck size={12} /> {requeridos > 0 ? `${documentos}/${requeridos}` : '—'}
-                                                    </span>
+                                                    </Pastilla>
                                                 </td>
-                                                <td className="ai-td-actions">
+                                                <td className="ai-td-actions" onClick={(ev) => ev.stopPropagation()}>
                                                     <div className="ai-row-actions">
                                                         <button onClick={() => handleEdit(t)} className="ai-icon-btn" aria-label="Editar">
                                                             <Edit3 size={16} />
@@ -279,7 +267,7 @@ const Traspasos = () => {
                                             </tr>
                                             {isExpanded && (
                                                 <tr>
-                                                    <td colSpan={9} style={{ background: 'var(--surface-0)' }}>
+                                                    <td colSpan={9} style={{ background: 'var(--surface-0)', padding: 16 }}>
                                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16, marginBottom: 20 }}>
                                                             <DetailField label="Tipo de contrato" value={t.tipo_contrato_anterior_nombre} />
                                                             <DetailField label="Ciudad donde labora" value={t.ciudad_anterior_nombre} />
@@ -334,6 +322,7 @@ const Traspasos = () => {
                                 })}
                             </tbody>
                         </table>
+                        </div>
                     )}
 
                     <Pagination

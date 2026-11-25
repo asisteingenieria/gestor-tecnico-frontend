@@ -13,10 +13,11 @@ import FiltroChip from './FiltroChip';
 import { nombrePropio, iniciales, claseCampania, formatearTelefono, primeraMayuscula } from '../utils/formatoRRHH';
 import { formatearFecha } from '../utils/fecha';
 import {
-    Users, Plus, Search, Edit3, Trash2, Eye,
+    Users, Plus, Edit3, Trash2, Eye,
     Package, AlertCircle, UserCheck, Wallet,
-    Upload, LayoutGrid, List, RefreshCw, Download, UserMinus
+    Upload, LayoutGrid, List, RefreshCw, Download, UserMinus, Contact
 } from 'lucide-react';
+import { EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Pastilla, AvatarVista, CargandoVista, VistaVacia, COLOR_EMPLEADO, TONO } from './ui';
 import { escucharAsistencia } from '../utils/socketAsistencia';
 
 const PAGE_SIZES = [20, 25, 50];
@@ -42,10 +43,11 @@ const formatSalario = (val) => {
 };
 
 const estadoBadge = (estado) => {
-    if (estado === 'activo') return { clase: 'ai-badge--success', texto: 'Activo' };
-    if (['retirado', 'inactivo'].includes(estado)) return { clase: 'ai-badge--danger', texto: primeraMayuscula(estado || '') };
-    if (!estado) return { clase: 'ai-badge--info', texto: 'Sin contrato' };
-    return { clase: 'ai-badge--warning', texto: primeraMayuscula(estado) };
+    const color = COLOR_EMPLEADO[estado || 'sin_contrato'] || TONO.alerta;
+    if (estado === 'activo') return { color, texto: 'Activo' };
+    if (['retirado', 'inactivo'].includes(estado)) return { color, texto: primeraMayuscula(estado || '') };
+    if (!estado) return { color, texto: 'Sin contrato' };
+    return { color, texto: primeraMayuscula(estado) };
 };
 
 // Documentación del empleado y contrato y anexos (migración 088): 2 por empleado.
@@ -349,6 +351,13 @@ const AgentManagement = ({ soloLectura = false }) => {
         hasta: rangoHasta
     });
 
+    // Los mosaicos de Activos y Retirados filtran por Estado: ponen los textos de esos contratos (o los quitan).
+    const textosDe = (cumple) => [...new Set(empleados.filter(cumple).map(e => estadoBadge(e.estado_contrato_nombre).texto))];
+    const textosActivos = textosDe(esActivo);
+    const textosRetirados = textosDe(esRetirado);
+    const filtroEs = (textos) => textos.length > 0 && filtroEstados.size === textos.length && textos.every(t => filtroEstados.has(t));
+    const filtrarPor = (textos) => setFiltroEstados(filtroEs(textos) ? new Set() : new Set(textos));
+
     const hayFiltrosFecha = fIngreso || fRegistro || fRetiro;
     const hayFiltrosActivos = searchTerm || filtroCampanias.size > 0 || filtroEstados.size > 0 || filtroCargos.size > 0 || filtroAnalistas.size > 0 || filtroDocumentos.size > 0 || hayFiltrosFecha || hayRango;
 
@@ -367,210 +376,139 @@ const AgentManagement = ({ soloLectura = false }) => {
     return (
         <div className="ai-scope">
             <div className="ai-content">
-                <div className="ai-page-head">
-                    <div>
-                        <h1 className="ai-page-title">Personal de la empresa</h1>
-                        <p className="ai-page-sub">{soloLectura ? 'Consulta de empleados, su ficha y documentos (solo lectura)' : 'Registra y administra los empleados y sus activos asignados'}</p>
+                <EncabezadoVista
+                    icono={Contact}
+                    titulo="Personal de la empresa"
+                    subtitulo={soloLectura ? 'Consulta de empleados, su ficha y documentos (solo lectura)' : 'Registra y administra los empleados y sus activos asignados'}
+                >
+                    <div className="ai-seg" role="tablist" aria-label="Vista">
+                        <span role="tab" tabIndex={0} aria-selected={vista === 'tabla'} className={vista === 'tabla' ? 'is-active' : ''} onClick={() => setVista('tabla')} style={{ cursor: 'pointer' }}>
+                            <List size={14} strokeWidth={1.75} /> Tabla
+                        </span>
+                        <span role="tab" tabIndex={0} aria-selected={vista === 'tarjetas'} className={vista === 'tarjetas' ? 'is-active' : ''} onClick={() => setVista('tarjetas')} style={{ cursor: 'pointer' }}>
+                            <LayoutGrid size={14} strokeWidth={1.75} /> Tarjetas
+                        </span>
                     </div>
-                    <div className="ai-row">
-                        <div className="ai-seg">
-                            <span className={vista === 'tabla' ? 'is-active' : ''} onClick={() => setVista('tabla')} style={{ cursor: 'pointer' }}>
-                                <List size={14} strokeWidth={1.75} /> Tabla
-                            </span>
-                            <span className={vista === 'tarjetas' ? 'is-active' : ''} onClick={() => setVista('tarjetas')} style={{ cursor: 'pointer' }}>
-                                <LayoutGrid size={14} strokeWidth={1.75} /> Tarjetas
-                            </span>
-                        </div>
-                        {!soloLectura && (
-                            <button onClick={() => setShowDescargarEmpleados(true)} className="ai-btn ai-btn--secondary" title="Excel con toda la información de los empleados, por estado y rango de fechas">
-                                <Download size={16} strokeWidth={1.75} />
-                                Descargar empleados
-                            </button>
-                        )}
-                        {puedeDescargarJefaturas && (
-                        <button onClick={descargarJefaturas} className="ai-btn ai-btn--secondary" disabled={descargandoJefaturas} title="Excel con el jefe inmediato, jefe de área, director, gestor de asistencia y quién sube el horario de cada empleado vigente">
-                            <Download size={16} strokeWidth={1.75} />
-                            {descargandoJefaturas ? 'Descargando…' : 'Descargar jefaturas'}
+                    {!soloLectura && (
+                        <button type="button" onClick={() => setShowDescargarEmpleados(true)} className="ai-monitor-btn" title="Excel con toda la información de los empleados, por estado y rango de fechas">
+                            <Download size={15} strokeWidth={2} /> Descargar empleados
                         </button>
-                        )}
-                        {soloLectura && (
-                            <button onClick={() => fetchEmpleados({ silencioso: true })} className="ai-btn ai-btn--secondary" disabled={refrescando} title="Actualizar la lista">
-                                <RefreshCw size={16} strokeWidth={1.75} className={refrescando ? 'animate-spin' : undefined} />
-                                {refrescando ? 'Actualizando…' : 'Actualizar'}
+                    )}
+                    {puedeDescargarJefaturas && (
+                        <button type="button" onClick={descargarJefaturas} className="ai-monitor-btn" disabled={descargandoJefaturas} title="Excel con el jefe inmediato, jefe de área, director, gestor de asistencia y quién sube el horario de cada empleado vigente">
+                            <Download size={15} strokeWidth={2} /> {descargandoJefaturas ? 'Descargando…' : 'Descargar jefaturas'}
+                        </button>
+                    )}
+                    {soloLectura && (
+                        <button type="button" onClick={() => fetchEmpleados({ silencioso: true })} className="ai-monitor-btn" disabled={refrescando} title="Actualizar la lista">
+                            <RefreshCw size={15} strokeWidth={2} className={refrescando ? 'animate-spin' : undefined} /> {refrescando ? 'Actualizando…' : 'Actualizar'}
+                        </button>
+                    )}
+                    {!soloLectura && (
+                        <>
+                            <button type="button" onClick={() => setShowImportModal(true)} className="ai-monitor-btn">
+                                <Upload size={15} strokeWidth={2} /> Cargar Excel
                             </button>
-                        )}
-                        {!soloLectura && (
-                            <>
-                                <button onClick={() => setShowImportModal(true)} className="ai-btn ai-btn--secondary">
-                                    <Upload size={16} strokeWidth={1.75} />
-                                    Cargar Excel
-                                </button>
-                                <button onClick={handleCreateEmpleado} className="ai-btn ai-btn--primary">
-                                    <Plus size={16} strokeWidth={1.75} />
-                                    Nuevo empleado
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
+                            <button type="button" onClick={handleCreateEmpleado} className="ai-monitor-btn ai-monitor-btn--primario">
+                                <Plus size={15} strokeWidth={2} /> Nuevo empleado
+                            </button>
+                        </>
+                    )}
+                </EncabezadoVista>
 
-                <div className="ai-kpi-strip" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-                    <div>
-                        <span className="ai-kpi-icon"><Users size={18} strokeWidth={1.75} /></span>
-                        <div>
-                            <p className="ai-kpi-label">Empleados activos</p>
-                            <p className="ai-kpi-value ai-num">{totalEmpleadosActivos}</p>
-                            {hayFiltrosActivos && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>Según los filtros · <span className="ai-num">{totalActivosGeneral}</span> en total</p>}
-                        </div>
-                    </div>
-                    <div>
-                        <span className="ai-kpi-icon"><UserMinus size={18} strokeWidth={1.75} /></span>
-                        <div>
-                            <p className="ai-kpi-label">Retirados</p>
-                            <p className="ai-kpi-value ai-num">{totalRetirados}</p>
-                            {hayFiltrosActivos && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>Según los filtros · <span className="ai-num">{totalRetiradosGeneral}</span> en total</p>}
-                        </div>
-                    </div>
-                    {!soloLectura && (
-                        <div>
-                            <span className="ai-kpi-icon"><UserCheck size={18} strokeWidth={1.75} /></span>
-                            <div>
-                                <p className="ai-kpi-label">Con activos asignados</p>
-                                <p className="ai-kpi-value ai-num">{totalConActivos}</p>
-                            </div>
-                        </div>
-                    )}
-                    {!soloLectura && (
-                        <div>
-                            <span className="ai-kpi-icon"><Package size={18} strokeWidth={1.75} /></span>
-                            <div>
-                                <p className="ai-kpi-label">Total activos asignados</p>
-                                <p className="ai-kpi-value ai-num">{totalActivos}</p>
-                            </div>
-                        </div>
-                    )}
+                <Mosaicos>
+                    <Mosaico
+                        color={TONO.exito} icono={Users} valor={totalEmpleadosActivos} label="Empleados activos"
+                        detalle={hayFiltrosActivos ? `Según los filtros · ${totalActivosGeneral} en total` : null}
+                        activo={filtroEs(textosActivos)} onClick={() => filtrarPor(textosActivos)}
+                    />
+                    <Mosaico
+                        color={TONO.peligro} icono={UserMinus} valor={totalRetirados} label="Retirados"
+                        detalle={hayFiltrosActivos ? `Según los filtros · ${totalRetiradosGeneral} en total` : null}
+                        activo={filtroEs(textosRetirados)} onClick={() => filtrarPor(textosRetirados)}
+                    />
+                    {!soloLectura && <Mosaico color={TONO.info} icono={UserCheck} valor={totalConActivos} label="Con activos asignados" />}
+                    {!soloLectura && <Mosaico color={TONO.acento} icono={Package} valor={totalActivos} label="Total activos asignados" />}
                     {!soloLectura && puedeVerGasto && (
-                        <div>
-                            <span className="ai-kpi-icon"><Wallet size={18} strokeWidth={1.75} /></span>
-                            <div>
-                                <p className="ai-kpi-label">Gasto mensual en personal</p>
-                                <p className="ai-kpi-value ai-num">{gastoTotal ? formatSalario(gastoTotal.gasto_mensual_total) : '—'}</p>
-                            </div>
-                        </div>
+                        <Mosaico color={TONO.cian} icono={Wallet} valor={gastoTotal ? formatSalario(gastoTotal.gasto_mensual_total) : '—'} label="Gasto mensual en personal" />
                     )}
-                </div>
+                </Mosaicos>
 
                 {error && (
-                    <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px' }}>
-                        {error}
-                    </div>
+                    <div style={{ marginBottom: 12 }}><Pastilla color={TONO.peligro} punto>{error}</Pastilla></div>
                 )}
 
-                <div className="ai-card">
-                    <div className="ai-toolbar">
-                        <div className="ai-search" style={{ flex: 1 }}>
-                            <Search size={16} strokeWidth={1.75} />
-                            <input
-                                type="text"
-                                placeholder="Buscar por nombre, identificación, correo, campaña o cargo…"
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                style={{ border: 0, outline: 'none', background: 'transparent', flex: 1, font: 'inherit', color: 'var(--ink)' }}
-                            />
-                        </div>
-                        <FiltroChip etiqueta="Campaña" opciones={opcionesCampania} seleccion={filtroCampanias} onChange={setFiltroCampanias} />
-                        <FiltroChip etiqueta="Estado" opciones={opcionesEstado} seleccion={filtroEstados} onChange={setFiltroEstados} />
-                        <FiltroChip etiqueta="Cargo" opciones={opcionesCargo} seleccion={filtroCargos} onChange={setFiltroCargos} />
-                        <FiltroChip etiqueta="Analista" opciones={opcionesAnalista} seleccion={filtroAnalistas} onChange={setFiltroAnalistas} />
-                        <FiltroChip etiqueta="Documentos" opciones={OPCIONES_DOCUMENTOS} seleccion={filtroDocumentos} onChange={setFiltroDocumentos} />
-                    </div>
-
-                    {!soloLectura && (
-                        <div className="ai-row" style={{ gap: 18, flexWrap: 'wrap', padding: '0 16px 12px', alignItems: 'flex-end' }}>
-                            <div>
-                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Rango sobre</label>
-                                <select className="ai-input" value={rangoCampo} onChange={(e) => { setRangoCampo(e.target.value); setRangoManual(true); }}>
-                                    {CAMPOS_RANGO.map(({ valor, etiqueta }) => <option key={valor} value={valor}>{etiqueta}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Desde</label>
-                                <input type="date" className="ai-input" value={rangoDesde} max={rangoHasta || undefined} onChange={(e) => setRangoDesde(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Hasta</label>
-                                <input type="date" className="ai-input" value={rangoHasta} min={rangoDesde || undefined} onChange={(e) => setRangoHasta(e.target.value)} />
-                            </div>
-                            {(hayRango || rangoManual) && (
-                                <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={limpiarRango}>
-                                    Limpiar fechas
-                                </button>
-                            )}
-                            {hayRango && !rangoInvalido && (
-                                <span className="ai-muted" style={{ fontSize: 13, paddingBottom: 8 }}>
-                                    <strong className="ai-num">{filteredEmpleados.length}</strong> empleado{filteredEmpleados.length === 1 ? '' : 's'} con {ETIQUETA_CAMPO_RANGO[rangoCampo].toLowerCase()} en el rango
-                                </span>
-                            )}
-                            {rangoInvalido && (
-                                <span style={{ color: 'var(--danger)', fontSize: 13, paddingBottom: 8 }}>La fecha Desde no puede ser posterior a Hasta</span>
-                            )}
-                        </div>
+                <BarraFiltros>
+                    <CampoBusqueda value={searchInput} onChange={setSearchInput} placeholder="Buscar por nombre, identificación, correo, campaña o cargo…" />
+                    <FiltroChip etiqueta="Campaña" opciones={opcionesCampania} seleccion={filtroCampanias} onChange={setFiltroCampanias} />
+                    <FiltroChip etiqueta="Estado" opciones={opcionesEstado} seleccion={filtroEstados} onChange={setFiltroEstados} />
+                    <FiltroChip etiqueta="Cargo" opciones={opcionesCargo} seleccion={filtroCargos} onChange={setFiltroCargos} />
+                    <FiltroChip etiqueta="Analista" opciones={opcionesAnalista} seleccion={filtroAnalistas} onChange={setFiltroAnalistas} />
+                    <FiltroChip etiqueta="Documentos" opciones={OPCIONES_DOCUMENTOS} seleccion={filtroDocumentos} onChange={setFiltroDocumentos} />
+                    {hayFiltrosActivos && (
+                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={limpiarFiltros}>Limpiar filtros</button>
                     )}
+                </BarraFiltros>
 
-                    {soloLectura && (
-                        <div className="ai-row" style={{ gap: 18, flexWrap: 'wrap', padding: '0 16px 12px', alignItems: 'flex-end' }}>
-                            <div>
-                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Fecha de registro</label>
-                                <select className="ai-input" value={fRegistro} onChange={(e) => setFRegistro(e.target.value)}>
-                                    <option value="">Todas</option>
-                                    {opcionesFechaRegistro.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Fecha de ingreso</label>
-                                <select className="ai-input" value={fIngreso} onChange={(e) => setFIngreso(e.target.value)}>
-                                    <option value="">Todas</option>
-                                    {opcionesFechaIngreso.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Fecha de retiro</label>
-                                <select className="ai-input" value={fRetiro} onChange={(e) => setFRetiro(e.target.value)}>
-                                    <option value="">Todas</option>
-                                    {opcionesFechaRetiro.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
-                                </select>
-                            </div>
-                            {hayFiltrosFecha && (
-                                <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => { setFIngreso(''); setFRegistro(''); setFRetiro(''); }}>
-                                    Limpiar fechas
-                                </button>
-                            )}
-                        </div>
-                    )}
+                {!soloLectura && (
+                    <BarraFiltros>
+                        <label className="ai-row" style={{ gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                            Rango sobre
+                            <select className="ai-input" style={{ width: 'auto', flex: 'none' }} value={rangoCampo} onChange={(e) => { setRangoCampo(e.target.value); setRangoManual(true); }}>
+                                {CAMPOS_RANGO.map(({ valor, etiqueta }) => <option key={valor} value={valor}>{etiqueta}</option>)}
+                            </select>
+                        </label>
+                        <label className="ai-row" style={{ gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                            Desde
+                            <input type="date" className="ai-input" style={{ width: 'auto', flex: 'none' }} value={rangoDesde} max={rangoHasta || undefined} onChange={(e) => setRangoDesde(e.target.value)} />
+                        </label>
+                        <label className="ai-row" style={{ gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                            Hasta
+                            <input type="date" className="ai-input" style={{ width: 'auto', flex: 'none' }} value={rangoHasta} min={rangoDesde || undefined} onChange={(e) => setRangoHasta(e.target.value)} />
+                        </label>
+                        {(hayRango || rangoManual) && (
+                            <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={limpiarRango}>Limpiar fechas</button>
+                        )}
+                        {hayRango && !rangoInvalido && (
+                            <span className="ai-muted" style={{ fontSize: 13 }}>
+                                <strong className="ai-num">{filteredEmpleados.length}</strong> empleado{filteredEmpleados.length === 1 ? '' : 's'} con {ETIQUETA_CAMPO_RANGO[rangoCampo].toLowerCase()} en el rango
+                            </span>
+                        )}
+                        {rangoInvalido && (
+                            <span style={{ color: 'var(--danger)', fontSize: 13 }}>La fecha Desde no puede ser posterior a Hasta</span>
+                        )}
+                    </BarraFiltros>
+                )}
 
+                {soloLectura && (
+                    <BarraFiltros>
+                        {[['Fecha de registro', fRegistro, setFRegistro, opcionesFechaRegistro], ['Fecha de ingreso', fIngreso, setFIngreso, opcionesFechaIngreso], ['Fecha de retiro', fRetiro, setFRetiro, opcionesFechaRetiro]].map(([etiqueta, valor, cambiar, opciones]) => (
+                            <label key={etiqueta} className="ai-row" style={{ gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                                {etiqueta}
+                                <select className="ai-input" style={{ width: 'auto', flex: 'none' }} value={valor} onChange={(e) => cambiar(e.target.value)}>
+                                    <option value="">Todas</option>
+                                    {opciones.map(d => <option key={d} value={d}>{formatearFecha(d)}</option>)}
+                                </select>
+                            </label>
+                        ))}
+                        {hayFiltrosFecha && (
+                            <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => { setFIngreso(''); setFRegistro(''); setFRetiro(''); }}>Limpiar fechas</button>
+                        )}
+                    </BarraFiltros>
+                )}
+
+                <div>
                     {loading ? (
-                        <div>
-                            {Array.from({ length: 8 }).map((_, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
-                                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--surface-200)' }} />
-                                    <div style={{ flex: 1, height: 12, borderRadius: 6, background: 'var(--surface-200)', maxWidth: 220 }} />
-                                    <div style={{ flex: 1, height: 12, borderRadius: 6, background: 'var(--surface-200)', maxWidth: 120 }} />
-                                    <div style={{ flex: 1, height: 12, borderRadius: 6, background: 'var(--surface-200)', maxWidth: 90 }} />
-                                </div>
-                            ))}
-                        </div>
+                        <CargandoVista />
                     ) : filteredEmpleados.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '48px 16px' }}>
-                            <Users size={40} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)', margin: '0 auto 12px' }} />
-                            <p style={{ font: '600 14px var(--font-sans)', color: 'var(--ink)' }}>No hay empleados que coincidan con los filtros</p>
+                        <VistaVacia icono={Users}>
+                            No hay empleados que coincidan con los filtros
                             {hayFiltrosActivos && (
-                                <button className="ai-btn ai-btn--ghost ai-btn--sm" style={{ marginTop: 12 }} onClick={limpiarFiltros}>
-                                    Limpiar filtros
-                                </button>
+                                <><br /><button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" style={{ marginTop: 12 }} onClick={limpiarFiltros}>Limpiar filtros</button></>
                             )}
-                        </div>
+                        </VistaVacia>
                     ) : vista === 'tarjetas' ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, padding: 16 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginBottom: 14 }}>
                             {paginatedEmpleados.map((empleado) => {
                                 const est = estadoBadge(empleado.estado_contrato_nombre);
                                 return (
@@ -586,7 +524,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                                             {empleado.campania_nombre && (
                                                 <span className={`ai-chip ${claseCampania(empleado.campania_nombre) || ''}`}>{empleado.campania_nombre}</span>
                                             )}
-                                            <span className={`ai-badge ${est.clase}`}><span className="ai-dot" />{est.texto}</span>
+                                            <Pastilla color={est.color} punto>{est.texto}</Pastilla>
                                         </div>
                                         <div className="ai-row" style={{ justifyContent: 'flex-end' }}>
                                             <button className="ai-icon-btn" aria-label="Ver perfil" onClick={() => abrirPerfil(empleado.id)}><Eye size={16} strokeWidth={1.75} /></button>
@@ -602,7 +540,8 @@ const AgentManagement = ({ soloLectura = false }) => {
                             })}
                         </div>
                     ) : (
-                        <table className="ai-table ai-table--dense">
+                        <div className="ai-monitor-tabla-wrap" style={{ marginBottom: 12 }}>
+                        <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                             <thead>
                                 <tr>
                                     {soloLectura && <th>Fecha de registro</th>}
@@ -622,24 +561,24 @@ const AgentManagement = ({ soloLectura = false }) => {
                                     const est = estadoBadge(empleado.estado_contrato_nombre);
                                     const chipCampania = claseCampania(empleado.campania_nombre);
                                     return (
-                                        <tr key={empleado.id}>
+                                        <tr key={empleado.id} className="is-clicable" onClick={() => abrirPerfil(empleado.id)} title="Ver ficha">
                                             {soloLectura && (
                                                 <td className="ai-num" title={empleado.retiro_registrado_en && empleado.estado_contrato_nombre === 'retirado' ? 'Fecha en que RRHH lo pasó a retirado' : 'Fecha en que se creó la ficha'}>
                                                     {formatearFecha(fechaRegistro(empleado)) || '—'}
                                                 </td>
                                             )}
-                                            <td>
-                                                <div className="ai-person">
-                                                    <span className="ai-avatar">{iniciales(empleado.nombre_completo)}</span>
-                                                    <div style={{ minWidth: 0 }}>
-                                                        <div className="ai-person-name">{nombrePropio(empleado.nombre_completo)}</div>
-                                                        {empleado.email && <div className="ai-person-sub">{empleado.email}</div>}
-                                                    </div>
-                                                </div>
+                                            <td className="ai-monitor-nombre">
+                                                <span>
+                                                    <AvatarVista />
+                                                    <span>
+                                                        {nombrePropio(empleado.nombre_completo).toUpperCase()}
+                                                        {empleado.email && <span className="ai-monitor-sub">{empleado.email}</span>}
+                                                    </span>
+                                                </span>
                                             </td>
                                             <td>
                                                 <div className="ai-num">{empleado.numero_identificacion}</div>
-                                                {empleado.tipo_identificacion_codigo && <div className="ai-person-sub">{empleado.tipo_identificacion_codigo}</div>}
+                                                {empleado.tipo_identificacion_codigo && <div className="ai-monitor-sub">{empleado.tipo_identificacion_codigo}</div>}
                                             </td>
                                             <td>
                                                 {empleado.campania_nombre ? (
@@ -649,11 +588,11 @@ const AgentManagement = ({ soloLectura = false }) => {
                                                 ) : '—'}
                                             </td>
                                             <td>{empleado.cargo_nombre ? primeraMayuscula(empleado.cargo_nombre) : '—'}</td>
-                                            <td><span className={`ai-badge ${est.clase}`}><span className="ai-dot" />{est.texto}</span></td>
+                                            <td><Pastilla color={est.color} punto>{est.texto}</Pastilla></td>
                                             <td className="ai-num">{soloLectura ? (formatearFecha(empleado.fecha_ingreso) || '—') : (empleado.telefono ? formatearTelefono(empleado.telefono) : '—')}</td>
                                             {soloLectura && <td className="ai-num">{formatearFecha(empleado.fecha_retiro) || '—'}</td>}
                                             {hayRango && <td className="ai-num">{formatearFecha(fechaDelRango(empleado)) || '—'}</td>}
-                                            <td className="ai-td-actions">
+                                            <td className="ai-td-actions" onClick={(ev) => ev.stopPropagation()}>
                                                 <div className="ai-row-actions">
                                                     <button className="ai-icon-btn" aria-label="Ver perfil" title="Ver perfil" onClick={() => abrirPerfil(empleado.id)}>
                                                         <Eye size={16} strokeWidth={1.75} />
@@ -675,6 +614,7 @@ const AgentManagement = ({ soloLectura = false }) => {
                                 })}
                             </tbody>
                         </table>
+                        </div>
                     )}
 
                     {!loading && (

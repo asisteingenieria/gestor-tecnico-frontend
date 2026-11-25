@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Inbox, Loader2, RotateCcw, Link2, Send, ArrowRight, AlertTriangle, Plus, Stethoscope } from 'lucide-react';
+import { Inbox, Loader2, RotateCcw, Link2, Send, ArrowRight, AlertTriangle, Plus, Stethoscope, UserPlus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { contratacionHydraService } from '../../services/api';
 import { nombrePropio } from '../../utils/formatoRRHH';
 import { ESTADO_LOTE, mensajeError } from './seccionesUI';
+import { EncabezadoVista, BarraFiltros, Pastilla, CargandoVista, VistaVacia, COLOR_LOTE, TONO } from '../ui';
 
 const TABS = [
     { clave: 'lotes', label: 'Lotes recibidos', icono: Inbox },
@@ -28,46 +29,38 @@ const ContratacionHydra = () => {
     return (
         <div className="ai-scope">
             <div className="ai-content">
-                <div className="ai-page-head">
-                    <div>
-                        <h1 className="ai-page-title">{isSst ? 'Exámenes médicos de contratación' : 'Contratación desde Hydra'}</h1>
-                        <p className="ai-page-sub">
-                            {isSst
-                                ? 'Candidatos que envía Hydra a contratación: marca si asistieron a los exámenes médicos y si los aprobaron. Solo los aprobados se registran como empleados'
-                                : 'Candidatos aprobados en reclutamiento: completa sus datos, verifica cada sección y regístralos como empleados. Solo se registran los que SST aprueba en exámenes médicos'}
-                        </p>
-                    </div>
-                </div>
+                <EncabezadoVista
+                    icono={isSst ? Stethoscope : UserPlus}
+                    titulo={isSst ? 'Exámenes médicos de contratación' : 'Contratación desde Hydra'}
+                    subtitulo={isSst
+                        ? 'Candidatos que envía Hydra a contratación: marca si asistieron a los exámenes médicos y si los aprobaron. Solo los aprobados se registran como empleados'
+                        : 'Candidatos aprobados en reclutamiento: completa sus datos, verifica cada sección y regístralos como empleados. Solo se registran los que SST aprueba en exámenes médicos'}
+                >
+                    {tabs.length > 1 && (
+                        <div className="ai-seg" role="tablist" aria-label="Sección">
+                            {tabs.map(({ clave, label, icono }) => (
+                                <span key={clave} role="tab" tabIndex={0} aria-selected={tab === clave} className={tab === clave ? 'is-active' : ''}
+                                    style={{ cursor: 'pointer' }} onClick={() => setTab(clave)}
+                                    onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') setTab(clave); }}>
+                                    {React.createElement(icono, { size: 14, strokeWidth: 1.9 })} {label}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </EncabezadoVista>
 
-                <div className="ai-card">
-                    <div className="ai-tabs">
-                        {tabs.map(({ clave, label, icono: Icono }) => (
-                            <button key={clave} type="button" className={`ai-tab${tab === clave ? ' is-active' : ''}`} onClick={() => setTab(clave)} style={{ background: 'transparent', border: 0, cursor: 'pointer' }}>
-                                <Icono size={16} strokeWidth={1.75} /> {label}
-                            </button>
-                        ))}
-                    </div>
-                    {tab === 'lotes' && <Lotes />}
-                    {tab === 'envios' && <Envios />}
-                    {tab === 'mapeos' && <Mapeos />}
-                </div>
+                {tab === 'lotes' && <Lotes />}
+                {tab === 'envios' && <Envios />}
+                {tab === 'mapeos' && <Mapeos />}
             </div>
         </div>
     );
 };
 
-const Cargando = () => (
-    <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
-        <Loader2 size={32} className="animate-spin" style={{ color: 'var(--primary)' }} />
-    </div>
-);
+const Cargando = () => <CargandoVista />;
 
-const Vacio = ({ icono: Icono, titulo, texto }) => (
-    <div className="ai-empty">
-        <span className="ai-modal-icon"><Icono size={24} strokeWidth={1.75} /></span>
-        <p style={{ fontWeight: 600, margin: 0, color: 'var(--ink)' }}>{titulo}</p>
-        <p style={{ margin: 0 }}>{texto}</p>
-    </div>
+const Vacio = ({ icono, titulo, texto }) => (
+    <VistaVacia icono={icono}><strong style={{ color: 'var(--ink)' }}>{titulo}</strong><br />{texto}</VistaVacia>
 );
 
 // ------------------------------------------------------------------ lotes ----
@@ -94,7 +87,7 @@ const Lotes = () => {
 
     return (
         <>
-            <div className="ai-toolbar">
+            <BarraFiltros>
                 <div className="ai-seg">
                     {FILTROS_LOTE.map(f => (
                         <span key={f.valor} className={filtro === f.valor ? 'is-active' : ''} onClick={() => setFiltro(f.valor)} style={{ cursor: 'pointer' }}>
@@ -102,12 +95,13 @@ const Lotes = () => {
                         </span>
                     ))}
                 </div>
-            </div>
+            </BarraFiltros>
             {error && <p className="ai-help is-error" style={{ padding: '0 16px' }}>{error}</p>}
             {!lotes && !error ? <Cargando /> : lotes?.length === 0 ? (
                 <Vacio icono={Inbox} titulo="No hay lotes" texto="Cuando Selección envíe candidatos desde Hydra aparecerán aquí." />
             ) : lotes && (
-                <table className="ai-table ai-table--dense">
+                <div className="ai-monitor-tabla-wrap" style={{ marginBottom: 12 }}>
+                <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                     <thead>
                         <tr>
                             <th>Lote</th>
@@ -124,12 +118,12 @@ const Lotes = () => {
                             const activos = l.total - l.fuera_del_lote;
                             const hechos = l.listos + l.registrados;
                             const pct = activos > 0 ? Math.round((hechos / activos) * 100) : 0;
-                            const estado = ESTADO_LOTE[l.estado] ?? ESTADO_LOTE.abierto;
+                            const estado = { ...(ESTADO_LOTE[l.estado] ?? ESTADO_LOTE.abierto), color: COLOR_LOTE[l.estado] || TONO.neutro };
                             return (
-                                <tr key={l.idhydra_lote} style={{ cursor: 'pointer' }} onClick={() => navigate(`/recursos-humanos/contratacion-hydra/${l.idhydra_lote}`)}>
+                                <tr key={l.idhydra_lote} className="is-clicable" onClick={() => navigate(`/recursos-humanos/contratacion-hydra/${l.idhydra_lote}`)}>
                                     <td>
-                                        <div className="ai-person-name">{l.nombre}</div>
-                                        <div className="ai-person-sub">{l.lote_externo_id}</div>
+                                        <div style={{ fontWeight: 700 }}>{l.nombre}</div>
+                                        <div className="ai-monitor-sub">{l.lote_externo_id}</div>
                                     </td>
                                     <td className="ai-muted">{fmtFecha(l.fecha_ingreso_sugerida)}</td>
                                     <td>
@@ -138,13 +132,13 @@ const Lotes = () => {
                                     </td>
                                     <td>
                                         {l.examenes_pendientes > 0 ? (
-                                            <span className="ai-badge ai-badge--warning" title="Candidatos en curso sin el examen aprobado por SST">
+                                            <Pastilla color={TONO.alerta} title="Candidatos en curso sin el examen aprobado por SST">
                                                 <Stethoscope size={12} /> {l.examenes_pendientes} por resolver
-                                            </span>
+                                            </Pastilla>
                                         ) : <span className="ai-help">Al día</span>}
                                         {l.examenes_no_asistio > 0 && <div className="ai-help">{l.examenes_no_asistio} no asistió</div>}
                                     </td>
-                                    <td><span className={`ai-badge ${estado.clase}`}><span className="ai-dot" />{estado.texto}</span></td>
+                                    <td><Pastilla color={estado?.color || TONO.neutro} punto>{estado?.texto}</Pastilla></td>
                                     <td className="ai-muted">{fmtInstante(l.created_at)}</td>
                                     <td className="ai-td-actions"><button className="ai-icon-btn" aria-label="Abrir lote"><ArrowRight size={16} /></button></td>
                                 </tr>
@@ -152,6 +146,7 @@ const Lotes = () => {
                         })}
                     </tbody>
                 </table>
+                </div>
             )}
         </>
     );
@@ -161,9 +156,9 @@ const Lotes = () => {
 
 const TIPO_ENVIO = { candidato_registrado: 'Contratado', candidato_descartado: 'Descartado' };
 const ESTADO_ENVIO = {
-    pendiente: { clase: 'ai-badge--warning', texto: 'Pendiente' },
-    enviado: { clase: 'ai-badge--success', texto: 'Entregado' },
-    fallido: { clase: 'ai-badge--danger', texto: 'Fallido' }
+    pendiente: { color: TONO.alerta, texto: 'Pendiente' },
+    enviado: { color: TONO.exito, texto: 'Entregado' },
+    fallido: { color: TONO.peligro, texto: 'Fallido' }
 };
 
 const Envios = () => {
@@ -194,15 +189,15 @@ const Envios = () => {
 
     return (
         <>
-            <div className="ai-toolbar">
+            <BarraFiltros>
                 <div className="ai-seg">
                     {[['', 'Todos'], ['pendiente', 'Pendientes'], ['fallido', 'Fallidos'], ['enviado', 'Entregados']].map(([v, t]) => (
                         <span key={v} className={filtro === v ? 'is-active' : ''} onClick={() => setFiltro(v)} style={{ cursor: 'pointer' }}>{t}</span>
                     ))}
                 </div>
-            </div>
+            </BarraFiltros>
             {datos && !datos.configurado && (
-                <div style={{ margin: '0 16px 12px', padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--warning-soft)', fontSize: 13, display: 'flex', gap: 8 }}>
+                <div style={{ margin: '0 0 12px', padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--warning-soft)', fontSize: 13, display: 'flex', gap: 8 }}>
                     <AlertTriangle size={16} style={{ color: 'var(--warning)', flexShrink: 0, marginTop: 2 }} />
                     El canal hacia Hydra no está configurado en este servidor: los avisos se acumulan como pendientes y saldrán cuando se configure.
                 </div>
@@ -211,7 +206,8 @@ const Envios = () => {
             {!datos && !error ? <Cargando /> : datos?.envios.length === 0 ? (
                 <Vacio icono={Send} titulo="Sin avisos" texto="Al registrar o descartar candidatos, Gestor le avisa a Hydra. Aquí se ve si llegó." />
             ) : datos && (
-                <table className="ai-table ai-table--dense">
+                <div className="ai-monitor-tabla-wrap" style={{ marginBottom: 12 }}>
+                <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                     <thead>
                         <tr><th>Candidato</th><th>Aviso</th><th>Estado</th><th>Intentos</th><th>Último error</th><th>Creado</th><th></th></tr>
                     </thead>
@@ -220,9 +216,9 @@ const Envios = () => {
                             const estado = ESTADO_ENVIO[e.estado];
                             return (
                                 <tr key={e.idhydra_envio_saliente}>
-                                    <td>{e.nombre_completo ? nombrePropio(e.nombre_completo) : `#${e.hydra_candidato_externo_id}`}</td>
+                                    <td style={{ fontWeight: 700 }}>{e.nombre_completo ? nombrePropio(e.nombre_completo) : `#${e.hydra_candidato_externo_id}`}</td>
                                     <td>{TIPO_ENVIO[e.tipo] ?? e.tipo}</td>
-                                    <td><span className={`ai-badge ${estado.clase}`}><span className="ai-dot" />{estado.texto}</span></td>
+                                    <td><Pastilla color={estado?.color || TONO.neutro} punto>{estado?.texto}</Pastilla></td>
                                     <td className="ai-num">{e.intentos}</td>
                                     <td className="ai-muted" style={{ maxWidth: 280, whiteSpace: 'normal' }}>{e.ultimo_error || '—'}</td>
                                     <td className="ai-muted">{fmtInstante(e.created_at)}</td>
@@ -238,6 +234,7 @@ const Envios = () => {
                         })}
                     </tbody>
                 </table>
+                </div>
             )}
         </>
     );
@@ -284,14 +281,16 @@ const Mapeos = () => {
     };
 
     return (
-        <div style={{ padding: '16px 20px' }}>
-            <p className="ai-help" style={{ marginTop: 0 }}>
+        <div>
+            <BarraFiltros>
+            <p className="ai-help" style={{ margin: 0 }}>
                 Hydra envía sus catálogos por código. Cuando un valor no existe en Gestor o coincide con más de uno
                 (por ejemplo "Sura EPS" con "SURA" y "EPS Sura"), aquí se define a cuál corresponde. Normalmente se crean desde el
                 propio candidato; esta lista sirve para revisarlas o corregirlas.
             </p>
+            </BarraFiltros>
 
-            <form onSubmit={guardar} className="ai-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto', alignItems: 'end', marginBottom: 16 }}>
+            <form onSubmit={guardar} className="ai-form-grid ai-monitor-barra" style={{ gridTemplateColumns: '1fr 1fr 1fr auto', alignItems: 'end', display: 'grid' }}>
                 <div className="ai-field">
                     <label className="ai-label">Catálogo</label>
                     <select className="ai-input" required value={nuevo.catalogo} onChange={(e) => setNuevo({ catalogo: e.target.value, valor_hydra: nuevo.valor_hydra, id_gestor: '' })}>
@@ -319,7 +318,8 @@ const Mapeos = () => {
             {!mapeos ? <Cargando /> : mapeos.length === 0 ? (
                 <Vacio icono={Link2} titulo="Sin equivalencias" texto="Todavía no se ha definido ninguna." />
             ) : (
-                <table className="ai-table ai-table--dense">
+                <div className="ai-monitor-tabla-wrap" style={{ marginBottom: 12 }}>
+                <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                     <thead><tr><th>Catálogo</th><th>Valor en Hydra</th><th>Equivale en Gestor</th><th>Definido por</th></tr></thead>
                     <tbody>
                         {mapeos.map(m => (
@@ -332,6 +332,7 @@ const Mapeos = () => {
                         ))}
                     </tbody>
                 </table>
+                </div>
             )}
         </div>
     );
