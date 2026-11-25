@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { irAlLoginPorVencimiento } from '../utils/sesion';
 
 // Configuración dinámica de la URL de la API
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
@@ -25,10 +26,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            window.location.href = '/login';
-        }
+        // Sesión vencida o inválida: al login con el aviso (asistencia.md §81).
+        if (error.response?.status === 401) irAlLoginPorVencimiento();
         if (error.response?.status === 403 && error.response?.data?.codigo === 'CAMBIO_PASSWORD_REQUERIDO'
             && window.location.pathname !== '/cambiar-password') {
             window.location.href = '/cambiar-password';

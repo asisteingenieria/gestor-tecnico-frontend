@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import AvisoSesion from '../components/AvisoSesion';
+import { guardarSesion, borrarSesion, vencimientoSesion } from '../utils/sesion';
 
 const AuthContext = createContext();
 
@@ -15,7 +17,12 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('token'));
+    // Una sesión que ya venció (p. ej. la pestaña quedó abierta desde ayer) no se usa: se descarta al cargar.
+    const [token, setToken] = useState(() => {
+        const vence = vencimientoSesion();
+        if (vence && vence <= Date.now()) { borrarSesion(); return null; }
+        return localStorage.getItem('token');
+    });
     const [loading, setLoading] = useState(true);
 
     // Configurar axios por defecto
@@ -55,7 +62,7 @@ export const AuthProvider = ({ children }) => {
 
             const { token: newToken, user: userData } = response.data;
 
-            localStorage.setItem('token', newToken);
+            guardarSesion(newToken);
             setToken(newToken);
             setUser(userData);
             setLoading(false);
@@ -73,7 +80,7 @@ export const AuthProvider = ({ children }) => {
 
 
     const logout = () => {
-        localStorage.removeItem('token');
+        borrarSesion();
         setToken(null);
         setUser(null);
         delete axios.defaults.headers.common['x-auth-token'];
@@ -88,7 +95,7 @@ export const AuthProvider = ({ children }) => {
             // El backend devuelve una sesión nueva (la anterior podía traer la marca de cambio
             // obligatorio). Se reemplaza para que el resto de la API vuelva a responder.
             if (response.data?.token) {
-                localStorage.setItem('token', response.data.token);
+                guardarSesion(response.data.token);
                 axios.defaults.headers.common['x-auth-token'] = response.data.token;
                 setToken(response.data.token);
                 setUser(response.data.user);
@@ -148,6 +155,7 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={value}>
             {children}
+            <AvisoSesion activo={Boolean(token)} />
         </AuthContext.Provider>
     );
 };
