@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Loader2, Users, RefreshCw, Search, ChevronUp, ChevronDown,
+    Users, RefreshCw,
     User, Headphones, Wifi, Coffee, Bath, Utensils, GraduationCap, Unplug, Play, CheckCircle2, Clock,
     CalendarDays, Activity, Timer, ClipboardList, Moon
 } from 'lucide-react';
@@ -10,6 +10,10 @@ import { escucharAsistencia } from '../../utils/socketAsistencia';
 import { datosPausa } from '../../utils/pausasAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 import NovedadChip from './NovedadChip';
+import {
+    EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Leyenda,
+    TablaVista, AvatarVista, siguienteOrden, Pastilla, CargandoVista, VistaVacia
+} from '../ui';
 import { tardeExacto } from '../../utils/llegadaAsistencia';
 import { etiquetaNovedad, noAsistioPorNovedad } from '../../utils/novedadesAsistencia';
 
@@ -45,7 +49,7 @@ function estadoMonitor(emp) {
 
 // Colores de cada clave de estadoMonitor (clases .ai-st--* de components.css).
 const COLOR_DE = { pausa: 'break', ausente: 'no_llego' };
-const claseColor = (clave) => `ai-st--${COLOR_DE[clave] || clave}`;
+const colorDe = (clave) => COLOR_DE[clave] || clave;
 
 // Mosaicos de arriba, uno por estado de AsisLock (asistencia.md §34) y los del día. `estados` = claves de
 // estadoMonitor que cuenta cada uno; un clic filtra la tabla. También son la leyenda.
@@ -205,109 +209,58 @@ const MonitorEquipo = () => {
         });
     }, [filas, filtro, busqueda, orden, totalDe, acumuladoDe]);
 
-    const ordenarPor = (col) => setOrden((o) => ({ col, asc: o.col === col ? !o.asc : true }));
+    const ordenarPor = (col) => setOrden(siguienteOrden(col));
 
     if (loading) {
-        return (
-            <div className="ai-content">
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
-            </div>
-        );
+        return <div className="ai-content"><CargandoVista /></div>;
     }
 
     return (
         <div className="ai-content">
-            <div className="ai-monitor-head">
-                <div className="ai-monitor-titulo">
-                    <Users size={52} strokeWidth={1.6} aria-hidden="true" />
-                    <div>
-                        <h1>Equipo</h1>
-                        <p>
-                            {equipo.length} persona{equipo.length === 1 ? '' : 's'} a tu cargo ·
-                            <span className="ai-monitor-vivo" aria-hidden="true" /> en vivo
-                        </p>
-                    </div>
-                </div>
-                <div className="ai-monitor-acciones">
-                    <SelectorVistaEquipo />
-                    <button type="button" className="ai-monitor-btn" onClick={() => cargar(true)}>
-                        <RefreshCw size={15} strokeWidth={2} className={actualizando ? 'animate-spin' : ''} /> Actualizar
-                    </button>
-                </div>
-            </div>
+            <EncabezadoVista
+                icono={Users}
+                titulo="Equipo"
+                subtitulo={`${equipo.length} persona${equipo.length === 1 ? '' : 's'} a tu cargo`}
+                enVivo
+            >
+                <SelectorVistaEquipo />
+                <button type="button" className="ai-monitor-btn" onClick={() => cargar(true)}>
+                    <RefreshCw size={15} strokeWidth={2} className={actualizando ? 'animate-spin' : ''} /> Actualizar
+                </button>
+            </EncabezadoVista>
 
             {error && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
 
-            <div className="ai-monitor-mosaicos">
+            <Mosaicos>
                 {MOSAICOS.map((m) => (
-                    <button
+                    <Mosaico
                         key={m.id}
-                        type="button"
-                        className={`ai-monitor-mosaico ${claseColor(m.id)} ${filtro === m.id ? 'is-active' : ''}`}
+                        color={colorDe(m.id)}
+                        icono={m.icono}
+                        valor={conteo[m.id]}
+                        label={m.label}
+                        activo={filtro === m.id}
                         onClick={() => setFiltro((f) => (f === m.id ? null : m.id))}
-                        aria-pressed={filtro === m.id}
-                        title={filtro === m.id ? 'Quitar el filtro' : `Ver solo: ${m.label.toLowerCase()}`}
-                    >
-                        <m.icono size={26} strokeWidth={2} className="ai-monitor-ic" aria-hidden="true" />
-                        <span className="ai-monitor-num">{conteo[m.id]}</span>
-                        <span className="ai-monitor-lbl">{m.label}</span>
-                    </button>
-                ))}
-            </div>
-
-            <div className="ai-monitor-barra">
-                <div className="ai-input">
-                    <Search size={16} strokeWidth={1.75} className="ai-ic" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre o cédula..."
-                        value={busqueda}
-                        onChange={(e) => setBusqueda(e.target.value)}
-                        style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
                     />
-                </div>
-                <div className="ai-monitor-leyenda" aria-label="Colores por estado">
-                    {MOSAICOS.map((m) => (
-                        <span key={m.id} className={claseColor(m.id)}>
-                            <i className="ai-monitor-punto" aria-hidden="true" /> {m.leyenda}
-                        </span>
-                    ))}
-                </div>
+                ))}
+            </Mosaicos>
+
+            <BarraFiltros>
+                <CampoBusqueda value={busqueda} onChange={setBusqueda} />
+                <Leyenda items={MOSAICOS.map((m) => ({ id: m.id, color: colorDe(m.id), label: m.leyenda }))} />
                 {filtro && (
                     <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => setFiltro(null)}>
                         Ver todos ({equipo.length})
                     </button>
                 )}
-            </div>
+            </BarraFiltros>
 
             {visibles.length === 0 ? (
-                <div className="ai-panel">
-                    <div className="ai-empty">
-                        <Users size={40} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                        <p>{equipo.length === 0 ? 'No tienes personas a cargo.' : 'Nadie coincide con este filtro.'}</p>
-                    </div>
-                </div>
+                <VistaVacia icono={Users}>
+                    {equipo.length === 0 ? 'No tienes personas a cargo.' : 'Nadie coincide con este filtro.'}
+                </VistaVacia>
             ) : (
-                <div className="ai-monitor-tabla-wrap">
-                    <table className="ai-monitor-tabla">
-                        <thead>
-                            <tr>
-                                {COLUMNAS.map((c) => (
-                                    <th key={c.id} aria-sort={orden.col === c.id ? (orden.asc ? 'ascending' : 'descending') : 'none'}>
-                                        <button type="button" onClick={() => ordenarPor(c.id)}>
-                                            <c.icono size={17} strokeWidth={1.9} aria-hidden="true" />
-                                            {c.label}
-                                            {orden.col === c.id && (orden.asc
-                                                ? <ChevronUp size={14} strokeWidth={2.4} />
-                                                : <ChevronDown size={14} strokeWidth={2.4} />)}
-                                        </button>
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
+                <TablaVista columnas={COLUMNAS} orden={orden} onOrdenar={ordenarPor}>
                             {visibles.map((fila) => {
                                 const { emp, est } = fila;
                                 const total = totalDe(fila);
@@ -327,16 +280,14 @@ const MonitorEquipo = () => {
                                         </td>
                                         <td className="ai-monitor-nombre">
                                             <span>
-                                                <i className="ai-monitor-avatar" aria-hidden="true"><User size={16} strokeWidth={2.4} /></i>
+                                                <AvatarVista />
                                                 {(emp.nombre || '').toUpperCase()}
                                                 <NovedadChip novedad={emp.novedad} />
                                             </span>
                                         </td>
                                         <td className="ai-monitor-centro">{textoHorario(emp.turno)}</td>
                                         <td className="ai-monitor-centro">
-                                            <span className={`ai-monitor-pill ${claseColor(est.clave)}`}>
-                                                <i className="ai-monitor-punto" aria-hidden="true" /> {est.label}
-                                            </span>
+                                            <Pastilla color={colorDe(est.clave)} punto>{est.label}</Pastilla>
                                         </td>
                                         <td className="ai-monitor-centro">
                                             {total != null
@@ -351,10 +302,9 @@ const MonitorEquipo = () => {
                                             return (
                                                 <td key={c.id} className="ai-monitor-centro">
                                                     {activo && acum != null ? (
-                                                        <span className={`ai-monitor-pill ai-monitor-pill--acum ${claseColor(c.id)}`}
-                                                            title={enCurso != null ? 'Desde que entró esta vez' : 'Acumulado del día'}>
+                                                        <Pastilla color={colorDe(c.id)} title={enCurso != null ? 'Desde que entró esta vez' : 'Acumulado del día'}>
                                                             {hhmmss(enCurso ?? acum)}
-                                                        </span>
+                                                        </Pastilla>
                                                     ) : (acum || veces ? hhmmss(acum ?? 0) : '—')}
                                                     {(enCurso != null || veces > 0) && (
                                                         <span className="ai-monitor-sub">
@@ -369,9 +319,7 @@ const MonitorEquipo = () => {
                                     </tr>
                                 );
                             })}
-                        </tbody>
-                    </table>
-                </div>
+                </TablaVista>
             )}
         </div>
     );
