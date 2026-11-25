@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Download, Search, ClipboardList } from 'lucide-react';
+import { Download, ClipboardList, CalendarClock, CalendarCheck, CalendarDays, Users, Hourglass } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import { descargarCsv } from '../../utils/csv';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
+import {
+    EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Pastilla, CargandoVista, VistaVacia,
+    TONO, colorTipoNovedad
+} from '../ui';
 
 // Historial de novedades de RRHH del equipo (asistencia.md §56): incapacidades, vacaciones, licencias y
 // suspensiones de la gente que cuelga del jefe —coordinador, jefe de área o director—, incluidos los ya
@@ -20,16 +24,16 @@ const fechaCorta = (f) => {
 };
 
 const ESTADOS = {
-    en_curso: { label: 'En curso', clase: 'ai-badge--warning' },
-    proxima: { label: 'Próxima', clase: 'ai-badge--info' },
-    finalizada: { label: 'Finalizada', clase: 'ai-badge--neutral' }
+    en_curso: { label: 'En curso', color: TONO.alerta },
+    proxima: { label: 'Próxima', color: TONO.info },
+    finalizada: { label: 'Finalizada', color: TONO.neutro }
 };
 
 const SOPORTES = {
-    completos: { label: 'Completos', clase: 'ai-badge--success' },
-    incompletos: { label: 'Incompletos', clase: 'ai-badge--warning' },
-    pendientes: { label: 'Pendientes', clase: 'ai-badge--danger' },
-    no_requiere: { label: 'No requiere', clase: 'ai-badge--neutral' }
+    completos: { label: 'Completos', color: TONO.exito },
+    incompletos: { label: 'Incompletos', color: TONO.alerta },
+    pendientes: { label: 'Pendientes', color: TONO.peligro },
+    no_requiere: { label: 'No requiere', color: TONO.neutro }
 };
 
 const sinTildes = (s = '') => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -83,6 +87,8 @@ const NovedadesEquipo = ({ vistaEquipo = false }) => {
     const resumen = useMemo(() => ({
         total: filtradas.length,
         enCurso: filtradas.filter((n) => n.estado === 'en_curso').length,
+        proximas: filtradas.filter((n) => n.estado === 'proxima').length,
+        finalizadas: filtradas.filter((n) => n.estado === 'finalizada').length,
         personas: new Set(filtradas.map((n) => n.empleado_id)).size,
         dias: filtradas.reduce((s, n) => s + (Number(n.total_dias) || 0), 0)
     }), [filtradas]);
@@ -101,68 +107,66 @@ const NovedadesEquipo = ({ vistaEquipo = false }) => {
         );
     };
 
+    const filtrarEstado = (e) => setEstado((actual) => (actual === e ? '' : e));
+
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Novedades del equipo</h1>
-                    <p className="ai-page-sub">Incapacidades, vacaciones, licencias y suspensiones que registró RRHH para tu gente</p>
-                </div>
-                <div className="ai-row" style={{ flexWrap: 'wrap' }}>
-                    {vistaEquipo && <SelectorVistaEquipo />}
-                    <input type="date" className="ai-input" style={{ width: 160 }} value={desde} max={hasta || undefined}
-                        onChange={(e) => setDesde(e.target.value)} aria-label="Desde" title="Desde" />
-                    <input type="date" className="ai-input" style={{ width: 160 }} value={hasta} min={desde || undefined}
-                        onChange={(e) => setHasta(e.target.value)} aria-label="Hasta" title="Hasta" />
-                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportar} disabled={filtradas.length === 0}>
-                        <Download size={14} strokeWidth={1.75} /> Exportar
-                    </button>
-                </div>
-            </div>
+            <EncabezadoVista
+                icono={ClipboardList}
+                titulo="Novedades del equipo"
+                subtitulo="Incapacidades, vacaciones, licencias y suspensiones que registró RRHH para tu gente"
+            >
+                {vistaEquipo && <SelectorVistaEquipo />}
+                <input type="date" className="ai-monitor-btn ai-monitor-mes" value={desde} max={hasta || undefined}
+                    onChange={(e) => setDesde(e.target.value)} aria-label="Desde" title="Desde" />
+                <input type="date" className="ai-monitor-btn ai-monitor-mes" value={hasta} min={desde || undefined}
+                    onChange={(e) => setHasta(e.target.value)} aria-label="Hasta" title="Hasta" />
+                <button type="button" className="ai-monitor-btn" onClick={exportar} disabled={filtradas.length === 0}>
+                    <Download size={15} strokeWidth={2} /> Exportar
+                </button>
+            </EncabezadoVista>
 
             {loading ? (
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
+                <CargandoVista />
             ) : !novedades ? (
-                <div className="ai-panel ai-empty"><p style={{ color: 'var(--danger)' }}>{error}</p></div>
+                <VistaVacia error>{error}</VistaVacia>
             ) : (
-                <div className="ai-panel">
-                    <div className="ai-panel-head" style={{ flexWrap: 'wrap', gap: 8 }}>
-                        <h3 className="ai-panel-title">
-                            {resumen.total} novedad{resumen.total === 1 ? '' : 'es'} · {resumen.personas} persona{resumen.personas === 1 ? '' : 's'}
-                            {' · '}{resumen.dias} día{resumen.dias === 1 ? '' : 's'}
-                            {resumen.enCurso > 0 && <span className="ai-badge ai-badge--warning" style={{ marginLeft: 8 }}>{resumen.enCurso} en curso hoy</span>}
-                        </h3>
-                        <div className="ai-row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                            <div style={{ position: 'relative' }}>
-                                <Search size={14} strokeWidth={1.75} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-subtle)' }} />
-                                <input className="ai-input" style={{ paddingLeft: 30, width: 220 }} placeholder="Nombre o cédula"
-                                    value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar" />
-                            </div>
-                            <select className="ai-input" style={{ width: 220 }} value={tipo} onChange={(e) => setTipo(e.target.value)} aria-label="Tipo de novedad">
-                                <option value="">Todos los tipos</option>
-                                {tipos.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
-                            </select>
-                            <select className="ai-input" style={{ width: 175 }} value={estado} onChange={(e) => setEstado(e.target.value)} aria-label="Estado">
-                                <option value="">Todos los estados</option>
-                                {Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                            </select>
-                            <label className="ai-row" style={{ gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                                <input type="checkbox" checked={verRetirados} onChange={(e) => setVerRetirados(e.target.checked)} />
-                                Incluir retirados
-                            </label>
-                        </div>
-                    </div>
+                <>
+                    <Mosaicos>
+                        <Mosaico color={TONO.info} icono={ClipboardList} valor={resumen.total} label="Novedades" />
+                        <Mosaico color={TONO.alerta} icono={Hourglass} valor={resumen.enCurso} label="En curso hoy"
+                            activo={estado === 'en_curso'} onClick={() => filtrarEstado('en_curso')} />
+                        <Mosaico color={TONO.acento} icono={CalendarClock} valor={resumen.proximas} label="Próximas"
+                            activo={estado === 'proxima'} onClick={() => filtrarEstado('proxima')} />
+                        <Mosaico color={TONO.neutro} icono={CalendarCheck} valor={resumen.finalizadas} label="Finalizadas"
+                            activo={estado === 'finalizada'} onClick={() => filtrarEstado('finalizada')} />
+                        <Mosaico color={TONO.suave} icono={Users} valor={resumen.personas} label="Personas" />
+                        <Mosaico color={TONO.cian} icono={CalendarDays} valor={resumen.dias} label="Días" />
+                    </Mosaicos>
+
+                    <BarraFiltros>
+                        <CampoBusqueda value={busqueda} onChange={setBusqueda} />
+                        <select className="ai-input ai-monitor-select" value={tipo} onChange={(e) => setTipo(e.target.value)} aria-label="Tipo de novedad">
+                            <option value="">Todos los tipos</option>
+                            {tipos.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
+                        </select>
+                        <select className="ai-input ai-monitor-select" value={estado} onChange={(e) => setEstado(e.target.value)} aria-label="Estado">
+                            <option value="">Todos los estados</option>
+                            {Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                        </select>
+                        <label className="ai-row" style={{ gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--mon-ink)' }}>
+                            <input type="checkbox" checked={verRetirados} onChange={(e) => setVerRetirados(e.target.checked)} />
+                            Incluir retirados
+                        </label>
+                    </BarraFiltros>
 
                     {filtradas.length === 0 ? (
-                        <div className="ai-empty">
-                            <ClipboardList size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                            <p>{novedades.length === 0 ? 'Tu equipo no tiene novedades registradas en este periodo.' : 'Ninguna novedad coincide con los filtros.'}</p>
-                        </div>
+                        <VistaVacia icono={ClipboardList}>
+                            {novedades.length === 0 ? 'Tu equipo no tiene novedades registradas en este periodo.' : 'Ninguna novedad coincide con los filtros.'}
+                        </VistaVacia>
                     ) : (
-                        <div style={{ overflowX: 'auto' }}>
-                            <table className="ai-table ai-table--dense">
+                        <div className="ai-monitor-tabla-wrap">
+                            <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                                 <thead>
                                     <tr>
                                         <th>Empleado</th>
@@ -178,40 +182,40 @@ const NovedadesEquipo = ({ vistaEquipo = false }) => {
                                     {filtradas.map((n) => (
                                         <tr key={n.id}>
                                             <td>
-                                                <div style={{ fontWeight: 600 }}>
+                                                <div style={{ fontWeight: 700 }}>
                                                     {nombrePropio(n.empleado)}
-                                                    {!n.contrato_vigente && <span className="ai-badge ai-badge--neutral" style={{ marginLeft: 6 }}>Retirado</span>}
+                                                    {!n.contrato_vigente && <> <Pastilla color={TONO.peligro}>Retirado</Pastilla></>}
                                                 </div>
-                                                <div className="ai-muted" style={{ fontSize: 12 }}>
+                                                <span className="ai-monitor-sub">
                                                     CC {n.cedula}{n.jefe_inmediato ? ` · Coord. ${nombrePropio(n.jefe_inmediato)}` : ''}
-                                                </div>
+                                                </span>
                                             </td>
                                             <td className="ai-muted" style={{ fontSize: 12 }}>
                                                 {[n.campania, n.centro_costo, n.cargo].filter(Boolean).map(primeraMayuscula).join(' · ') || '—'}
                                             </td>
-                                            <td style={{ maxWidth: 260 }}>
-                                                <div>{n.tipo_novedad}</div>
+                                            <td style={{ maxWidth: 280 }}>
+                                                <Pastilla color={colorTipoNovedad(n.tipo_novedad)} punto>{n.tipo_novedad}</Pastilla>
                                                 {(n.origen || n.observaciones) && (
-                                                    <div className="ai-muted" style={{ fontSize: 12 }}>
+                                                    <span className="ai-monitor-sub">
                                                         {[n.origen && primeraMayuscula(n.origen), n.observaciones].filter(Boolean).join(' · ')}
-                                                    </div>
+                                                    </span>
                                                 )}
                                             </td>
                                             <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>
                                                 {fechaCorta(n.fecha_inicial)}
                                                 {n.fecha_final && n.fecha_final !== n.fecha_inicial && <> → {fechaCorta(n.fecha_final)}</>}
-                                                {n.fecha_retorno && <div className="ai-muted" style={{ fontSize: 12 }}>Retorna {fechaCorta(n.fecha_retorno)}</div>}
+                                                {n.fecha_retorno && <span className="ai-monitor-sub">Retorna {fechaCorta(n.fecha_retorno)}</span>}
                                             </td>
-                                            <td className="ai-num">{n.total_dias ?? '—'}</td>
-                                            <td><span className={`ai-badge ${ESTADOS[n.estado]?.clase || ''}`}>{ESTADOS[n.estado]?.label || n.estado}</span></td>
-                                            <td><span className={`ai-badge ${SOPORTES[n.soportes]?.clase || ''}`}>{SOPORTES[n.soportes]?.label || n.soportes}</span></td>
+                                            <td className="ai-num" style={{ fontWeight: 700 }}>{n.total_dias ?? '—'}</td>
+                                            <td><Pastilla color={ESTADOS[n.estado]?.color || TONO.neutro} punto>{ESTADOS[n.estado]?.label || n.estado}</Pastilla></td>
+                                            <td><Pastilla color={SOPORTES[n.soportes]?.color || TONO.neutro}>{SOPORTES[n.soportes]?.label || n.soportes}</Pastilla></td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
                     )}
-                </div>
+                </>
             )}
         </div>
     );

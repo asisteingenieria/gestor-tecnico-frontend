@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, CalendarClock, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Search, FileSpreadsheet } from 'lucide-react';
+import { CalendarClock, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, FileSpreadsheet, Users, LayoutTemplate, CalendarCheck, Moon, CalendarX, CalendarDays } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import CargarMallaModal from './CargarMallaModal';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
 import { useAlcanceEquipo, paramsAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
+import { EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Leyenda, PanelVista, Pastilla, CargandoVista, TONO } from '../ui';
 
 const DIAS_SEMANA = [
     { valor: 1, label: 'L' }, { valor: 2, label: 'M' }, { valor: 3, label: 'X' },
@@ -394,39 +395,39 @@ const GestionHorarios = () => {
     };
 
     if (loading) {
-        return (
-            <div className="ai-content">
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
-            </div>
-        );
+        return <div className="ai-content"><CargandoVista /></div>;
     }
+
+    // Totales de la semana visible (con los filtros de centro y búsqueda): turnos, descansos y celdas sin horario.
+    const celdasSemana = gruposSemana.flatMap((g) => g.empleados)
+        .flatMap((emp) => dias.map((fecha) => mapaCeldas[`${emp.users_company_id}_${fecha}`]));
+    const totalSemana = {
+        personas: gruposSemana.reduce((a, g) => a + g.empleados.length, 0),
+        turnos: celdasSemana.filter((h) => h && !h.es_descanso).length,
+        descansos: celdasSemana.filter((h) => h?.es_descanso).length,
+        sinHorario: celdasSemana.filter((h) => !h).length
+    };
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">{soloLectura ? 'Horarios' : 'Horarios del equipo'}</h1>
-                    <p className="ai-page-sub">
-                        {soloLectura ? `${primeraMayuscula(nombreAlcance)} · ${equipo.length} persona${equipo.length === 1 ? '' : 's'} · solo consulta` : 'Plantillas de turno y asignación semanal'}
-                    </p>
-                </div>
-                <div className="ai-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    {verTodas && <FiltroCampaniaEquipo alcance={alcance} campanias={campanias} onChange={cambiarAlcance} />}
-                    {!soloLectura && (<>
-                    <button type="button" className="ai-btn ai-btn--secondary" onClick={abrirNuevaPlantilla}>
-                        <Plus size={16} strokeWidth={1.75} /> Nueva plantilla
+            <EncabezadoVista
+                icono={CalendarClock}
+                titulo={soloLectura ? 'Horarios' : 'Horarios del equipo'}
+                subtitulo={soloLectura ? `${primeraMayuscula(nombreAlcance)} · ${equipo.length} persona${equipo.length === 1 ? '' : 's'} · solo consulta` : 'Plantillas de turno y asignación semanal'}
+            >
+                {verTodas && <FiltroCampaniaEquipo alcance={alcance} campanias={campanias} onChange={cambiarAlcance} />}
+                {!soloLectura && (<>
+                    <button type="button" className="ai-monitor-btn" onClick={abrirNuevaPlantilla}>
+                        <Plus size={15} strokeWidth={2} /> Nueva plantilla
                     </button>
-                    <button type="button" className="ai-btn ai-btn--secondary" onClick={() => setModalMalla(true)}>
-                        <FileSpreadsheet size={16} strokeWidth={1.75} /> Cargar malla (Excel)
+                    <button type="button" className="ai-monitor-btn" onClick={() => setModalMalla(true)}>
+                        <FileSpreadsheet size={15} strokeWidth={2} /> Cargar malla (Excel)
                     </button>
-                    <button type="button" className="ai-btn ai-btn--primary" onClick={abrirAsignar}>
-                        <CalendarClock size={16} strokeWidth={1.75} /> Asignar horario
+                    <button type="button" className="ai-monitor-btn ai-monitor-btn--primario" onClick={abrirAsignar}>
+                        <CalendarClock size={15} strokeWidth={2} /> Asignar horario
                     </button>
-                    </>)}
-                </div>
-            </div>
+                </>)}
+            </EncabezadoVista>
 
             {modalMalla && (
                 <CargarMallaModal
@@ -448,12 +449,33 @@ const GestionHorarios = () => {
                 <p style={{ color: mensaje.tipo === 'ok' ? 'var(--success)' : 'var(--danger)', fontSize: 13 }}>{mensaje.texto}</p>
             )}
 
+            <Mosaicos>
+                <Mosaico color={TONO.info} icono={Users} valor={totalSemana.personas} label="Personas" />
+                <Mosaico color={TONO.acento} icono={LayoutTemplate} valor={plantillasVisibles.length} label={soloLectura ? 'Turnos distintos' : 'Plantillas'} />
+                <Mosaico color={TONO.exito} icono={CalendarCheck} valor={totalSemana.turnos} label="Turnos esta semana" />
+                <Mosaico color="descanso" icono={Moon} valor={totalSemana.descansos} label="Descansos" />
+                <Mosaico color={totalSemana.sinHorario > 0 ? 'no_llego' : TONO.suave} icono={CalendarX} valor={totalSemana.sinHorario} label="Días sin horario" />
+            </Mosaicos>
+
+            <BarraFiltros>
+                <div className="ai-datenav">
+                    <button type="button" className="ai-icon-btn" onClick={() => setSemanaInicio((s) => sumarDias(s, -7))} aria-label="Semana anterior"><ChevronLeft size={16} strokeWidth={1.75} /></button>
+                    <b>{DIAS_LABEL_CORTO[0]} {dias[0].slice(8, 10)} – {DIAS_LABEL_CORTO[6]} {dias[6].slice(8, 10)} {dias[6].slice(0, 4)}</b>
+                    <button type="button" className="ai-icon-btn" onClick={() => setSemanaInicio((s) => sumarDias(s, 7))} aria-label="Semana siguiente"><ChevronRight size={16} strokeWidth={1.75} /></button>
+                </div>
+                <CampoBusqueda value={busqueda} onChange={setBusqueda} placeholder="Buscar empleado..." />
+                <select className="ai-input ai-monitor-select" value={centroFiltro} onChange={(e) => setCentroFiltro(e.target.value)} aria-label="Centro de costo">
+                    <option value="">Todos los centros de costo ({equipo.length})</option>
+                    {centros.map((c) => <option key={c.clave} value={c.clave}>{c.nombre} ({c.total})</option>)}
+                </select>
+            </BarraFiltros>
+
             <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(0, 1fr)', gap: 'var(--space-5)', alignItems: 'start' }}>
-                <div className="ai-panel">
-                    <div className="ai-panel-head">
-                        <h3 className="ai-panel-title">{soloLectura ? 'Turnos de la semana' : 'Plantillas de turno'}</h3>
-                        {centroFiltro && <span className="ai-muted" style={{ fontSize: 12 }}>{nombreCentro(centroFiltro)} y generales</span>}
-                    </div>
+                <PanelVista
+                    icono={LayoutTemplate}
+                    titulo={soloLectura ? 'Turnos de la semana' : 'Plantillas de turno'}
+                    extra={centroFiltro ? <span style={{ fontSize: 12, color: 'var(--mon-head-ink)', opacity: 0.85 }}>{nombreCentro(centroFiltro)} y generales</span> : null}
+                >
                     <div className="ai-panel-body">
                         {plantillasVisibles.map((p) => {
                             const c = colorDe(plantillasVista.indexOf(p));
@@ -474,7 +496,7 @@ const GestionHorarios = () => {
                                         </span>
                                         )}
                                     </div>
-                                    {!soloLectura && <span className="ai-badge ai-badge--neutral" style={{ alignSelf: 'flex-start', height: 20, fontSize: 11 }}>{p.centro_costo || 'General'}</span>}
+                                    {!soloLectura && <span style={{ alignSelf: 'flex-start' }}><Pastilla color={p.centro_costo ? TONO.info : TONO.suave}>{p.centro_costo || 'General'}</Pastilla></span>}
                                     <span className="ai-muted" style={{ fontSize: 13 }}>{hhmm(p.hora_entrada)} – {hhmm(p.hora_salida)}{cruza ? ' (cruza medianoche)' : ''}</span>
                                     <div className="ai-shift-bar">
                                         <span style={{ left: `${(entradaMin / 1440) * 100}%`, width: `${(anchoMin / 1440) * 100}%`, background: c.ink }} />
@@ -492,33 +514,16 @@ const GestionHorarios = () => {
                             </div>
                         )}
                     </div>
-                </div>
+                </PanelVista>
 
-                <div className="ai-panel">
-                    <div className="ai-panel-head" style={{ flexWrap: 'wrap', gap: 12 }}>
-                        <div className="ai-datenav">
-                            <button type="button" className="ai-icon-btn" onClick={() => setSemanaInicio((s) => sumarDias(s, -7))} aria-label="Semana anterior"><ChevronLeft size={16} strokeWidth={1.75} /></button>
-                            <b>{DIAS_LABEL_CORTO[0]} {dias[0].slice(8, 10)} – {DIAS_LABEL_CORTO[6]} {dias[6].slice(8, 10)} {dias[6].slice(0, 4)}</b>
-                            <button type="button" className="ai-icon-btn" onClick={() => setSemanaInicio((s) => sumarDias(s, 7))} aria-label="Semana siguiente"><ChevronRight size={16} strokeWidth={1.75} /></button>
-                        </div>
-                        <select className="ai-input" style={{ maxWidth: 260, height: 34 }} value={centroFiltro} onChange={(e) => setCentroFiltro(e.target.value)} aria-label="Centro de costo">
-                            <option value="">Todos los centros de costo ({equipo.length})</option>
-                            {centros.map((c) => <option key={c.clave} value={c.clave}>{c.nombre} ({c.total})</option>)}
-                        </select>
-                        <div className="ai-input" style={{ maxWidth: 220, height: 34 }}>
-                            <Search size={14} strokeWidth={1.75} className="ai-ic" />
-                            <input
-                                type="text" placeholder="Buscar empleado" value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
-                                style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
-                            />
-                        </div>
-                        <div className="ai-legend">
-                            {plantillasVista.slice(0, 5).map((p, i) => {
-                                const c = colorDe(i);
-                                return <span key={p.idhorario_plantilla}><i style={{ background: c.ink }} /> {p.nombre}</span>;
-                            })}
-                        </div>
-                    </div>
+                <PanelVista
+                    icono={CalendarDays}
+                    titulo="Semana"
+                    extra={plantillasVista.length > 0 ? (
+                        <Leyenda enPanel ariaLabel="Colores de las plantillas"
+                            items={plantillasVista.slice(0, 5).map((p, i) => ({ id: p.idhorario_plantilla, fondo: colorDe(i).ink, label: p.nombre }))} />
+                    ) : null}
+                >
                     <div className="ai-panel-body" style={{ overflowX: 'auto', paddingTop: 0 }}>
                         <table className="ai-week">
                             <thead>
@@ -533,8 +538,9 @@ const GestionHorarios = () => {
                                 {gruposSemana.map((grupo) => (
                                     <React.Fragment key={grupo.clave}>
                                     <tr>
-                                        <td colSpan={8} style={{ background: 'var(--primary-soft)', color: 'var(--primary-soft-ink)', fontWeight: 700, fontSize: 12 }}>
-                                            {grupo.nombre}{grupo.campania ? ` · ${grupo.campania}` : ''} · {grupo.empleados.length} persona{grupo.empleados.length === 1 ? '' : 's'}
+                                        <td colSpan={8} className="ai-monitor-grupo">
+                                            {grupo.nombre}{grupo.campania ? ` · ${grupo.campania}` : ''}
+                                            <span className="ai-monitor-grupo-n"> · {grupo.empleados.length} persona{grupo.empleados.length === 1 ? '' : 's'}</span>
                                         </td>
                                     </tr>
                                     {grupo.empleados.map((emp) => (
@@ -583,7 +589,7 @@ const GestionHorarios = () => {
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </PanelVista>
             </div>
 
             {modalPlantilla && (

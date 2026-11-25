@@ -547,6 +547,32 @@
   .gm-rejilla { left: 118px; }
   .gm-ver { margin-left: 0; }
 }
+/* Tabla del diseño de Equipo con encabezados de solo texto (pantallas migradas del sistema "Opción C"):
+   el <th> lleva el texto directo, sin botón de orden. Filas no clicables salvo que la vista lo pida. */
+.ai-monitor-tabla--simple th { padding: 12px 12px; font: 600 12.5px/15px var(--font-sans); color: var(--mon-head-ink); text-align: left; white-space: nowrap; }
+.ai-monitor-tabla--simple th.ai-num, .ai-monitor-tabla--simple td.ai-num { text-align: right; }
+.ai-monitor-tabla--simple tbody tr { cursor: default; }
+.ai-monitor-tabla--simple tbody tr.is-clicable { cursor: pointer; }
+.ai-monitor-tabla--simple td { vertical-align: middle; }
+.ai-monitor-tabla--simple .ai-muted { color: var(--ink-muted); }
+/* Tabla del diseño de Equipo con encabezados de solo texto (pantallas migradas del sistema "Opción C"):
+   el <th> lleva el texto directo, sin botón de orden. Filas no clicables salvo que la vista lo pida. */
+.ai-monitor-tabla--simple th { padding: 12px 12px; font: 600 12.5px/15px var(--font-sans); color: var(--mon-head-ink); text-align: left; white-space: nowrap; }
+.ai-monitor-tabla--simple th.ai-num, .ai-monitor-tabla--simple td.ai-num { text-align: right; }
+.ai-monitor-tabla--simple tbody tr { cursor: default; }
+.ai-monitor-tabla--simple tbody tr.is-clicable { cursor: pointer; }
+.ai-monitor-tabla--simple td { vertical-align: middle; }
+.ai-monitor-tabla--simple .ai-muted { color: var(--ink-muted); }
+/* Acción principal dentro de las pastillas del encabezado (crear, asignar). */
+.ai-monitor-acciones .ai-monitor-btn--primario { background: var(--mon-head); color: #fff; border-color: var(--mon-head); }
+[data-theme="dark"] .ai-monitor-acciones .ai-monitor-btn--primario { background: #2f6fc4; border-color: #2f6fc4; }
+.ai-monitor-acciones .ai-monitor-btn:disabled { opacity: .55; cursor: not-allowed; }
+.ai-monitor-barra .ai-datenav { flex: none; }
+/* Reparto del día (EquipoAsistencia, §78): barra con los siete estados, con el color de cada mosaico. */
+.ai-monitor-reparto { flex: 1 1 260px; min-width: 200px; display: flex; gap: 2px; height: 12px; border-radius: 999px; overflow: hidden; background: var(--surface-200); }
+.ai-monitor-reparto > i { display: block; height: 100%; background: var(--st-dot); }
+.ai-monitor-reparto-txt { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 500 13px/18px var(--font-sans); color: var(--mon-ink); }
+.ai-monitor-reparto-txt b { font-weight: 800; }
 /* Llegada tarde: pastilla roja junto a la hora de login. */
 .ai-monitor-tarde { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #e0302a; color: #fff; font: 700 10.5px/15px var(--font-sans); letter-spacing: .02em; vertical-align: 1px; }
 @media (max-width: 520px) {

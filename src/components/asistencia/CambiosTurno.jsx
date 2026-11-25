@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, CalendarClock, ArrowLeftRight, Check, X, Plus, Search, ArrowRight } from 'lucide-react';
+import { CalendarClock, ArrowLeftRight, Check, X, Plus, Search, ArrowRight, Clock3, CheckCircle2, XCircle, Inbox, Send, ListChecks } from 'lucide-react';
 import { cambioTurnoService } from '../../services/api';
 import { escucharAsistencia } from '../../utils/socketAsistencia';
 import { avisarCambioContadores } from '../../utils/eventosAsistencia';
 import { formatearFecha } from '../../utils/fecha';
 import { nombrePropio } from '../../utils/formatoRRHH';
+import { EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, PanelVista, Pastilla, CargandoVista, VistaVacia, COLOR_SOLICITUD, TONO } from '../ui';
 
 // Cambios de turno (asistencia.md §50, flujo de §51). Una pantalla, tres vistas:
 // - jefe de operaciones (gestiona la asistencia de su equipo): pide cambios para su gente y ve
@@ -14,18 +15,8 @@ import { nombrePropio } from '../../utils/formatoRRHH';
 // - financiera (`financiera`): todas las solicitudes y su estado, solo lectura.
 // Se recarga sola con el aviso `asistencia:notificacion` del socket.
 
-const ESTADO_BADGE = {
-    pendiente: { label: 'Pendiente', clase: 'ai-badge--warning' },
-    aprobada: { label: 'Aprobada', clase: 'ai-badge--success' },
-    rechazada: { label: 'Rechazada', clase: 'ai-badge--danger' }
-};
+const ESTADO_LABEL = { pendiente: 'Pendiente', aprobada: 'Aprobada', rechazada: 'Rechazada' };
 const TIPO_LABEL = { cambio_horario: 'Cambio de horario', intercambio: 'Intercambio' };
-const FILTROS_ESTADO = [
-    { valor: '', texto: 'Todas' },
-    { valor: 'pendiente', texto: 'Pendientes' },
-    { valor: 'aprobada', texto: 'Aprobadas' },
-    { valor: 'rechazada', texto: 'Rechazadas' }
-];
 
 const hhmm = (h) => (h ? String(h).slice(0, 5) : '');
 const hoyBogota = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
@@ -39,19 +30,12 @@ const textoAnterior = (d) => (d.anterior_hora_entrada == null
     ? 'Sin horario'
     : textoTurno({ es_descanso: d.anterior_es_descanso, hora_entrada: d.anterior_hora_entrada, hora_salida: d.anterior_hora_salida, plantilla: d.anterior_plantilla }));
 
-const Cargando = () => (
-    <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-        <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-    </div>
-);
-
 // ---------------------------------------------------------------------------------------------
 // Tarjeta de una solicitud, con los días (antes → después) y, en la bandeja del jefe, sus acciones.
 const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
     const [accion, setAccion] = useState(null); // 'aprobar' | 'rechazar'
     const [texto, setTexto] = useState('');
     const [procesando, setProcesando] = useState(false);
-    const badge = ESTADO_BADGE[s.estado] || ESTADO_BADGE.pendiente;
 
     const confirmar = async () => {
         if (accion === 'rechazar' && !texto.trim()) return;
@@ -70,23 +54,22 @@ const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
     };
 
     return (
-        <div className="ai-panel" style={{ padding: 16 }}>
-            <div className="ai-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                <div className="ai-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                    <span className="ai-badge ai-badge--neutral">
-                        {s.tipo === 'intercambio' ? <ArrowLeftRight size={12} strokeWidth={2} /> : <CalendarClock size={12} strokeWidth={2} />}
-                        &nbsp;{TIPO_LABEL[s.tipo]}
-                    </span>
-                    <span className={`ai-badge ${badge.clase}`}>{badge.label}</span>
-                    <span className="ai-muted" style={{ fontSize: 12 }}>#{s.idsolicitud_cambio_turno} · {fmtInstante(s.creado_en)}</span>
+        <PanelVista
+            icono={s.tipo === 'intercambio' ? ArrowLeftRight : CalendarClock}
+            titulo={`${TIPO_LABEL[s.tipo]} · #${s.idsolicitud_cambio_turno} · ${fmtInstante(s.creado_en)}`}
+            extra={(
+                <div className="ai-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                    <Pastilla color={COLOR_SOLICITUD[s.estado] || TONO.neutro} punto>{ESTADO_LABEL[s.estado] || s.estado}</Pastilla>
+                    {conAcciones && s.estado === 'pendiente' && !accion && (
+                        <>
+                            <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => setAccion('rechazar')}><X size={14} strokeWidth={1.75} /> Rechazar</button>
+                            <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => setAccion('aprobar')}><Check size={14} strokeWidth={1.75} /> Aprobar</button>
+                        </>
+                    )}
                 </div>
-                {conAcciones && s.estado === 'pendiente' && !accion && (
-                    <div className="ai-row" style={{ gap: 6 }}>
-                        <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => setAccion('rechazar')}><X size={14} strokeWidth={1.75} /> Rechazar</button>
-                        <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => setAccion('aprobar')}><Check size={14} strokeWidth={1.75} /> Aprobar</button>
-                    </div>
-                )}
-            </div>
+            )}
+        >
+        <div style={{ padding: 16 }}>
 
             <div className="ai-req-meta">
                 <span>Pedida por <strong>{nombrePropio(s.solicitante)}</strong></span>
@@ -94,15 +77,15 @@ const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
             </div>
             <p style={{ fontSize: 13, margin: '8px 0' }}><span className="ai-muted">Motivo:</span> {s.motivo}</p>
 
-            <div style={{ overflowX: 'auto' }}>
-                <table className="ai-table" style={{ fontSize: 13 }}>
+            <div className="ai-monitor-tabla-wrap" style={{ boxShadow: 'none', border: '1px solid var(--border)' }}>
+                <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                     <thead>
                         <tr><th>Empleado</th><th>Fecha</th><th>Turno actual</th><th aria-label="pasa a" /><th>Turno nuevo</th></tr>
                     </thead>
                     <tbody>
                         {s.dias.map((d) => (
                             <tr key={d.idsolicitud_cambio_turno_dia}>
-                                <td>{nombrePropio(d.empleado)}</td>
+                                <td style={{ fontWeight: 700 }}>{nombrePropio(d.empleado)}</td>
                                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDia(d.fecha)}</td>
                                 <td className="ai-muted">{textoAnterior(d)}</td>
                                 <td><ArrowRight size={14} strokeWidth={1.75} style={{ color: 'var(--ink-subtle)' }} /></td>
@@ -148,6 +131,7 @@ const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
                 </div>
             )}
         </div>
+        </PanelVista>
     );
 };
 
@@ -500,65 +484,67 @@ const CambiosTurno = ({ financiera = false }) => {
         avisarCambioContadores();
     };
 
-    if (loading) return <div className="ai-content"><Cargando /></div>;
+    if (loading) return <div className="ai-content"><CargandoVista /></div>;
 
     const tabs = [
-        ...(permisos?.puede_aprobar ? [{ id: 'bandeja', label: 'Por aprobar', count: bandeja.filter((s) => s.estado === 'pendiente').length }] : []),
-        ...(permisos?.puede_solicitar ? [{ id: 'mias', label: 'Mis solicitudes', count: mias.filter((s) => s.estado === 'pendiente').length }] : [])
+        ...(permisos?.puede_aprobar ? [{ id: 'bandeja', label: 'Por aprobar', icono: Inbox, count: bandeja.filter((s) => s.estado === 'pendiente').length }] : []),
+        ...(permisos?.puede_solicitar ? [{ id: 'mias', label: 'Mis solicitudes', icono: Send, count: mias.filter((s) => s.estado === 'pendiente').length }] : [])
     ];
+    const cuenta = (e) => fuente.filter((s) => s.estado === e).length;
+    const filtrarEstado = (e) => setFiltro((actual) => (actual === e ? '' : e));
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Cambios de turno</h1>
-                    <p className="ai-page-sub">
-                        {financiera ? 'Todas las solicitudes de los jefes y la respuesta de su director' : 'Los pide el jefe de operaciones y los aprueba su director'}
-                    </p>
-                </div>
+            <EncabezadoVista
+                icono={CalendarClock}
+                titulo="Cambios de turno"
+                subtitulo={financiera ? 'Todas las solicitudes de los jefes y la respuesta de su director' : 'Los pide el jefe de operaciones y los aprueba su director'}
+            >
                 {permisos?.puede_solicitar && (
-                    <button type="button" className="ai-btn ai-btn--primary" onClick={() => { setAviso(null); setModal(true); }}>
-                        <Plus size={16} strokeWidth={1.75} /> Solicitar cambio de turno
+                    <button type="button" className="ai-monitor-btn" onClick={() => { setAviso(null); setModal(true); }}>
+                        <Plus size={15} strokeWidth={2} /> Solicitar cambio de turno
                     </button>
                 )}
-            </div>
+            </EncabezadoVista>
 
             {mensaje && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{mensaje}</p>}
             {aviso && (
-                <div className="ai-row" role="status" style={{ background: 'var(--success-soft)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
+                <div className="ai-row" role="status" style={{ background: 'var(--success-soft)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius-md)', marginBottom: 14 }}>
                     <Check size={16} strokeWidth={1.75} /><span style={{ fontSize: 13 }}>{aviso}</span>
                 </div>
             )}
 
             {!financiera && tabs.length === 0 ? (
-                <div className="ai-panel"><div className="ai-empty"><CalendarClock size={36} strokeWidth={1.5} /><p>Los cambios de turno los pide el jefe de operaciones y los aprueba su director.</p></div></div>
+                <VistaVacia icono={CalendarClock}>Los cambios de turno los pide el jefe de operaciones y los aprueba su director.</VistaVacia>
             ) : (
                 <>
-                    <div className="ai-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                        {tabs.length > 1 ? (
-                            <div className="ai-tabs" style={{ borderBottom: 0 }}>
+                    {/* Cada mosaico filtra por su estado; "Todas" quita el filtro. */}
+                    <Mosaicos>
+                        <Mosaico color={TONO.info} icono={ListChecks} valor={fuente.length} label="Todas" activo={!filtro} onClick={() => setFiltro('')} title="Ver todas" />
+                        <Mosaico color={COLOR_SOLICITUD.pendiente} icono={Clock3} valor={cuenta('pendiente')} label="Pendientes" activo={filtro === 'pendiente'} onClick={() => filtrarEstado('pendiente')} />
+                        <Mosaico color={COLOR_SOLICITUD.aprobada} icono={CheckCircle2} valor={cuenta('aprobada')} label="Aprobadas" activo={filtro === 'aprobada'} onClick={() => filtrarEstado('aprobada')} />
+                        <Mosaico color={COLOR_SOLICITUD.rechazada} icono={XCircle} valor={cuenta('rechazada')} label="Rechazadas" activo={filtro === 'rechazada'} onClick={() => filtrarEstado('rechazada')} />
+                    </Mosaicos>
+
+                    <BarraFiltros>
+                        <CampoBusqueda value={busqueda} onChange={setBusqueda} placeholder="Buscar por nombre..." />
+                        {tabs.length > 1 && (
+                            <div className="ai-seg" role="tablist" aria-label="Bandeja">
                                 {tabs.map((t) => (
-                                    <button key={t.id} type="button" className={`ai-tab ${tab === t.id ? 'is-active' : ''}`}
-                                        style={{ background: 'none', border: 0, cursor: 'pointer' }} onClick={() => setTab(t.id)}>
-                                        {t.label}<span className="ai-count">{t.count}</span>
-                                    </button>
+                                    <span key={t.id} role="tab" tabIndex={0} aria-selected={tab === t.id} className={tab === t.id ? 'is-active' : ''}
+                                        style={{ cursor: 'pointer' }} onClick={() => setTab(t.id)}
+                                        onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') setTab(t.id); }}>
+                                        <t.icono size={14} strokeWidth={1.9} /> {t.label} <span className="ai-count">{t.count}</span>
+                                    </span>
                                 ))}
                             </div>
-                        ) : <span />}
-                        <div className="ai-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                            <div className="ai-seg">
-                                {FILTROS_ESTADO.map((f) => (
-                                    <span key={f.valor} className={filtro === f.valor ? 'is-active' : ''} style={{ cursor: 'pointer' }} onClick={() => setFiltro(f.valor)}>{f.texto}</span>
-                                ))}
-                            </div>
-                            <input className="ai-input" style={{ width: 220, height: 36 }} placeholder="Buscar por nombre" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-                        </div>
-                    </div>
+                        )}
+                    </BarraFiltros>
 
                     {visibles.length === 0 ? (
-                        <div className="ai-panel"><div className="ai-empty"><CalendarClock size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} /><p>No hay solicitudes con este filtro.</p></div></div>
+                        <VistaVacia icono={CalendarClock}>No hay solicitudes con este filtro.</VistaVacia>
                     ) : (
-                        <div className="ai-stack" style={{ gap: 12 }}>
+                        <div>
                             {visibles.map((s) => (
                                 <TarjetaSolicitud key={s.idsolicitud_cambio_turno} s={s} conAcciones={tab === 'bandeja'} onResuelta={resuelta} onError={(m) => { setAviso(null); setMensaje(m); }} />
                             ))}

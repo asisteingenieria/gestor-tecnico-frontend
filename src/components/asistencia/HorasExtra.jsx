@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Loader2, Clock3, Check, X, Plus, Search } from 'lucide-react';
+import { Clock3, Check, X, Plus, Search, CheckCircle2, XCircle, Inbox, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { asistenciaService, cambioTurnoService } from '../../services/api';
 import { formatearFecha } from '../../utils/fecha';
@@ -8,19 +8,9 @@ import { nombrePropio, iniciales } from '../../utils/formatoRRHH';
 import { avisarCambioContadores } from '../../utils/eventosAsistencia';
 import { escucharAsistencia } from '../../utils/socketAsistencia';
 import { OPCIONES_CLASE, etiquetaClase } from '../../utils/reporteHorasExtra';
+import { EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, PanelVista, Pastilla, CargandoVista, VistaVacia, COLOR_SOLICITUD, TONO } from '../ui';
 
-const ESTADO_BADGE = {
-    pendiente: { label: 'Pendiente', clase: 'ai-badge--info' },
-    aprobada: { label: 'Aprobada', clase: 'ai-badge--success' },
-    rechazada: { label: 'Rechazada', clase: 'ai-badge--danger' },
-    cancelada: { label: 'Cancelada', clase: 'ai-badge--neutral' }
-};
-
-const ESTADOS = [
-    { id: 'pendiente', label: 'Pendientes' },
-    { id: 'aprobada', label: 'Aprobadas' },
-    { id: 'rechazada', label: 'Rechazadas' }
-];
+const ESTADO_LABEL = { pendiente: 'Pendiente', aprobada: 'Aprobada', rechazada: 'Rechazada', cancelada: 'Cancelada' };
 
 // Vista previa de la clasificación: como mucho para estas personas (cada una se calcula con su turno).
 const MAX_PREVIA = 10;
@@ -40,7 +30,7 @@ function esDelMesActual(fechaIso) {
 
 const Tramos = ({ tramos }) => (tramos?.length > 0 ? (
     <div className="ai-req-meta" style={{ marginTop: 4, flexWrap: 'wrap' }}>
-        {tramos.map((t) => <span key={t.clase} className="ai-badge ai-badge--neutral">{etiquetaClase(t.clase)}: {formatearDuracion(t.minutos)}</span>)}
+        {tramos.map((t) => <Pastilla key={t.clase} color={TONO.suave}>{etiquetaClase(t.clase)}: {formatearDuracion(t.minutos)}</Pastilla>)}
     </div>
 ) : null);
 
@@ -258,6 +248,7 @@ const HorasExtra = () => {
     const visibles = useMemo(() => fuente.filter((h) => h.estado === estado), [fuente, estado]);
     const kpis = useMemo(() => ({
         pendientes: fuente.filter((h) => h.estado === 'pendiente').length,
+        aprobadas: fuente.filter((h) => h.estado === 'aprobada').length,
         aprobadasMes: fuente.filter((h) => h.estado === 'aprobada' && esDelMesActual(h.fecha)).reduce((acc, h) => acc + (h.minutos_aprobados || 0), 0),
         rechazadas: fuente.filter((h) => h.estado === 'rechazada').length
     }), [fuente]);
@@ -314,22 +305,15 @@ const HorasExtra = () => {
     const cambiarTramo = (i, campo, valor) => setTramosAjuste((prev) => prev.map((t, j) => (j === i ? { ...t, [campo]: valor } : t)));
 
     if (loading) {
-        return (
-            <div className="ai-content">
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
-            </div>
-        );
+        return <div className="ai-content"><CargandoVista /></div>;
     }
 
     const tabs = isDirectorOperaciones ? [
-        ...(puedeAprobar ? [{ id: 'bandeja', label: 'Por aprobar', count: bandeja.filter((h) => h.estado === 'pendiente').length }] : []),
-        { id: 'mias', label: 'Mis solicitudes', count: solicitadas.filter((h) => h.estado === 'pendiente').length }
+        ...(puedeAprobar ? [{ id: 'bandeja', label: 'Por aprobar', icono: Inbox, count: bandeja.filter((h) => h.estado === 'pendiente').length }] : []),
+        { id: 'mias', label: 'Mis solicitudes', icono: Send, count: solicitadas.filter((h) => h.estado === 'pendiente').length }
     ] : [];
 
     const fila = (h) => {
-        const badge = ESTADO_BADGE[h.estado] || ESTADO_BADGE.cancelada;
         const enBandeja = tab === 'bandeja';
         const nombre = isDirectorOperaciones ? nombrePropio(h.empleado || '') : fmtDia(h.fecha);
         return (
@@ -343,7 +327,7 @@ const HorasExtra = () => {
                         <span>{formatearDuracion(h.minutos_estimados)} solicitados</span>
                         {h.minutos_aprobados != null && <span>{formatearDuracion(h.minutos_aprobados)} aprobados</span>}
                         {enBandeja && h.solicitante && <span>Pedida por {nombrePropio(h.solicitante)}</span>}
-                        {enBandeja && !h.solicitante && <span className="ai-badge ai-badge--neutral">La pidió el empleado</span>}
+                        {enBandeja && !h.solicitante && <Pastilla color={TONO.suave}>La pidió el empleado</Pastilla>}
                         {tab === 'mias' && h.aprobador && <span>La aprueba {nombrePropio(h.aprobador)}</span>}
                     </div>
                     {h.motivo && <q className="ai-muted">{h.motivo}</q>}
@@ -387,75 +371,72 @@ const HorasExtra = () => {
                         <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => abrirAjuste(h)}>Ajustar</button>
                         <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={() => aprobar(h.idhora_extra)} disabled={procesando === h.idhora_extra}><Check size={14} strokeWidth={1.75} /> Aprobar</button>
                     </div>
-                ) : (!enBandeja && <span className={`ai-badge ${badge.clase}`}>{badge.label}</span>)}
+                ) : (!enBandeja && <Pastilla color={COLOR_SOLICITUD[h.estado] || TONO.neutro} punto>{ESTADO_LABEL[h.estado] || h.estado}</Pastilla>)}
             </div>
         );
     };
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Horas extra</h1>
-                    <p className="ai-page-sub">
-                        {isDirectorOperaciones ? 'Las solicitas para tu equipo y las aprueba tu director' : 'Las solicita tu jefe y las aprueba su director'}
-                    </p>
-                </div>
+            <EncabezadoVista
+                icono={Clock3}
+                titulo="Horas extra"
+                subtitulo={isDirectorOperaciones ? 'Las solicitas para tu equipo y las aprueba tu director' : 'Las solicita tu jefe y las aprueba su director'}
+            >
                 {isDirectorOperaciones && (
-                    <button type="button" className="ai-btn ai-btn--primary" onClick={() => { setAviso(null); setModal(true); }}>
-                        <Plus size={16} strokeWidth={1.75} /> Solicitar horas extra
+                    <button type="button" className="ai-monitor-btn" onClick={() => { setAviso(null); setModal(true); }}>
+                        <Plus size={15} strokeWidth={2} /> Solicitar horas extra
                     </button>
                 )}
-            </div>
+            </EncabezadoVista>
 
             {mensaje && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{mensaje}</p>}
             {aviso && (
-                <div className="ai-row" role="status" style={{ background: 'var(--success-soft)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
+                <div className="ai-row" role="status" style={{ background: 'var(--success-soft)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius-md)', marginBottom: 14 }}>
                     <Check size={16} strokeWidth={1.75} />
                     <span style={{ fontSize: 13 }}>{aviso}</span>
                 </div>
             )}
 
-            <div className="ai-kpi-strip">
-                <div>
-                    <span className="ai-kpi-icon"><Clock3 size={16} strokeWidth={1.75} /></span>
-                    <span><span className="ai-kpi-label">Pendientes</span><div className="ai-kpi-value">{kpis.pendientes}</div></span>
-                </div>
-                <div>
-                    <span><span className="ai-kpi-label">Aprobadas este mes</span><div className="ai-kpi-value">{formatearDuracion(kpis.aprobadasMes)}</div></span>
-                </div>
-                <div>
-                    <span><span className="ai-kpi-label">Rechazadas</span><div className="ai-kpi-value">{kpis.rechazadas}</div></span>
-                </div>
-            </div>
+            {/* Cada mosaico filtra la lista por su estado. */}
+            <Mosaicos>
+                <Mosaico color={COLOR_SOLICITUD.pendiente} icono={Clock3} valor={kpis.pendientes} label="Pendientes"
+                    activo={estado === 'pendiente'} onClick={() => setEstado('pendiente')} title="Ver las pendientes" />
+                <Mosaico color={COLOR_SOLICITUD.aprobada} icono={CheckCircle2} valor={kpis.aprobadas} label="Aprobadas"
+                    activo={estado === 'aprobada'} onClick={() => setEstado('aprobada')} title="Ver las aprobadas" />
+                <Mosaico color={TONO.cian} icono={CheckCircle2} valor={formatearDuracion(kpis.aprobadasMes)} label="Aprobadas este mes" />
+                <Mosaico color={COLOR_SOLICITUD.rechazada} icono={XCircle} valor={kpis.rechazadas} label="Rechazadas"
+                    activo={estado === 'rechazada'} onClick={() => setEstado('rechazada')} title="Ver las rechazadas" />
+            </Mosaicos>
 
-            <div className="ai-panel">
-                <div className="ai-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, paddingRight: 12 }}>
-                    {tabs.length > 0 ? (
-                        <div className="ai-tabs" style={{ borderBottom: 0 }}>
-                            {tabs.map((t) => (
-                                <button key={t.id} type="button" className={`ai-tab ${tab === t.id ? 'is-active' : ''}`}
-                                    style={{ background: 'none', border: 0, cursor: 'pointer' }} onClick={() => setTab(t.id)}>
-                                    {t.label}<span className="ai-count">{t.count}</span>
-                                </button>
-                            ))}
-                        </div>
-                    ) : <div className="ai-panel-head"><h3 className="ai-panel-title">Mis horas extra</h3></div>}
-                    <div className="ai-seg">
-                        {ESTADOS.map((e) => (
-                            <span key={e.id} className={estado === e.id ? 'is-active' : ''} style={{ cursor: 'pointer' }} onClick={() => setEstado(e.id)}>{e.label}</span>
+            {tabs.length > 0 && (
+                <BarraFiltros>
+                    <div className="ai-seg" role="tablist" aria-label="Bandeja">
+                        {tabs.map((t) => (
+                            <span key={t.id} role="tab" tabIndex={0} aria-selected={tab === t.id} className={tab === t.id ? 'is-active' : ''}
+                                style={{ cursor: 'pointer' }} onClick={() => setTab(t.id)}
+                                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') setTab(t.id); }}>
+                                <t.icono size={14} strokeWidth={1.9} /> {t.label} <span className="ai-count">{t.count}</span>
+                            </span>
                         ))}
                     </div>
-                </div>
-                {visibles.length === 0 ? (
-                    <div className="ai-empty">
-                        <Clock3 size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                        <p>{!isDirectorOperaciones && estado === 'pendiente' && propias.length === 0
-                            ? 'No tienes horas extra. Las solicita tu jefe y te llega un aviso cuando se aprueban.'
-                            : 'No hay horas extra con este filtro.'}</p>
-                    </div>
-                ) : visibles.map(fila)}
-            </div>
+                </BarraFiltros>
+            )}
+
+            {visibles.length === 0 ? (
+                <VistaVacia icono={Clock3}>
+                    {!isDirectorOperaciones && estado === 'pendiente' && propias.length === 0
+                        ? 'No tienes horas extra. Las solicita tu jefe y te llega un aviso cuando se aprueban.'
+                        : 'No hay horas extra con este filtro.'}
+                </VistaVacia>
+            ) : (
+                <PanelVista
+                    icono={Clock3}
+                    titulo={`${isDirectorOperaciones ? (tab === 'bandeja' ? 'Por aprobar' : 'Mis solicitudes') : 'Mis horas extra'} · ${(ESTADO_LABEL[estado] || '').toLowerCase()}s (${visibles.length})`}
+                >
+                    {visibles.map(fila)}
+                </PanelVista>
+            )}
 
             {modal && (
                 <ModalSolicitud

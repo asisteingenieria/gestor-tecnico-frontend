@@ -1,9 +1,11 @@
 import React from 'react';
-import { Loader2, Clock } from 'lucide-react';
+import { Clock, Timer, LogIn, Coffee, Unplug, Activity, Laptop, DoorOpen, CalendarDays, ListOrdered } from 'lucide-react';
 import { formatearHora12, formatearDuracion, minutosDesdeMedianoche, minutosBogotaDe } from '../../utils/tiempoAsistencia';
 import { tardeExacto } from '../../utils/llegadaAsistencia';
-import { BadgeIngreso, RegistrosAsislock } from './IngresoAsislock';
+import { RegistrosAsislock } from './IngresoAsislock';
 import MarcacionesMolinete from './MarcacionesMolinete';
+import { MODALIDAD_INGRESO } from '../../utils/asislock';
+import { Mosaicos, Mosaico, PanelVista, Leyenda, Pastilla, CargandoVista, VistaVacia, TONO } from '../ui';
 
 const ETIQUETAS_EVENTO = {
     entrada: 'Entrada',
@@ -25,11 +27,11 @@ const ETIQUETAS_EVENTO = {
 const ORIGEN_LABEL = { empleado: 'El empleado', director: 'El director', sistema: 'Cierre automático', asislock: 'AsisLock', molinete: 'Molinete' };
 
 const ESTADO_BADGE = {
-    pendiente: { label: 'Sin iniciar', clase: 'ai-badge--neutral' },
-    en_curso: { label: 'En turno', clase: 'ai-badge--success' },
-    en_pausa: { label: 'En pausa', clase: 'ai-badge--info' },
-    finalizada: { label: 'Finalizada', clase: 'ai-badge--neutral' },
-    ausente: { label: 'Ausente', clase: 'ai-badge--danger' }
+    pendiente: { label: 'Sin iniciar', color: 'sin_iniciar' },
+    en_curso: { label: 'En turno', color: 'conectado' },
+    en_pausa: { label: 'En pausa', color: 'break' },
+    finalizada: { label: 'Finalizada', color: 'finalizado' },
+    ausente: { label: 'Ausente', color: 'no_llego' }
 };
 
 // Break usa el color de pausa (tiempo libre); capacitación el de trabajo (cuenta como laborada).
@@ -77,38 +79,25 @@ function construirSegmentos(eventos, finAbierto) {
 function detalleEvento(ev, jornada) {
     if (ev.tipo === 'entrada') {
         return jornada.minutosTarde > 0
-            ? <span className="ai-badge ai-badge--warning">+{tardeExacto(jornada.segundosTarde, jornada.minutosTarde)} tarde</span>
-            : <span className="ai-badge ai-badge--success">Puntual</span>;
+            ? <Pastilla color={TONO.alerta}>+{tardeExacto(jornada.segundosTarde, jornada.minutosTarde)} tarde</Pastilla>
+            : <Pastilla color={TONO.exito}>Puntual</Pastilla>;
     }
     if (ev.tipo === 'fin_bano' || ev.tipo === 'fin_break' || ev.tipo === 'fin_almuerzo' || ev.tipo === 'fin_capacitacion' || ev.tipo === 'fin_desconexion') {
         return <span className="ai-muted">Regresó {formatearHora12(ev.ocurrido_en)}</span>;
     }
     if (ev.tipo === 'inicio_desconexion') {
-        return <span className="ai-badge ai-badge--warning">No cuenta como tiempo laborado</span>;
+        return <Pastilla color={TONO.alerta}>No cuenta como tiempo laborado</Pastilla>;
     }
     if (ev.tipo === 'salida' && jornada.minutosSalidaAnticipada > 0) {
-        return <span className="ai-badge ai-badge--warning">Salida anticipada</span>;
+        return <Pastilla color={TONO.alerta}>Salida anticipada</Pastilla>;
     }
     return null;
 }
 
 const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
-    if (loading) {
-        return (
-            <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-            </div>
-        );
-    }
+    if (loading) return <CargandoVista />;
 
-    if (error) {
-        return (
-            <div className="ai-empty">
-                <Clock size={40} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                <p>{error}</p>
-            </div>
-        );
-    }
+    if (error) return <VistaVacia icono={Clock}>{error}</VistaVacia>;
 
     if (!datos) return null;
 
@@ -142,87 +131,49 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
 
     return (
         <>
-            <div className="ai-kpi-strip">
-                <div>
-                    <span className="ai-kpi-icon"><Clock size={16} strokeWidth={1.75} /></span>
-                    <span>
-                        <span className="ai-kpi-label">Tiempo trabajado</span>
-                        <div className="ai-kpi-value">{formatearDuracion(jornada.minutosTrabajados)}</div>
-                    </span>
-                </div>
-                <div>
-                    <span>
-                        <span className="ai-kpi-label">Entrada</span>
-                        <div className="ai-kpi-value" style={{ fontSize: 18 }}>
-                            {formatearHora12(jornada.hora_entrada_real) || '—'}
-                        </div>
-                        {jornada.hora_entrada_real && (
-                            jornada.minutosTarde > 0
-                                ? <span className="ai-badge ai-badge--warning">+{tardeExacto(jornada.segundosTarde, jornada.minutosTarde)}</span>
-                                : <span className="ai-badge ai-badge--success">Puntual</span>
-                        )}
-                    </span>
-                </div>
-                <div>
-                    <span>
-                        <span className="ai-kpi-label">Pausas + almuerzo</span>
-                        <div className="ai-kpi-value">{formatearDuracion(minutosPausas)}</div>
-                    </span>
-                </div>
+            <Mosaicos>
+                <Mosaico color={TONO.exito} icono={Timer} valor={formatearDuracion(jornada.minutosTrabajados)} label="Tiempo trabajado" />
+                <Mosaico
+                    color={!jornada.hora_entrada_real ? TONO.suave : jornada.minutosTarde > 0 ? 'almuerzo' : TONO.info}
+                    icono={LogIn}
+                    valor={formatearHora12(jornada.hora_entrada_real) || '—'}
+                    label={!jornada.hora_entrada_real ? 'Entrada' : jornada.minutosTarde > 0 ? `Entrada · +${tardeExacto(jornada.segundosTarde, jornada.minutosTarde)} tarde` : 'Entrada · puntual'}
+                />
+                <Mosaico color="break" icono={Coffee} valor={formatearDuracion(minutosPausas)} label="Pausas + almuerzo" />
                 {jornada.minutosDesconexion > 0 && (
-                    <div>
-                        <span>
-                            <span className="ai-kpi-label">Desconectado de AsisLock</span>
-                            <div className="ai-kpi-value">{formatearDuracion(jornada.minutosDesconexion)}</div>
-                        </span>
-                    </div>
+                    <Mosaico color="desconectado" icono={Unplug} valor={formatearDuracion(jornada.minutosDesconexion)} label="Desconectado de AsisLock" />
                 )}
-                <div>
-                    <span>
-                        <span className="ai-kpi-label">Estado</span>
-                        <div style={{ marginTop: 4 }}><span className={`ai-badge ${badge.clase}`}>{badge.label}</span></div>
-                    </span>
-                </div>
+                <Mosaico color={badge.color} icono={Activity} valor={badge.label} label="Estado" />
                 {asislock?.resumen && (
-                    <div>
-                        <span>
-                            <span className="ai-kpi-label">Ingreso (AsisLock)</span>
-                            <div style={{ marginTop: 4 }}>
-                                <BadgeIngreso modalidad={asislock.resumen.modalidad} vacio="Sin dato" />
-                                {asislock.resumen.modalidades.length > 1 && (
-                                    <span className="ai-muted" style={{ fontSize: 12, marginLeft: 6 }}>(cambió en el día)</span>
-                                )}
-                            </div>
-                        </span>
-                    </div>
+                    <Mosaico
+                        color={TONO.cian}
+                        icono={Laptop}
+                        valor={MODALIDAD_INGRESO[asislock.resumen.modalidad]?.label || 'Sin dato'}
+                        label={asislock.resumen.modalidades.length > 1 ? 'Ingreso AsisLock · cambió en el día' : 'Ingreso (AsisLock)'}
+                    />
                 )}
                 {datos.molinete?.resumen && (
-                    <div>
-                        <span>
-                            <span className="ai-kpi-label">Cruces del molinete</span>
-                            <div className="ai-kpi-value">{datos.molinete.resumen.cruces_intermedios}</div>
-                        </span>
-                    </div>
+                    <Mosaico color={TONO.suave} icono={DoorOpen} valor={datos.molinete.resumen.cruces_intermedios} label="Cruces del molinete" />
                 )}
-            </div>
+            </Mosaicos>
 
             {jornada.alertas?.length > 0 && (
-                <div className="ai-row">
+                <div className="ai-row" style={{ marginBottom: 14, flexWrap: 'wrap', gap: 6 }}>
                     {jornada.alertas.map((a) => (
-                        <span key={a} className="ai-badge ai-badge--warning">{a.replace(/_/g, ' ')}</span>
+                        <Pastilla key={a} color={TONO.alerta} punto>{a.replace(/_/g, ' ')}</Pastilla>
                     ))}
                 </div>
             )}
 
-            <div className="ai-panel">
-                <div className="ai-panel-head">
-                    <h3 className="ai-panel-title">Línea del día</h3>
-                    <div className="ai-legend">
-                        <span><i style={{ background: 'var(--primary)' }} /> Trabajo</span>
-                        <span><i style={{ background: 'var(--brand-cyan)' }} /> Baño</span>
-                        <span><i style={{ background: 'var(--lunch)' }} /> Almuerzo</span>
-                    </div>
-                </div>
+            <PanelVista
+                icono={CalendarDays}
+                titulo="Línea del día"
+                extra={<Leyenda enPanel ariaLabel="Colores de la línea" items={[
+                    { id: 'trabajo', fondo: 'var(--primary)', label: 'Trabajo' },
+                    { id: 'bano', fondo: 'var(--brand-cyan)', label: 'Baño' },
+                    { id: 'almuerzo', fondo: 'var(--lunch)', label: 'Almuerzo' }
+                ]} />}
+            >
                 <div className="ai-panel-body">
                     <div className="ai-daybar">
                         {horario && (
@@ -255,12 +206,11 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                         ))}
                     </div>
                 </div>
-            </div>
+            </PanelVista>
 
             {horaExtra && (
-                <div className="ai-panel">
-                    <div className="ai-panel-head"><h3 className="ai-panel-title">Hora extra</h3></div>
-                    <div className="ai-stack" style={{ padding: '4px 4px 10px', gap: 8 }}>
+                <PanelVista icono={Clock} titulo="Hora extra">
+                    <div className="ai-stack" style={{ padding: '12px 16px', gap: 8 }}>
                         {horaExtra.solicitudes.map((s, i) => (
                             <p key={i} className="ai-muted" style={{ fontSize: 13, margin: 0 }}>
                                 Solicitó hora extra de <b>{s.hora_inicio}</b> a <b>{s.hora_fin}</b>
@@ -274,20 +224,23 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                                     ? <> y sigue trabajando ({formatearDuracion(horaExtra.extra.minutos)} hasta ahora).</>
                                     : <> hasta las <b>{formatearHora12(horaExtra.extra.fin_real)}</b> ({formatearDuracion(horaExtra.extra.minutos)}).</>}
                                 {horaExtra.extra.excedio_min > 0 && (
-                                    <span className="ai-badge ai-badge--warning" style={{ marginLeft: 6 }}>
+                                    <>{' '}<Pastilla color={TONO.alerta}>
                                         Siguió {formatearDuracion(horaExtra.extra.excedio_min)} más allá del fin aprobado
-                                    </span>
+                                    </Pastilla></>
                                 )}
                             </p>
                         ) : (
                             <p className="ai-muted" style={{ fontSize: 13, margin: 0 }}>Aún no registra ingreso al tiempo extra.</p>
                         )}
                     </div>
-                </div>
+                </PanelVista>
             )}
 
-            <div className="ai-panel">
-                <table className="ai-table ai-table--dense">
+            <div className="ai-monitor-detalle-head">
+                <h3><ListOrdered size={18} strokeWidth={2} aria-hidden="true" /> Eventos del día</h3>
+            </div>
+            <div className="ai-monitor-tabla-wrap" style={{ marginBottom: 14 }}>
+                <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                     <thead>
                         <tr>
                             <th>Hora</th>
@@ -305,7 +258,7 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                             const duracion = hastaMin != null ? formatearDuracion(hastaMin - desdeMin) : '—';
                             return (
                                 <tr key={i}>
-                                    <td className="ai-num">{new Date(ev.ocurrido_en).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                    <td style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{new Date(ev.ocurrido_en).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                                     <td>
                                         <span className="ai-row" style={{ gap: 8 }}>
                                             <i style={{ width: 8, height: 8, borderRadius: 2, display: 'inline-block', background: 'var(--primary)' }} />
