@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Users, Clock, CalendarX, Download, BarChart3, Search, History, X, Timer, ClipboardList, Moon } from 'lucide-react';
+import { Loader2, Users, Clock, CalendarX, Download, BarChart3, Search, History, X, Timer, ClipboardList, Moon, CalendarRange, Building2, ChevronRight } from 'lucide-react';
+import { EncabezadoVista, Mosaicos, Mosaico, PanelVista, CargandoVista, VistaVacia, TONO } from '../ui';
 import { financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula, iniciales } from '../../utils/formatoRRHH';
 import { descargarCsv } from '../../utils/csv';
@@ -137,49 +138,46 @@ const AsistenciaMensual = () => {
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Reporte de asistencia</h1>
-                    <p className="ai-page-sub">{nombrePeriodo(periodo)} · comparativo por campaña; abre una campaña para ver su detalle completo</p>
-                </div>
-                <div className="ai-row">
-                    <select className="ai-input" style={{ width: 220 }} value={campaniaId} onChange={(e) => cambiar('campania', e.target.value)} aria-label="Abrir campaña">
-                        <option value="">Abrir campaña…</option>
-                        {campanias.map((c) => <option key={c.idcampania} value={c.idcampania}>{primeraMayuscula(c.nombre)}</option>)}
-                    </select>
-                    <input
-                        type="month" className="ai-input" style={{ width: 170 }} value={periodo} max={periodoActual()}
-                        onChange={(e) => e.target.value && cambiar('periodo', e.target.value)} aria-label="Mes"
-                    />
-                </div>
-            </div>
+            <EncabezadoVista
+                icono={CalendarRange}
+                titulo="Reporte de asistencia"
+                subtitulo={`${nombrePeriodo(periodo)} · comparativo por campaña; abre una campaña para ver su detalle completo`}
+                enVivo={periodo === periodoActual()}
+            >
+                <select className="ai-monitor-btn ai-monitor-select" value={campaniaId} onChange={(e) => cambiar('campania', e.target.value)} aria-label="Abrir campaña">
+                    <option value="">Abrir campaña…</option>
+                    {campanias.map((c) => <option key={c.idcampania} value={c.idcampania}>{primeraMayuscula(c.nombre)}</option>)}
+                </select>
+                <input
+                    type="month" className="ai-monitor-btn ai-monitor-mes" value={periodo} max={periodoActual()}
+                    onChange={(e) => e.target.value && cambiar('periodo', e.target.value)} aria-label="Mes"
+                />
+                <button type="button" className="ai-monitor-btn" onClick={exportarComparativo} disabled={porCampania.length === 0}>
+                    <Download size={15} strokeWidth={2} /> Exportar
+                </button>
+            </EncabezadoVista>
 
             {loading && !datos ? (
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
+                <CargandoVista />
             ) : error ? (
-                <div className="ai-panel ai-empty"><p style={{ color: 'var(--danger)' }}>{error}</p></div>
+                <VistaVacia error>{error}</VistaVacia>
             ) : !datos ? null : (
                 <>
-                    <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
-                        <Kpi label="Puntualidad global" valor={totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'} icon={<Clock size={16} strokeWidth={1.75} />} />
-                        <Kpi label="Empleados" valor={totales.empleados} icon={<Users size={16} strokeWidth={1.75} />} />
-                        <Kpi label="Días trabajados" valor={totales.dias_trabajados} icon={<BarChart3 size={16} strokeWidth={1.75} />} />
-                        <Kpi label="Ausencias" valor={totales.ausencias} alerta={totales.ausencias > 0} icon={<CalendarX size={16} strokeWidth={1.75} />} />
-                        <Kpi label="Días con novedad" valor={totales.dias_novedad || 0} icon={<ClipboardList size={16} strokeWidth={1.75} />} />
-                        <Kpi label="Horas extra" valor={hFmt(totales.minutos_extra)} icon={<Clock size={16} strokeWidth={1.75} />} />
-                    </div>
+                    <Mosaicos>
+                        <Mosaico
+                            color={totales.porcentaje_puntualidad == null ? TONO.suave : totales.porcentaje_puntualidad >= 90 ? TONO.exito : totales.porcentaje_puntualidad >= 75 ? TONO.alerta : TONO.peligro}
+                            icono={Clock} valor={totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'} label="Puntualidad global"
+                        />
+                        <Mosaico color={TONO.info} icono={Users} valor={totales.empleados} label="Empleados" />
+                        <Mosaico color="conectado" icono={BarChart3} valor={totales.dias_trabajados} label="Días trabajados" />
+                        <Mosaico color={totales.ausencias > 0 ? 'no_llego' : TONO.suave} icono={CalendarX} valor={totales.ausencias} label="Ausencias" />
+                        <Mosaico color="novedad" icono={ClipboardList} valor={totales.dias_novedad || 0} label="Días con novedad" />
+                        <Mosaico color={TONO.acento} icono={Timer} valor={hFmt(totales.minutos_extra)} label="Horas extra" />
+                    </Mosaicos>
 
-                    <div className="ai-panel">
-                        <div className="ai-panel-head">
-                            <h3 className="ai-panel-title">Comparativo por campaña</h3>
-                            <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportarComparativo} disabled={porCampania.length === 0}>
-                                <Download size={14} strokeWidth={1.75} /> Exportar
-                            </button>
-                        </div>
+                    <PanelVista icono={Building2} titulo="Comparativo por campaña" extra={<span style={{ fontSize: 12, opacity: 0.85 }}>{porCampania.length} campaña{porCampania.length === 1 ? '' : 's'}</span>}>
                         <div style={{ overflowX: 'auto' }}>
-                            <table className="ai-table ai-table--dense">
+                            <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                                 <thead>
                                     <tr>
                                         <th>Campaña</th>
@@ -197,8 +195,12 @@ const AsistenciaMensual = () => {
                                 </thead>
                                 <tbody>
                                     {porCampania.map((c) => (
-                                        <tr key={c.idcampania ?? 'sin'}>
-                                            <td style={{ fontWeight: 600 }}>{primeraMayuscula(c.campania)}</td>
+                                        <tr
+                                            key={c.idcampania ?? 'sin'}
+                                            className={c.idcampania != null ? 'is-clicable' : undefined}
+                                            onClick={c.idcampania != null ? () => cambiar('campania', String(c.idcampania)) : undefined}
+                                        >
+                                            <td style={{ fontWeight: 700 }}>{primeraMayuscula(c.campania)}</td>
                                             <td className="ai-num">{c.totales.empleados}</td>
                                             <td><BarraPuntualidad pct={c.totales.porcentaje_puntualidad} /></td>
                                             <td className="ai-num"><Tendencia totales={c.totales} anterior={c.anterior} periodoAnterior={datos.periodo_anterior} /></td>
@@ -210,8 +212,8 @@ const AsistenciaMensual = () => {
                                             <td className="ai-num">{hFmt(c.totales.minutos_extra)}</td>
                                             <td className="ai-num">
                                                 {c.idcampania != null && (
-                                                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => cambiar('campania', String(c.idcampania))}>
-                                                        Ver detalle
+                                                    <button type="button" className="ai-monitor-btn" style={{ height: 30 }} onClick={(e) => { e.stopPropagation(); cambiar('campania', String(c.idcampania)); }}>
+                                                        Ver detalle <ChevronRight size={14} strokeWidth={2} />
                                                     </button>
                                                 )}
                                             </td>
@@ -220,7 +222,7 @@ const AsistenciaMensual = () => {
                                 </tbody>
                                 {totales && (
                                     <tfoot>
-                                        <tr style={{ fontWeight: 600 }}>
+                                        <tr>
                                             <td>Total</td>
                                             <td className="ai-num">{totales.empleados}</td>
                                             <td>{totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'}</td>
@@ -237,7 +239,7 @@ const AsistenciaMensual = () => {
                                 )}
                             </table>
                         </div>
-                    </div>
+                    </PanelVista>
                 </>
             )}
 

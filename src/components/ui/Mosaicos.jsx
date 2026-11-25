@@ -6,12 +6,14 @@ export const Mosaicos = ({ children }) => <div className="ai-monitor-mosaicos">{
 
 // Un mosaico: número, ícono y etiqueta sobre el color del estado (`color` = clave de `.ai-st--*`, ver
 // paletasEstado.js). Con `onClick` es un botón que filtra (`activo` lo marca); sin él es un KPI fijo.
-export const Mosaico = ({ color, icono: Icono, valor, label, activo = false, onClick, title }) => {
+// `detalle` es una línea chica debajo de la etiqueta (p. ej. el total sin filtros o el valor en dinero).
+export const Mosaico = ({ color, icono: Icono, valor, label, detalle, activo = false, onClick, title }) => {
     const contenido = (
         <>
             {Icono && <Icono size={26} strokeWidth={2} className="ai-monitor-ic" aria-hidden="true" />}
             <span className="ai-monitor-num">{valor}</span>
             <span className="ai-monitor-lbl">{label}</span>
+            {detalle && <span className="ai-monitor-det">{detalle}</span>}
         </>
     );
     if (!onClick) {

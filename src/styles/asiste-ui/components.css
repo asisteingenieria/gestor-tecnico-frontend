@@ -480,6 +480,7 @@
 .ai-monitor-sub { display: block; margin-top: 3px; font: 600 11px/14px var(--font-sans); color: var(--ink-muted); }
 /* Histórico del equipo (EquipoMensual.jsx) con el mismo diseño: mosaicos fijos, paneles y tabla de detalle. */
 .ai-monitor-mosaico--estatico { cursor: default; }
+.ai-monitor-det { font-size: 11.5px; line-height: 15px; opacity: .88; text-align: center; font-variant-numeric: tabular-nums; }
 .ai-monitor-detalle-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 10px; }
 .ai-monitor-detalle-head h3 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font: 800 16px/20px var(--font-sans); color: var(--mon-ink); }
 .ai-monitor-mosaico--estatico:hover { transform: none; box-shadow: 0 2px 6px rgba(15,43,91,.12); }
@@ -567,6 +568,10 @@
 .ai-monitor-acciones .ai-monitor-btn--primario { background: var(--mon-head); color: #fff; border-color: var(--mon-head); }
 [data-theme="dark"] .ai-monitor-acciones .ai-monitor-btn--primario { background: #2f6fc4; border-color: #2f6fc4; }
 .ai-monitor-acciones .ai-monitor-btn:disabled { opacity: .55; cursor: not-allowed; }
+/* Botones de pastilla fuera del encabezado: dentro de paneles y tablas (Ver detalle, Exportar…). */
+.ai-monitor-panel .ai-monitor-btn, .ai-monitor-tabla .ai-monitor-btn { height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-100); color: var(--mon-ink); font: 700 12px/16px var(--font-sans); letter-spacing: .03em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; text-decoration: none; }
+.ai-monitor-panel-head .ai-monitor-btn { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); color: var(--mon-head-ink); }
+.ai-monitor-panel-head .ai-monitor-btn:hover { background: rgba(255,255,255,.22); }
 .ai-monitor-barra .ai-datenav { flex: none; }
 /* Reparto del día (EquipoAsistencia, §78): barra con los siete estados, con el color de cada mosaico. */
 .ai-monitor-reparto { flex: 1 1 260px; min-width: 200px; display: flex; gap: 2px; height: 12px; border-radius: 999px; overflow: hidden; background: var(--surface-200); }

@@ -5,10 +5,11 @@ import SelectorVistaEquipo from './asistencia/SelectorVistaEquipo';
 import Pagination from './Pagination';
 import FiltroChip from './FiltroChip';
 import AjusteSaldoPasivo from './AjusteSaldoPasivo';
-import { nombrePropio, iniciales, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
+import { nombrePropio, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
 import {
-    CalendarClock, Search, AlertCircle, Download, Loader2, Users, Wallet, CalendarDays, Info, SlidersHorizontal
+    CalendarClock, AlertCircle, Download, Loader2, Users, Wallet, CalendarDays, Info, SlidersHorizontal, Palmtree
 } from 'lucide-react';
+import { EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Pastilla, AvatarVista, CargandoVista, VistaVacia, TONO } from './ui';
 
 // Pasivo vacacional calculado (claude/modulo recursoshumanos.md §58). Mismas fórmulas del Excel de Gestión Humana:
 // días trabajados = DAYS360(ingreso, fecha) + 1; acumulados = trabajados × 15 / 360; pasivo = acumulados −
@@ -176,134 +177,95 @@ const PasivoVacacional = ({ vistaEquipo = false }) => {
     return (
         <div className={vistaEquipo ? undefined : 'ai-scope'}>
             <div className="ai-content">
-                <div className="ai-page-head">
-                    <div>
-                        <h1 className="ai-page-title">{vistaEquipo ? 'Vacaciones del equipo' : 'Pasivo vacacional'}</h1>
-                        <p className="ai-page-sub">
-                            {vistaEquipo
-                                ? 'Días de vacaciones pendientes de tu gente, con la fórmula de Gestión Humana'
-                                : <>{conValores ? 'Días y valor' : 'Días'} de vacaciones pendientes por empleado, con la fórmula del Excel de Gestión Humana</>}
-                        </p>
-                    </div>
-                    <div className="ai-row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                        {vistaEquipo && <SelectorVistaEquipo />}
-                        <div>
-                            <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Calcular al</label>
-                            <input type="date" className="ai-input" value={fecha} onChange={(e) => e.target.value && setFecha(e.target.value)} />
-                        </div>
-                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => setFecha(finDeMes(-1))}>Cierre mes anterior</button>
-                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => setFecha(finDeMes(0))}>Cierre de este mes</button>
-                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={() => setFecha(hoyBogota())}>Hoy</button>
-                        {/* La descarga es solo de financiera (§58.2); RRHH consulta en pantalla. */}
-                        {conValores && (
-                            <button onClick={descargar} className="ai-btn ai-btn--secondary" disabled={descargando || loading}>
-                                {descargando ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                                {descargando ? 'Descargando…' : 'Descargar Excel'}
-                            </button>
-                        )}
-                    </div>
-                </div>
+                <EncabezadoVista
+                    icono={Palmtree}
+                    titulo={vistaEquipo ? 'Vacaciones del equipo' : 'Pasivo vacacional'}
+                    subtitulo={vistaEquipo
+                        ? 'Días de vacaciones pendientes de tu gente, con la fórmula de Gestión Humana'
+                        : `${conValores ? 'Días y valor' : 'Días'} de vacaciones pendientes por empleado, con la fórmula del Excel de Gestión Humana`}
+                >
+                    {vistaEquipo && <SelectorVistaEquipo />}
+                    <input type="date" className="ai-monitor-btn ai-monitor-mes" value={fecha} onChange={(e) => e.target.value && setFecha(e.target.value)} aria-label="Calcular al" title="Calcular al" />
+                    <button type="button" className="ai-monitor-btn" onClick={() => setFecha(finDeMes(-1))}>Cierre mes anterior</button>
+                    <button type="button" className="ai-monitor-btn" onClick={() => setFecha(finDeMes(0))}>Cierre de este mes</button>
+                    <button type="button" className="ai-monitor-btn" onClick={() => setFecha(hoyBogota())}>Hoy</button>
+                    {/* La descarga es solo de financiera (§58.2); RRHH consulta en pantalla. */}
+                    {conValores && (
+                        <button type="button" onClick={descargar} className="ai-monitor-btn" disabled={descargando || loading}>
+                            {descargando ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} strokeWidth={2} />}
+                            {descargando ? 'Descargando…' : 'Descargar Excel'}
+                        </button>
+                    )}
+                </EncabezadoVista>
 
                 {error && (
-                    <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', width: 'fit-content' }}>
-                        <span className="ai-dot" />
-                        {error}
-                    </div>
+                    <div style={{ marginBottom: 12 }}><Pastilla color={TONO.peligro} punto>{error}</Pastilla></div>
                 )}
                 {aviso && (
-                    <div className="ai-badge ai-badge--success" style={{ height: 'auto', padding: '10px 14px', width: 'fit-content' }}>
-                        <span className="ai-dot" />
-                        {aviso}
-                    </div>
+                    <div style={{ marginBottom: 12 }}><Pastilla color={TONO.exito} punto>{aviso}</Pastilla></div>
                 )}
 
-                <div className="ai-kpi-strip" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                    <div>
-                        <span className="ai-kpi-icon"><Users size={18} strokeWidth={1.75} /></span>
-                        <div>
-                            <p className="ai-kpi-label">Empleados</p>
-                            <p className="ai-kpi-value ai-num">{kpi.empleados}</p>
-                            {!vistaEquipo && kpi.sinCorte > 0 && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }} title={AYUDA_OBSERVACION}><span className="ai-num">{kpi.sinCorte}</span> con observación</p>}
-                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{kpiTotal.empleados}</span> en total</p>}
-                        </div>
-                    </div>
-                    <div>
-                        <span className="ai-kpi-icon"><CalendarClock size={18} strokeWidth={1.75} /></span>
-                        <div>
-                            <p className="ai-kpi-label">Pasivo (días)</p>
-                            <p className="ai-kpi-value ai-num">{fmtDias(kpi.pasivoDias)}</p>
-                            {conValores && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>{fmtMoneda(kpi.valorPasivo)}</p>}
-                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{fmtDias(kpiTotal.pasivoDias)}{conValores && ` · ${fmtMoneda(kpiTotal.valorPasivo)}`}</span> en total</p>}
-                        </div>
-                    </div>
-                    <div>
-                        <span className="ai-kpi-icon"><CalendarDays size={18} strokeWidth={1.75} /></span>
-                        <div>
-                            <p className="ai-kpi-label">Vacaciones programadas</p>
-                            <p className="ai-kpi-value ai-num">{fmtDias(kpi.programadas)}</p>
-                            <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>días después del {fmtFecha(fecha)}</p>
-                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{fmtDias(kpiTotal.programadas)}</span> en total</p>}
-                        </div>
-                    </div>
-                    <div>
-                        <span className="ai-kpi-icon"><Wallet size={18} strokeWidth={1.75} /></span>
-                        <div>
-                            <p className="ai-kpi-label">Total (pasivo − programadas)</p>
-                            {conValores ? (
-                                <>
-                                    <p className="ai-kpi-value ai-num">{fmtMoneda(kpi.valorTotal)}</p>
-                                    <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}><span className="ai-num">{fmtDias(kpi.totalDias)}</span> días</p>
-                                </>
-                            ) : (
-                                <p className="ai-kpi-value ai-num">{fmtDias(kpi.totalDias)} <span className="ai-muted" style={{ fontSize: 13, fontWeight: 400 }}>días</span></p>
-                            )}
-                            {hayFiltros && <p className="ai-muted" style={{ fontSize: 11, margin: 0 }}>Según los filtros · <span className="ai-num">{conValores ? fmtMoneda(kpiTotal.valorTotal) : `${fmtDias(kpiTotal.totalDias)} días`}</span> en total</p>}
-                        </div>
-                    </div>
+                <Mosaicos>
+                    <Mosaico
+                        color={TONO.info} icono={Users} valor={kpi.empleados} label="Empleados"
+                        title={!vistaEquipo && kpi.sinCorte > 0 ? AYUDA_OBSERVACION : undefined}
+                        detalle={[
+                            !vistaEquipo && kpi.sinCorte > 0 ? `${kpi.sinCorte} con observación` : null,
+                            hayFiltros ? `Según los filtros · ${kpiTotal.empleados} en total` : null
+                        ].filter(Boolean).join(' · ') || null}
+                    />
+                    <Mosaico
+                        color={TONO.acento} icono={CalendarClock} valor={fmtDias(kpi.pasivoDias)} label="Pasivo (días)"
+                        detalle={[
+                            conValores ? fmtMoneda(kpi.valorPasivo) : null,
+                            hayFiltros ? `Según los filtros · ${fmtDias(kpiTotal.pasivoDias)}${conValores ? ` · ${fmtMoneda(kpiTotal.valorPasivo)}` : ''} en total` : null
+                        ].filter(Boolean).join(' · ') || null}
+                    />
+                    <Mosaico
+                        color={TONO.cian} icono={CalendarDays} valor={fmtDias(kpi.programadas)} label="Vacaciones programadas"
+                        detalle={`días después del ${fmtFecha(fecha)}${hayFiltros ? ` · según los filtros · ${fmtDias(kpiTotal.programadas)} en total` : ''}`}
+                    />
+                    <Mosaico
+                        color={TONO.exito} icono={Wallet}
+                        valor={conValores ? fmtMoneda(kpi.valorTotal) : fmtDias(kpi.totalDias)}
+                        label={conValores ? 'Total (pasivo − programadas)' : 'Total días (pasivo − programadas)'}
+                        detalle={[
+                            conValores ? `${fmtDias(kpi.totalDias)} días` : null,
+                            hayFiltros ? `Según los filtros · ${conValores ? fmtMoneda(kpiTotal.valorTotal) : `${fmtDias(kpiTotal.totalDias)} días`} en total` : null
+                        ].filter(Boolean).join(' · ') || null}
+                    />
+                </Mosaicos>
+
+                <BarraFiltros>
+                    <CampoBusqueda value={searchTerm} onChange={setSearchTerm} placeholder="Buscar por empleado, identificación o cargo..." />
+                    <FiltroChip etiqueta="Campaña" opciones={opcionesCampania} seleccion={filtroCampanias} onChange={setFiltroCampanias} />
+                    <FiltroChip etiqueta="Área" opciones={opcionesArea} seleccion={filtroAreas} onChange={setFiltroAreas} />
+                    {!vistaEquipo && <FiltroChip etiqueta="Observación" opciones={[SALDO.sin, SALDO.con, SALDO.ajustado]} seleccion={filtroSaldo} onChange={setFiltroSaldo} />}
+                    <FiltroChip etiqueta="Pasivo" opciones={RANGOS_PASIVO.map(r => r.etiqueta)} seleccion={filtroPasivo} onChange={setFiltroPasivo} />
+                    <select value={orden} onChange={(e) => setOrden(e.target.value)} className="ai-input ai-monitor-select" title="Orden de la tabla">
+                        {Object.entries(ORDENES).map(([k, o]) => <option key={k} value={k}>Ordenar: {o.etiqueta}</option>)}
+                    </select>
+                </BarraFiltros>
+
+                <div className="ai-row" style={{ gap: 8, margin: '-6px 4px 12px', alignItems: 'center' }}>
+                    <Info size={14} style={{ color: 'var(--ink-subtle)', flexShrink: 0 }} />
+                    <span className="ai-muted" style={{ fontSize: 12 }}>
+                        Disfrutados y compensados = los del Excel al corte + novedades de Vacaciones desde el corte, según su
+                        modalidad. Programadas = novedades de Vacaciones que empiezan después de la fecha.{conValores && ' Valor = días × salario / 30.'}
+                        {hayFiltros && <> · <strong className="ai-num">{filtradas.length}</strong> de {datos.filas.length} empleados</>}
+                    </span>
                 </div>
 
-                <div className="ai-card">
-                    <div className="ai-toolbar">
-                        <div className="ai-search" style={{ flex: 1 }}>
-                            <Search size={16} />
-                            <input
-                                type="text"
-                                placeholder="Buscar por empleado, identificación o cargo..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{ border: 0, outline: 'none', background: 'transparent', flex: 1, font: 'inherit', color: 'inherit' }}
-                            />
-                        </div>
-                        <FiltroChip etiqueta="Campaña" opciones={opcionesCampania} seleccion={filtroCampanias} onChange={setFiltroCampanias} />
-                        <FiltroChip etiqueta="Área" opciones={opcionesArea} seleccion={filtroAreas} onChange={setFiltroAreas} />
-                        {!vistaEquipo && <FiltroChip etiqueta="Observación" opciones={[SALDO.sin, SALDO.con, SALDO.ajustado]} seleccion={filtroSaldo} onChange={setFiltroSaldo} />}
-                        <FiltroChip etiqueta="Pasivo" opciones={RANGOS_PASIVO.map(r => r.etiqueta)} seleccion={filtroPasivo} onChange={setFiltroPasivo} />
-                        <select value={orden} onChange={(e) => setOrden(e.target.value)} className="ai-input" style={{ width: 'auto' }} title="Orden de la tabla">
-                            {Object.entries(ORDENES).map(([k, o]) => <option key={k} value={k}>Ordenar: {o.etiqueta}</option>)}
-                        </select>
-                    </div>
-                    <div className="ai-row" style={{ gap: 8, padding: '0 16px 12px', alignItems: 'center' }}>
-                        <Info size={14} style={{ color: 'var(--ink-subtle)', flexShrink: 0 }} />
-                        <span className="ai-muted" style={{ fontSize: 12 }}>
-                            Disfrutados y compensados = los del Excel al corte + novedades de Vacaciones desde el corte, según su
-                            modalidad. Programadas = novedades de Vacaciones que empiezan después de la fecha.{conValores && ' Valor = días × salario / 30.'}
-                            {hayFiltros && <> · <strong className="ai-num">{filtradas.length}</strong> de {datos.filas.length} empleados</>}
-                        </span>
-                    </div>
-
+                <div>
                     {loading ? (
-                        <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: 'var(--primary)' }} />
-                        </div>
+                        <CargandoVista />
                     ) : filtradas.length === 0 ? (
-                        <div style={{ padding: 48, textAlign: 'center' }}>
-                            <CalendarClock size={36} style={{ margin: '0 auto 10px', color: 'var(--ink-subtle)' }} />
-                            <p style={{ fontWeight: 600, margin: 0 }}>Sin empleados</p>
-                            <p className="ai-muted" style={{ marginTop: 4 }}>{hayFiltros ? 'Ningún empleado coincide con los filtros.' : (vistaEquipo ? 'No tienes personal a cargo vigente a esa fecha.' : 'No hay empleados vigentes a esa fecha.')}</p>
-                        </div>
+                        <VistaVacia icono={CalendarClock}>
+                            {hayFiltros ? 'Ningún empleado coincide con los filtros.' : (vistaEquipo ? 'No tienes personal a cargo vigente a esa fecha.' : 'No hay empleados vigentes a esa fecha.')}
+                        </VistaVacia>
                     ) : (
-                        <div style={{ overflowX: 'auto' }}>
-                            <table className="ai-table ai-table--dense">
+                        <div className="ai-monitor-tabla-wrap">
+                            <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                                 <thead>
                                     <tr>
                                         <th>Empleado</th>
@@ -325,26 +287,22 @@ const PasivoVacacional = ({ vistaEquipo = false }) => {
                                         const chip = claseCampania(f.campania);
                                         return (
                                             <tr key={f.users_company_id}>
-                                                <td>
-                                                    <div className="ai-person">
-                                                        <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(f.nombre)}</span>
-                                                        <div>
-                                                            <div className="ai-person-name">{nombrePropio(f.nombre)}</div>
-                                                            <div className="ai-person-sub">
-                                                                {f.numero_identificacion}
+                                                <td className="ai-monitor-nombre">
+                                                    <span>
+                                                        <AvatarVista />
+                                                        <span>
+                                                            {nombrePropio(f.nombre).toUpperCase()}
+                                                            <span className="ai-monitor-sub">
+                                                                CC {f.numero_identificacion}
                                                                 {!vistaEquipo && f.con_observacion && (
-                                                                    <span className="ai-badge ai-badge--warning" style={{ marginLeft: 6 }} title={AYUDA_OBSERVACION}>
-                                                                        con observación
-                                                                    </span>
+                                                                    <span style={{ marginLeft: 6 }} title={AYUDA_OBSERVACION}><Pastilla color={TONO.alerta}>con observación</Pastilla></span>
                                                                 )}
                                                                 {f.origen_saldo === 'financiera' && (
-                                                                    <span className="ai-badge ai-badge--info" style={{ marginLeft: 6 }} title={`Saldo ajustado por financiera al ${fmtFecha(f.fecha_corte)}${f.nota_saldo ? `: ${f.nota_saldo}` : ''}`}>
-                                                                        ajustado
-                                                                    </span>
+                                                                    <span style={{ marginLeft: 6 }} title={`Saldo ajustado por financiera al ${fmtFecha(f.fecha_corte)}${f.nota_saldo ? `: ${f.nota_saldo}` : ''}`}><Pastilla color={TONO.info}>ajustado</Pastilla></span>
                                                                 )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                            </span>
+                                                        </span>
+                                                    </span>
                                                 </td>
                                                 <td>
                                                     {f.campania ? <span className={`ai-chip${chip ? ` ${chip}` : ''}`}>{primeraMayuscula(f.campania)}</span> : <span className="ai-muted">—</span>}
@@ -354,7 +312,7 @@ const PasivoVacacional = ({ vistaEquipo = false }) => {
                                                 <td className="ai-num">{fmtDias(f.dias_acumulados)}</td>
                                                 <td className="ai-num">{fmtDias(f.dias_disfrutados)}</td>
                                                 <td className="ai-num">{fmtDias(f.dias_compensados)}</td>
-                                                <td className="ai-num" style={{ fontWeight: 600, color: f.pasivo_dias < 0 ? 'var(--danger)' : undefined }}>{fmtDias(f.pasivo_dias)}</td>
+                                                <td className="ai-num" style={{ fontWeight: 700, color: f.pasivo_dias < 0 ? 'var(--danger)' : undefined }}>{fmtDias(f.pasivo_dias)}</td>
                                                 <td className="ai-num">{fmtDias(f.dias_programados)}</td>
                                                 <td className="ai-num">{fmtDias(f.total_dias)}</td>
                                                 {conValores && (
