@@ -148,6 +148,14 @@ export const assetHistoryService = {
 };
 
 // === SERVICIOS DE EMPLEADOS (users_company) ===
+// Catálogo de cargos con sus clientes y sueldo de referencia, para RRHH y financiera (§61).
+export const cargoService = {
+    listar: () => api.get('/users-company/cargos'),
+    crear: (data) => api.post('/users-company/cargos', data),
+    actualizar: (id, data) => api.put(`/users-company/cargos/${id}`, data),
+    eliminar: (id) => api.delete(`/users-company/cargos/${id}`)
+};
+
 export const userCompanyService = {
     getAll: (params = {}) => api.get('/users-company', { params }),
     getById: (id) => api.get(`/users-company/${id}`),

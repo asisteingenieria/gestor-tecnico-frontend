@@ -36,6 +36,7 @@ import RecursosHumanosLayout from './components/RecursosHumanosLayout';
 import CambiarPasswordObligatorio from './components/CambiarPasswordObligatorio';
 import NovedadesRRHH from './components/NovedadesRRHH';
 import Traspasos from './components/Traspasos';
+import CatalogoCargos from './components/CatalogoCargos';
 import PasivoVacacional from './components/PasivoVacacional';
 import ContratacionHydra from './components/contratacionHydra/ContratacionHydra';
 import LoteHydra from './components/contratacionHydra/LoteHydra';
@@ -570,6 +571,7 @@ function App() {
               <Route path="recursos-humanos" element={<RecursosHumanosRoute><AgentManagement /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/novedades" element={<RecursosHumanosRoute><NovedadesRRHH /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/traspasos" element={<RecursosHumanosRoute><Traspasos /></RecursosHumanosRoute>} />
+              <Route path="recursos-humanos/cargos" element={<RecursosHumanosRoute><CatalogoCargos /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/vacaciones" element={<RecursosHumanosRoute><PasivoVacacional /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/contratacion-hydra" element={<ContratacionHydraRoute><ContratacionHydra /></ContratacionHydraRoute>} />
               <Route path="recursos-humanos/contratacion-hydra/:id" element={<ContratacionHydraRoute><LoteHydra /></ContratacionHydraRoute>} />
