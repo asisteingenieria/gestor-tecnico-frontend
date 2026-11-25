@@ -8,13 +8,8 @@ import { formatearMiles } from '../utils/catalogosRRHH';
 // Cada cargo lleva sus clientes con el sueldo de referencia: el formulario de empleados filtra los cargos
 // por cliente con esa lista, así que un cargo sin el cliente no aparece al elegir ese cliente.
 
-const FILTROS = [
-    { clave: 'todos', label: 'Todos' },
-    { clave: 'sin_clientes', label: 'Sin clientes' },
-    { clave: 'sin_uso', label: 'Sin empleados' }
-];
-
-const pesos = (v) => `$ ${formatearMiles(v)}`;
+// Sueldos distintos del cargo (un cargo puede tener varios según el cliente), de menor a mayor.
+const salariosDe = (cargo) => [...new Set(cargo.referencias.map((r) => r.salario))].sort((a, b) => a - b);
 
 const CatalogoCargos = () => {
     const [cargos, setCargos] = useState([]);
@@ -23,7 +18,6 @@ const CatalogoCargos = () => {
     const [error, setError] = useState('');
     const [aviso, setAviso] = useState('');
     const [busqueda, setBusqueda] = useState('');
-    const [filtro, setFiltro] = useState('todos');
     const [editando, setEditando] = useState(null); // null | 'nuevo' | cargo
     const [eliminando, setEliminando] = useState(null);
 
@@ -44,20 +38,8 @@ const CatalogoCargos = () => {
 
     const visibles = useMemo(() => {
         const q = busqueda.trim().toLowerCase();
-        return cargos.filter((c) => {
-            if (filtro === 'sin_clientes' && c.referencias.length) return false;
-            if (filtro === 'sin_uso' && c.contratos_total) return false;
-            if (!q) return true;
-            return c.nombre.toLowerCase().includes(q)
-                || c.referencias.some((r) => r.cliente_nombre.toLowerCase().includes(q));
-        });
-    }, [cargos, busqueda, filtro]);
-
-    const conteo = {
-        todos: cargos.length,
-        sin_clientes: cargos.filter((c) => !c.referencias.length).length,
-        sin_uso: cargos.filter((c) => !c.contratos_total).length
-    };
+        return q ? cargos.filter((c) => c.nombre.toLowerCase().includes(q)) : cargos;
+    }, [cargos, busqueda]);
 
     const alGuardar = (mensaje) => {
         setEditando(null);
@@ -72,8 +54,7 @@ const CatalogoCargos = () => {
                     <div>
                         <h1 className="ai-page-title">Cargos</h1>
                         <p className="ai-page-sub">
-                            Catálogo de cargos y sus clientes con el sueldo de referencia. El formulario y el cargue masivo de
-                            empleados usan esta lista.
+                            Catálogo de cargos. El formulario y el cargue masivo de empleados usan esta lista.
                         </p>
                     </div>
                     <button type="button" onClick={() => { setAviso(''); setEditando('nuevo'); }} className="ai-btn ai-btn--primary">
@@ -91,24 +72,9 @@ const CatalogoCargos = () => {
                             <input
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
-                                placeholder="Buscar cargo o cliente"
+                                placeholder="Buscar cargo"
                                 style={{ border: 0, outline: 'none', background: 'transparent', flex: 1, color: 'var(--ink)', font: 'inherit' }}
                             />
-                        </div>
-                        <div className="ai-seg">
-                            {FILTROS.map((f) => (
-                                <span
-                                    key={f.clave}
-                                    role="button"
-                                    tabIndex={0}
-                                    className={filtro === f.clave ? 'is-active' : ''}
-                                    onClick={() => setFiltro(f.clave)}
-                                    onKeyDown={(e) => e.key === 'Enter' && setFiltro(f.clave)}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    {f.label} <span className="ai-count">{conteo[f.clave]}</span>
-                                </span>
-                            ))}
                         </div>
                     </div>
 
@@ -124,8 +90,7 @@ const CatalogoCargos = () => {
                             <thead>
                                 <tr>
                                     <th>Cargo</th>
-                                    <th>Clientes y sueldo de referencia</th>
-                                    <th style={{ textAlign: 'right' }}>Empleados activos</th>
+                                    <th style={{ textAlign: 'right' }}>Salario</th>
                                     <th className="ai-td-actions" />
                                 </tr>
                             </thead>
@@ -133,26 +98,10 @@ const CatalogoCargos = () => {
                                 {visibles.map((c) => (
                                     <tr key={c.id}>
                                         <td style={{ fontWeight: 600 }}>{c.nombre}</td>
-                                        <td style={{ whiteSpace: 'normal' }}>
-                                            {c.referencias.length ? (
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                                    {c.referencias.map((r) => (
-                                                        <span key={r.id} className="ai-badge ai-badge--info" title={`${r.cliente_nombre}: ${pesos(r.salario)}`}>
-                                                            {r.cliente_nombre} · {pesos(r.salario)}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <span className="ai-badge ai-badge--warning" title="No aparece al elegir un cliente que tenga cargos asignados">
-                                                    Sin clientes
-                                                </span>
-                                            )}
-                                        </td>
                                         <td style={{ textAlign: 'right' }} className="ai-num">
-                                            {c.contratos_activos}
-                                            {c.contratos_total > c.contratos_activos && (
-                                                <span className="ai-muted" style={{ fontSize: 12 }}> · {c.contratos_total} en total</span>
-                                            )}
+                                            {salariosDe(c).length
+                                                ? salariosDe(c).map((v) => `$ ${formatearMiles(v)}`).join(' · ')
+                                                : <span className="ai-muted">—</span>}
                                         </td>
                                         <td className="ai-td-actions">
                                             <div className="ai-row-actions">
