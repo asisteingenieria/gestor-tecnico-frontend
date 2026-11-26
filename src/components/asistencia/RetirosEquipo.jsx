@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Search, UserMinus, Check, AlertTriangle } from 'lucide-react';
+import { Loader2, UserMinus, Check, AlertTriangle, Users, CheckCircle2 } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import { avisarCambioContadores } from '../../utils/eventosAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
+import { EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Pastilla, CargandoVista, VistaVacia, AvatarVista, TONO } from '../ui';
 
 // Retiros de Claro del equipo (asistencia.md §59): cuando RRHH retira a alguien de Claro, sus jefes —
 // jefe de área y gestor; desde §61 no el coordinador— registran aquí la fecha en que lo retiraron de la
@@ -25,13 +26,6 @@ const registradoEn = (valor) => {
     const texto = typeof valor === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(valor) ? `${valor.replace(' ', 'T')}Z` : valor;
     return new Date(texto).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 };
-
-// Pendientes = sin fecha de retiro en la RM; Registrados = ya la tienen (la puso este jefe, otro jefe o el admin).
-const FILTROS = [
-    { id: 'todos', label: 'Todos' },
-    { id: 'pendientes', label: 'Pendientes' },
-    { id: 'registrados', label: 'Registrados' }
-];
 
 const hoyBogota = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 const sinTildes = (s = '') => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -58,9 +52,14 @@ const FilaRetiro = ({ r, onGuardado }) => {
 
     return (
         <tr>
-            <td>
-                <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{nombrePropio(r.empleado)}</div>
-                <div className="ai-person-sub">{r.cedula}</div>
+            <td className="ai-monitor-nombre">
+                <span>
+                    <AvatarVista />
+                    <span>
+                        {nombrePropio(r.empleado).toUpperCase()}
+                        <span className="ai-monitor-sub">CC {r.cedula}</span>
+                    </span>
+                </span>
             </td>
             <td style={{ fontSize: 13 }}>
                 <div>{[r.campania, r.centro_costo].filter(Boolean).join(' · ') || '—'}</div>
@@ -90,8 +89,8 @@ const FilaRetiro = ({ r, onGuardado }) => {
             </td>
             <td>
                 {r.pendiente
-                    ? <span className="ai-badge ai-badge--warning"><span className="ai-dot" />Pendiente</span>
-                    : <span className="ai-badge ai-badge--success"><span className="ai-dot" />Registrado</span>}
+                    ? <Pastilla color={TONO.alerta} punto>Pendiente</Pastilla>
+                    : <Pastilla color={TONO.exito} punto>Registrado</Pastilla>}
             </td>
         </tr>
     );
@@ -123,7 +122,6 @@ const RetirosEquipo = ({ vistaEquipo = false }) => {
 
     const pendientes = (retiros ?? []).filter((r) => r.pendiente).length;
     const registrados = (retiros ?? []).length - pendientes;
-    const conteo = { todos: (retiros ?? []).length, pendientes, registrados };
     const filtrados = useMemo(() => {
         const q = sinTildes(busqueda.trim());
         return (retiros ?? []).filter((r) =>
@@ -139,63 +137,51 @@ const RetirosEquipo = ({ vistaEquipo = false }) => {
         avisarCambioContadores();
     };
 
+    const filtrar = (id) => setFiltro((actual) => (actual === id ? 'todos' : id));
+
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Retiros del equipo</h1>
-                    <p className="ai-page-sub">Gente de Claro que RRHH retiró: registra la fecha en que la retiraste de la Red Maestra</p>
-                </div>
-                <div className="ai-row" style={{ flexWrap: 'wrap' }}>
-                    {vistaEquipo && <SelectorVistaEquipo />}
-                </div>
-            </div>
+            <EncabezadoVista
+                icono={UserMinus}
+                titulo="Retiros del equipo"
+                subtitulo="Gente de Claro que RRHH retiró: registra la fecha en que la retiraste de la Red Maestra"
+            >
+                {vistaEquipo && <SelectorVistaEquipo />}
+            </EncabezadoVista>
 
             {pendientes > 0 && (
-                <div className="ai-badge ai-badge--warning" style={{ height: 'auto', padding: '10px 14px', whiteSpace: 'normal', display: 'flex', gap: 8 }}>
+                <div className="ai-badge ai-badge--warning" style={{ height: 'auto', padding: '10px 14px', whiteSpace: 'normal', display: 'flex', gap: 8, marginBottom: 14 }}>
                     <AlertTriangle size={16} strokeWidth={1.75} />
                     Tienes {pendientes} retiro{pendientes === 1 ? '' : 's'} sin fecha de retiro en la Red Maestra.
                 </div>
             )}
 
             {loading ? (
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
+                <CargandoVista />
             ) : !retiros ? (
-                <div className="ai-panel ai-empty"><p style={{ color: 'var(--danger)' }}>{error}</p></div>
+                <VistaVacia error>{error}</VistaVacia>
             ) : (
-                <div className="ai-panel">
-                    <div className="ai-panel-head" style={{ flexWrap: 'wrap', gap: 8 }}>
-                        <h3 className="ai-panel-title">
-                            {retiros.length} retirado{retiros.length === 1 ? '' : 's'} de Claro · {pendientes} pendiente{pendientes === 1 ? '' : 's'} · {registrados} registrado{registrados === 1 ? '' : 's'}
-                        </h3>
-                        <div className="ai-row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                            <div style={{ position: 'relative' }}>
-                                <Search size={14} strokeWidth={1.75} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-subtle)' }} />
-                                <input className="ai-input" style={{ paddingLeft: 30, width: 220 }} placeholder="Nombre o cédula"
-                                    value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar" />
-                            </div>
-                            <div className="ai-seg" role="group" aria-label="Filtrar retiros">
-                                {FILTROS.map((f) => (
-                                    <span key={f.id} role="button" tabIndex={0} className={filtro === f.id ? 'is-active' : ''}
-                                        style={{ cursor: 'pointer' }} aria-pressed={filtro === f.id}
-                                        onClick={() => setFiltro(f.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFiltro(f.id); }}>
-                                        {f.label} <span className="ai-count">{conteo[f.id]}</span>
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                <>
+                    <Mosaicos>
+                        <Mosaico color={TONO.info} icono={Users} valor={retiros.length} label="Retirados de Claro"
+                            activo={filtro === 'todos'} onClick={() => setFiltro('todos')} title="Ver todos" />
+                        <Mosaico color={TONO.alerta} icono={AlertTriangle} valor={pendientes} label="Pendientes"
+                            activo={filtro === 'pendientes'} onClick={() => filtrar('pendientes')} />
+                        <Mosaico color={TONO.exito} icono={CheckCircle2} valor={registrados} label="Registrados"
+                            activo={filtro === 'registrados'} onClick={() => filtrar('registrados')} />
+                    </Mosaicos>
+
+                    <BarraFiltros>
+                        <CampoBusqueda value={busqueda} onChange={setBusqueda} />
+                    </BarraFiltros>
 
                     {filtrados.length === 0 ? (
-                        <div className="ai-empty">
-                            <UserMinus size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                            <p>{retiros.length === 0 ? 'No hay retiros de Claro en tu equipo.' : filtro === 'pendientes' && !busqueda ? 'No tienes retiros pendientes. ¡Al día!' : filtro === 'registrados' && !busqueda ? 'Todavía no has registrado ninguna fecha de retiro en la Red Maestra.' : 'Ningún retiro coincide con la búsqueda.'}</p>
-                        </div>
+                        <VistaVacia icono={UserMinus}>
+                            {retiros.length === 0 ? 'No hay retiros de Claro en tu equipo.' : filtro === 'pendientes' && !busqueda ? 'No tienes retiros pendientes. ¡Al día!' : filtro === 'registrados' && !busqueda ? 'Todavía no has registrado ninguna fecha de retiro en la Red Maestra.' : 'Ningún retiro coincide con la búsqueda.'}
+                        </VistaVacia>
                     ) : (
-                        <div style={{ overflowX: 'auto' }}>
-                            <table className="ai-table ai-table--dense">
+                        <div className="ai-monitor-tabla-wrap">
+                            <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                                 <thead>
                                     <tr>
                                         <th>Empleado</th>
@@ -211,7 +197,7 @@ const RetirosEquipo = ({ vistaEquipo = false }) => {
                             </table>
                         </div>
                     )}
-                </div>
+                </>
             )}
         </div>
     );

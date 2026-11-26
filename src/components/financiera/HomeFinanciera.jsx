@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import {
-    Loader2, RefreshCw, Wallet, Clock3, Users, Clock, CalendarX, AlertTriangle, CheckCircle2, Info,
-    Table2, BarChart3, ArrowUpRight, ArrowDownRight, Minus, Download
+    RefreshCw, Wallet, Clock3, Users, Clock, CalendarX, AlertTriangle, CheckCircle2, Info,
+    Table2, BarChart3, ArrowUpRight, ArrowDownRight, Minus, Download, LayoutDashboard, Lightbulb, Trophy, Landmark
 } from 'lucide-react';
+import { EncabezadoVista, Mosaicos, Mosaico, PanelVista, AvatarVista, CargandoVista, VistaVacia, TONO } from '../ui';
 import { useAuth } from '../../context/AuthContext';
 import { financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
@@ -64,18 +65,22 @@ function useTemaOscuro() {
 }
 
 // Opciones base: grid recesivo, ejes en tinta tenue, tooltip con el valor formateado.
-function opcionesBase(c, { horizontal = false, formato = entero, ejeFormato, leyenda = false, max } = {}) {
+const fuenteApp = () => (typeof document !== 'undefined'
+    && getComputedStyle(document.documentElement).getPropertyValue('--font-sans').trim()) || 'system-ui, sans-serif';
+
+function opcionesBase(c, { horizontal = false, formato = entero, ejeFormato, max } = {}) {
+    const fuente = fuenteApp();
     const ejeValor = {
         beginAtZero: true,
         max,
         grid: { color: c.grid, drawTicks: false },
         border: { display: false },
-        ticks: { color: c.texto, font: { size: 11 }, padding: 6, callback: (v) => (ejeFormato || formato)(v), maxTicksLimit: 6 }
+        ticks: { color: c.texto, font: { family: fuente, size: 11, weight: 500 }, padding: 6, callback: (v) => (ejeFormato || formato)(v), maxTicksLimit: 5 }
     };
     const ejeCategoria = {
         grid: { display: false },
         border: { color: c.eje },
-        ticks: { color: c.texto, font: { size: 11 }, autoSkip: false }
+        ticks: { color: c.texto, font: { family: fuente, size: 11, weight: 500 }, autoSkip: false }
     };
     return {
         responsive: true,
@@ -84,12 +89,23 @@ function opcionesBase(c, { horizontal = false, formato = entero, ejeFormato, ley
         animation: { duration: 250 },
         interaction: { mode: 'index', intersect: false, axis: horizontal ? 'y' : 'x' },
         plugins: {
-            legend: leyenda
-                ? { display: true, position: 'top', align: 'end', labels: { color: c.texto, boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2, font: { size: 12 } } }
-                : { display: false },
+            legend: { display: false },
+            // Mismo detalle que el de las gráficas del Histórico de Equipo (.gm-tip): tarjeta clara con borde.
             tooltip: {
-                padding: 10,
-                cornerRadius: 6,
+                backgroundColor: c.superficie,
+                borderColor: c.eje,
+                borderWidth: 1,
+                titleColor: c.meta,
+                bodyColor: c.meta,
+                footerColor: c.meta,
+                titleFont: { family: fuente, size: 12, weight: 700 },
+                bodyFont: { family: fuente, size: 12, weight: 500 },
+                footerFont: { family: fuente, size: 12, weight: 600 },
+                padding: 12,
+                cornerRadius: 10,
+                boxPadding: 4,
+                boxWidth: 10,
+                boxHeight: 10,
                 callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${formato(ctx.parsed[horizontal ? 'x' : 'y'])}` }
             }
         },
@@ -97,7 +113,7 @@ function opcionesBase(c, { horizontal = false, formato = entero, ejeFormato, ley
     };
 }
 
-const barra = (extra) => ({ borderRadius: 4, borderSkipped: 'start', maxBarThickness: 26, categoryPercentage: 0.72, barPercentage: 0.9, ...extra });
+const barra = (extra) => ({ borderRadius: 4, borderSkipped: 'start', maxBarThickness: 22, categoryPercentage: 0.7, barPercentage: 0.86, ...extra });
 
 // Las tres partes del costo de nómina, en orden fijo de la paleta (el color sigue a la parte).
 const PARTES_COSTO = [
@@ -123,7 +139,7 @@ function datasetsCosto(c, filas, { horizontal = false, alfa } = {}) {
             borderWidth: horizontal ? { right: ultimo ? 0 : 2 } : { top: ultimo ? 0 : 2 },
             borderSkipped: false,
             borderRadius: ultimo ? (horizontal ? { topRight: 4, bottomRight: 4 } : { topLeft: 4, topRight: 4 }) : 0,
-            maxBarThickness: horizontal ? 18 : 34,
+            maxBarThickness: horizontal ? 16 : 26,
             categoryPercentage: 0.72,
             barPercentage: 0.9
         };
@@ -143,28 +159,94 @@ function opcionesApiladas(c, { horizontal = false, filas = [] } = {}) {
     return o;
 }
 
-// Línea vertical de la meta de puntualidad (en las barras horizontales).
-const lineaMeta = (valor, color) => ({
-    id: 'lineaMeta',
-    afterDatasetsDraw(chart) {
-        const { ctx, chartArea, scales } = chart;
-        const x = scales.x.getPixelForValue(valor);
-        ctx.save();
-        ctx.strokeStyle = color;
-        ctx.setLineDash([4, 4]);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x, chartArea.top);
-        ctx.lineTo(x, chartArea.bottom);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = color;
-        ctx.font = '600 11px system-ui, -apple-system, "Segoe UI", sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText(`Meta ${valor} %`, x - 4, chartArea.top + 10);
-        ctx.restore();
-    }
-});
+// Barras horizontales con el diseño de las gráficas del Histórico de Equipo (clases gm-*): una fila por
+// categoría, segmentos apilados con 2 px de separación, valor al final, rejilla tenue y el detalle al pasar
+// el mouse. `fila.color` pinta toda la barra (p. ej. bajo la meta); si no, cada serie lleva su color.
+function marcasEje(max) {
+    if (max <= 0) return [0];
+    const bruto = max / 4;
+    const mag = 10 ** Math.floor(Math.log10(bruto));
+    const paso = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((p) => p >= bruto);
+    return Array.from({ length: Math.ceil(max / paso) + 1 }, (_, i) => i * paso);
+}
+
+const BarrasH = ({ filas, series, formato, formatoEje = formato, max, meta, valorFinal }) => {
+    const [tip, setTip] = useState(null);
+    const total = (f) => series.reduce((a, s) => a + (Number(f.valores[s.id]) || 0), 0);
+    const ejes = marcasEje(max ?? Math.max(0, ...filas.map(total)));
+    const tope = (max ?? ejes[ejes.length - 1]) || 1;
+    const pos = (v) => `${(v / tope) * 100}%`;
+
+    const mostrar = (ev, f) => {
+        const caja = ev.currentTarget.closest('.gm-cuerpo').getBoundingClientRect();
+        const fila = ev.currentTarget.getBoundingClientRect();
+        const x = (ev.clientX || fila.left + fila.width / 2) - caja.left;
+        const y = (ev.clientY || fila.bottom) - caja.top;
+        setTip({ f, x, y, izquierda: x > caja.width - 250, arriba: y > caja.height / 2 });
+    };
+
+    return (
+        <div className={`gm-cuerpo${meta != null ? ' fin-barras--meta' : ''}`} onMouseLeave={() => setTip(null)}>
+            <div className="gm-rejilla" aria-hidden="true">
+                {ejes.map((m) => <span key={m} style={{ left: pos(m) }} />)}
+                {meta != null && <span className="fin-meta" style={{ left: pos(meta) }}><em>Meta {meta} %</em></span>}
+            </div>
+            {filas.map((f) => {
+                const t = total(f);
+                return (
+                    <div
+                        key={f.id} className="gm-fila fin-fila" tabIndex={0}
+                        onMouseMove={(ev) => mostrar(ev, f)} onFocus={(ev) => mostrar(ev, f)} onBlur={() => setTip(null)}
+                        aria-label={`${f.label}: ${series.map((s) => `${s.label} ${formato(Number(f.valores[s.id]) || 0)}`).join(', ')}`}
+                    >
+                        <span className="gm-nombre" title={f.label}>{f.label}</span>
+                        <span className="gm-pista">
+                            <span className="gm-barra" style={{ width: pos(t) }}>
+                                {series.filter((s) => f.valores[s.id] > 0).map((s) => (
+                                    <span key={s.id} className="gm-seg" style={{ flexGrow: f.valores[s.id], background: f.color || s.color }} />
+                                ))}
+                            </span>
+                            <span className="gm-valor">{valorFinal ? valorFinal(t, f) : formato(t)}</span>
+                        </span>
+                    </div>
+                );
+            })}
+            <div className="gm-eje">
+                <span className="gm-nombre" />
+                <span className="gm-pista">
+                    {ejes.map((m) => <span key={m} style={{ left: pos(m) }}>{formatoEje(m)}</span>)}
+                </span>
+            </div>
+
+            {tip && (
+                <div
+                    className="gm-tip" role="tooltip"
+                    style={{
+                        left: tip.izquierda ? tip.x - 14 : tip.x + 14,
+                        top: tip.arriba ? tip.y - 14 : tip.y + 14,
+                        transform: `translate(${tip.izquierda ? '-100%' : '0'}, ${tip.arriba ? '-100%' : '0'})`
+                    }}
+                >
+                    <strong>{tip.f.label}</strong>
+                    {series.map((s) => (
+                        <div key={s.id} className="gm-tip-fila">
+                            <i style={{ background: tip.f.color || s.color }} aria-hidden="true" />
+                            <span>{s.label}</span>
+                            <b>{formato(Number(tip.f.valores[s.id]) || 0)}</b>
+                        </div>
+                    ))}
+                    {(series.length > 1 || tip.f.pie) && (
+                        <div className="gm-tip-pie">
+                            {series.length > 1 ? `Total: ${formato(total(tip.f))}` : ''}
+                            {series.length > 1 && tip.f.pie ? ' · ' : ''}
+                            {tip.f.pie}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const HomeFinanciera = () => {
     const [periodo, setPeriodo] = useState(periodoActual());
@@ -202,33 +284,25 @@ const HomeFinanciera = () => {
     return (
         <div className="ai-scope" style={{ minHeight: '100%' }}>
             <div className="ai-content">
-                <div className="ai-page-head">
-                    <div>
-                        <h1 className="ai-page-title">Home</h1>
-                        <p className="ai-page-sub">
-                            {nombrePeriodo(periodo)}
-                            {datos?.mes_en_curso ? ' · mes en curso, en vivo' : ''}
-                            {' · RRHH, asistencia, horas extra y costos'}
-                            {actualizado && <span className="ai-muted"> · actualizado {actualizado.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>}
-                        </p>
-                    </div>
-                    <div className="ai-row">
-                        <input
-                            type="month" className="ai-input" style={{ width: 170 }} value={periodo} max={periodoActual()}
-                            onChange={(e) => e.target.value && setPeriodo(e.target.value)} aria-label="Mes"
-                        />
-                        <button type="button" className="ai-btn ai-btn--secondary" onClick={() => cargar()} disabled={loading} title="Actualizar">
-                            <RefreshCw size={16} strokeWidth={1.75} className={loading ? 'animate-spin' : ''} />
-                        </button>
-                    </div>
-                </div>
+                <EncabezadoVista
+                    icono={LayoutDashboard}
+                    titulo="Home"
+                    subtitulo={`${nombrePeriodo(periodo)} · RRHH, asistencia, horas extra y costos${actualizado ? ` · actualizado ${actualizado.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
+                    enVivo={!!datos?.mes_en_curso}
+                >
+                    <input
+                        type="month" className="ai-monitor-btn ai-monitor-mes" value={periodo} max={periodoActual()}
+                        onChange={(e) => e.target.value && setPeriodo(e.target.value)} aria-label="Mes"
+                    />
+                    <button type="button" className="ai-monitor-btn" onClick={() => cargar()} disabled={loading} title="Actualizar">
+                        <RefreshCw size={15} strokeWidth={2} className={loading ? 'animate-spin' : ''} /> Actualizar
+                    </button>
+                </EncabezadoVista>
 
                 {loading && !datos ? (
-                    <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
-                        <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                    </div>
+                    <CargandoVista />
                 ) : error ? (
-                    <div className="ai-panel ai-empty"><p style={{ color: 'var(--danger)' }}>{error}</p></div>
+                    <VistaVacia error>{error}</VistaVacia>
                 ) : datos && (
                     // key: Chart.js no relee los plugins (línea de meta) al cambiar el tema; se remonta.
                     <Tablero key={oscuro ? 'oscuro' : 'claro'} datos={datos} c={c} />
@@ -249,228 +323,212 @@ const Tablero = ({ datos, c }) => {
     const extraOrdenado = useMemo(() => porCampania.filter((x) => x.dinero_extra > 0).sort((a, b) => b.dinero_extra - a.dinero_extra), [porCampania]);
     const conPuntualidad = useMemo(() => porCampania.filter((x) => x.puntualidad != null).sort((a, b) => a.puntualidad - b.puntualidad), [porCampania]);
     const sinMarcaciones = porCampania.length - conPuntualidad.length;
-    const alto = (n) => Math.max(180, n * 26 + 40);
 
     return (
         <>
             <Hallazgos lista={datos.hallazgos} />
 
-            <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
-                <Kpi
-                    hero label={enCurso ? 'Costo total de nómina · proyectado' : 'Costo total de nómina'}
-                    valor={copCompacto(kpis.nomina.total)} titulo={cop(kpis.nomina.total)}
-                    icon={<Wallet size={18} strokeWidth={1.75} />}
-                    pie={enCurso && kpis.nomina.causado_hoy
+            <Mosaicos>
+                <Mosaico
+                    color={TONO.info} icono={Wallet}
+                    valor={copCompacto(kpis.nomina.total)} title={cop(kpis.nomina.total)}
+                    label={enCurso ? 'Costo de nómina · proyectado' : 'Costo total de nómina'}
+                    detalle={enCurso && kpis.nomina.causado_hoy
                         ? `Causado a hoy ${copCompacto(kpis.nomina.causado_hoy.total)}`
-                        : <Delta valor={kpis.nomina.variacion_pct} sufijo="%" texto={`vs ${anterior}`} neutro />}
+                        : deltaTexto(kpis.nomina.variacion_pct, '%', `vs ${anterior}`)}
                 />
-                <Kpi
-                    label="Costo horas extra" valor={copCompacto(kpis.horas_extra.dinero)} titulo={cop(kpis.horas_extra.dinero)}
-                    icon={<Clock3 size={18} strokeWidth={1.75} />}
-                    pie={enCurso
-                        ? <span>{horas(kpis.horas_extra.horas)} · {anterior}: {copCompacto(kpis.horas_extra.dinero_anterior)}</span>
-                        : <Delta valor={kpis.horas_extra.variacion_pct} sufijo="%" subirEsMalo texto={`vs ${anterior}`} />}
+                <Mosaico
+                    color={TONO.acento} icono={Clock3}
+                    valor={copCompacto(kpis.horas_extra.dinero)} title={cop(kpis.horas_extra.dinero)} label="Costo horas extra"
+                    detalle={enCurso
+                        ? `${horas(kpis.horas_extra.horas)} · ${anterior}: ${copCompacto(kpis.horas_extra.dinero_anterior)}`
+                        : deltaTexto(kpis.horas_extra.variacion_pct, '%', `vs ${anterior}`)}
                 />
-                <Kpi
-                    label="Empleados activos" valor={entero(kpis.dotacion.activos)}
-                    icon={<Users size={18} strokeWidth={1.75} />}
-                    pie={`${kpis.dotacion.ingresos_mes} ingreso${kpis.dotacion.ingresos_mes === 1 ? '' : 's'} · ${kpis.dotacion.retiros_mes} retiro${kpis.dotacion.retiros_mes === 1 ? '' : 's'} en el mes`}
+                <Mosaico
+                    color={TONO.exito} icono={Users} valor={entero(kpis.dotacion.activos)} label="Empleados activos"
+                    detalle={`${kpis.dotacion.ingresos_mes} ingreso${kpis.dotacion.ingresos_mes === 1 ? '' : 's'} · ${kpis.dotacion.retiros_mes} retiro${kpis.dotacion.retiros_mes === 1 ? '' : 's'} en el mes`}
                 />
-                <Kpi
-                    label="Puntualidad global" valor={kpis.asistencia.puntualidad != null ? `${kpis.asistencia.puntualidad} %` : '—'}
-                    icon={<Clock size={18} strokeWidth={1.75} />}
-                    pie={<Delta valor={kpis.asistencia.delta_pp} sufijo=" pp" texto={`vs ${anterior}`} />}
+                <Mosaico
+                    color={kpis.asistencia.puntualidad == null ? TONO.suave : kpis.asistencia.puntualidad >= 90 ? 'conectado' : kpis.asistencia.puntualidad >= 75 ? TONO.alerta : TONO.peligro}
+                    icono={Clock} valor={kpis.asistencia.puntualidad != null ? `${kpis.asistencia.puntualidad} %` : '—'} label="Puntualidad global"
+                    detalle={deltaTexto(kpis.asistencia.delta_pp, ' pp', `vs ${anterior}`)}
                 />
-                <Kpi
-                    label="Ausencias del mes" valor={entero(kpis.asistencia.ausencias)} alerta={kpis.asistencia.ausencias > 0}
-                    icon={<CalendarX size={18} strokeWidth={1.75} />}
-                    pie={`${entero(kpis.novedades.total)} novedades · ${entero(kpis.novedades.dias)} días`}
+                <Mosaico
+                    color={kpis.asistencia.ausencias > 0 ? 'no_llego' : TONO.suave} icono={CalendarX}
+                    valor={entero(kpis.asistencia.ausencias)} label="Ausencias del mes"
+                    detalle={`${entero(kpis.novedades.total)} novedades · ${entero(kpis.novedades.dias)} días`}
                 />
-            </div>
+            </Mosaicos>
 
             <CostoNomina costo={datos.costo_nomina} nomina={kpis.nomina} periodo={datos.periodo} c={c} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
-                <Tarjeta
-                    titulo="Costo de horas extra · últimos 6 meses"
-                    fuente="Horas extra aprobadas × valor hora (salario ÷ 240) × factor de ley por clase."
-                    vacio={tendencia.every((t) => !t.dinero_extra) && 'No hay horas extra aprobadas en estos meses.'}
-                    tabla={{
-                        columnas: ['Mes', 'Costo', 'Horas'],
-                        filas: tendencia.map((t) => [nombrePeriodo(t.periodo), cop(t.dinero_extra), horas(t.horas_extra)])
-                    }}
-                >
-                    <div style={{ height: 240 }}>
-                        <Bar
-                            data={{
-                                labels: tendencia.map((t) => mesCorto(t.periodo)),
-                                datasets: [{
-                                    label: 'Costo', data: tendencia.map((t) => t.dinero_extra),
-                                    // El mes en curso va más claro: todavía no está cerrado.
-                                    backgroundColor: tendencia.map((t, i) => (enCurso && i === tendencia.length - 1 ? `${c.serie1}66` : c.serie1)),
-                                    ...barra()
-                                }]
-                            }}
-                            options={opcionesBase(c, { formato: cop, ejeFormato: copCompacto })}
-                        />
-                    </div>
-                </Tarjeta>
+            <PanelVista icono={BarChart3} titulo={`Indicadores · ${nombrePeriodo(datos.periodo)}`}>
+                <div className="gm-graficas fin-graficas">
+                    <Tarjeta
+                        titulo="Costo de horas extra" icono={Clock3}
+                        subtitulo={`Últimos 6 meses${enCurso ? ' · el mes en curso, más claro' : ''}`}
+                        fuente="Horas extra aprobadas × valor hora (salario ÷ 240) × factor de ley por clase."
+                        vacio={tendencia.every((t) => !t.dinero_extra) && 'No hay horas extra aprobadas en estos meses.'}
+                        tabla={{
+                            columnas: ['Mes', 'Costo', 'Horas'],
+                            filas: tendencia.map((t) => [nombrePeriodo(t.periodo), cop(t.dinero_extra), horas(t.horas_extra)])
+                        }}
+                    >
+                        <div style={{ height: 230 }}>
+                            <Bar
+                                data={{
+                                    labels: tendencia.map((t) => mesCorto(t.periodo)),
+                                    datasets: [{
+                                        label: 'Costo', data: tendencia.map((t) => t.dinero_extra),
+                                        // El mes en curso va más claro: todavía no está cerrado.
+                                        backgroundColor: tendencia.map((t, i) => (enCurso && i === tendencia.length - 1 ? `${c.serie1}66` : c.serie1)),
+                                        ...barra()
+                                    }]
+                                }}
+                                options={opcionesBase(c, { formato: cop, ejeFormato: copCompacto })}
+                            />
+                        </div>
+                    </Tarjeta>
 
-                <Tarjeta
-                    titulo="Ingresos y retiros · últimos 6 meses"
-                    fuente="Ingresos por fecha de ingreso del contrato; retiros por fecha de retiro registrada."
-                    tabla={{
-                        columnas: ['Mes', 'Ingresos', 'Retiros', 'Neto'],
-                        filas: tendencia.map((t) => [nombrePeriodo(t.periodo), t.ingresos, t.retiros, t.ingresos - t.retiros])
-                    }}
-                >
-                    <div style={{ height: 240 }}>
-                        <Bar
-                            data={{
-                                labels: tendencia.map((t) => mesCorto(t.periodo)),
-                                datasets: [
-                                    { label: 'Ingresos', data: tendencia.map((t) => t.ingresos), backgroundColor: c.serie1, ...barra({ maxBarThickness: 18 }) },
-                                    { label: 'Retiros', data: tendencia.map((t) => t.retiros), backgroundColor: c.serie2, ...barra({ maxBarThickness: 18 }) }
-                                ]
-                            }}
-                            options={opcionesBase(c, { leyenda: true })}
-                        />
-                    </div>
-                </Tarjeta>
+                    <Tarjeta
+                        titulo="Ingresos y retiros" icono={Users} subtitulo="Últimos 6 meses"
+                        leyenda={[{ color: c.serie1, texto: 'Ingresos' }, { color: c.serie2, texto: 'Retiros' }]}
+                        fuente="Ingresos por fecha de ingreso del contrato; retiros por fecha de retiro registrada."
+                        tabla={{
+                            columnas: ['Mes', 'Ingresos', 'Retiros', 'Neto'],
+                            filas: tendencia.map((t) => [nombrePeriodo(t.periodo), t.ingresos, t.retiros, t.ingresos - t.retiros])
+                        }}
+                    >
+                        <div style={{ height: 230 }}>
+                            <Bar
+                                data={{
+                                    labels: tendencia.map((t) => mesCorto(t.periodo)),
+                                    datasets: [
+                                        { label: 'Ingresos', data: tendencia.map((t) => t.ingresos), backgroundColor: c.serie1, ...barra({ maxBarThickness: 16 }) },
+                                        { label: 'Retiros', data: tendencia.map((t) => t.retiros), backgroundColor: c.serie2, ...barra({ maxBarThickness: 16 }) }
+                                    ]
+                                }}
+                                options={opcionesBase(c)}
+                            />
+                        </div>
+                    </Tarjeta>
 
-                <Tarjeta
-                    titulo="Costo total de nómina por campaña"
-                    subtitulo={<Leyenda items={LEYENDA_COSTO(c)} />}
-                    fuente="Costo del mes elegido: nómina prorrateada por días + prestaciones + aportes + bonos + auxilio de transporte, según la campaña actual del contrato."
-                    vacio={nominaOrdenada.length === 0 && 'No hay salarios registrados.'}
-                    tabla={{
-                        columnas: ['Campaña', 'Empleados', ...PARTES_COSTO.map((p) => p.etiqueta), 'Total'],
-                        filas: nominaOrdenada.map((x) => [primeraMayuscula(x.campania), x.empleados, ...PARTES_COSTO.map((p) => cop(x[p.clave])), cop(x.costo_total)])
-                    }}
-                >
-                    <div style={{ height: alto(nominaOrdenada.length) }}>
-                        <Bar
-                            data={{
-                                labels: nominaOrdenada.map((x) => primeraMayuscula(x.campania)),
-                                datasets: datasetsCosto(c, nominaOrdenada, { horizontal: true })
-                            }}
-                            options={opcionesApiladas(c, { horizontal: true, filas: nominaOrdenada.map((x) => ({ total: x.costo_total, empleados: x.empleados })) })}
+                    <Tarjeta
+                        titulo="Costo de nómina por campaña" icono={Landmark}
+                        subtitulo="De mayor a menor costo total del mes"
+                        leyenda={LEYENDA_COSTO(c)}
+                        fuente="Costo del mes elegido: nómina prorrateada por días + prestaciones + aportes + bonos + auxilio de transporte, según la campaña actual del contrato."
+                        vacio={nominaOrdenada.length === 0 && 'No hay salarios registrados.'}
+                        tabla={{
+                            columnas: ['Campaña', 'Empleados', ...PARTES_COSTO.map((p) => p.etiqueta), 'Total'],
+                            filas: nominaOrdenada.map((x) => [primeraMayuscula(x.campania), x.empleados, ...PARTES_COSTO.map((p) => cop(x[p.clave])), cop(x.costo_total)])
+                        }}
+                    >
+                        <BarrasH
+                            series={PARTES_COSTO.map((p) => ({ id: p.clave, label: p.etiqueta, color: c[p.color] }))}
+                            filas={nominaOrdenada.map((x) => ({
+                                id: x.campania, label: primeraMayuscula(x.campania),
+                                valores: Object.fromEntries(PARTES_COSTO.map((p) => [p.clave, Number(x[p.clave]) || 0])),
+                                pie: `${entero(x.empleados)} empleados`
+                            }))}
+                            formato={cop} formatoEje={copCompacto} valorFinal={copCompacto}
                         />
-                    </div>
-                </Tarjeta>
+                    </Tarjeta>
 
-                <Tarjeta
-                    titulo="Puntualidad por campaña"
-                    subtitulo={<Leyenda items={[{ color: c.serie2, texto: `Bajo la meta (${meta} %)` }, { color: c.contexto, texto: 'En la meta o más' }]} />}
-                    fuente={`Días puntuales ÷ días trabajados del mes.${sinMarcaciones > 0 ? ` ${sinMarcaciones} campaña${sinMarcaciones === 1 ? '' : 's'} sin marcaciones en el mes no aparece${sinMarcaciones === 1 ? '' : 'n'}.` : ''}`}
-                    vacio={conPuntualidad.length === 0 && 'Ninguna campaña tiene jornadas registradas en el mes.'}
-                    tabla={{
-                        columnas: ['Campaña', 'Puntualidad', 'Días trabajados', 'Ausencias'],
-                        filas: conPuntualidad.map((x) => [primeraMayuscula(x.campania), `${x.puntualidad} %`, x.dias_trabajados, x.ausencias])
-                    }}
-                >
-                    <div style={{ height: alto(conPuntualidad.length) }}>
-                        <Bar
-                            data={{
-                                labels: conPuntualidad.map((x) => primeraMayuscula(x.campania)),
-                                datasets: [{
-                                    label: 'Puntualidad', data: conPuntualidad.map((x) => x.puntualidad),
-                                    backgroundColor: conPuntualidad.map((x) => (x.puntualidad < meta ? c.serie2 : c.contexto)),
-                                    ...barra({ maxBarThickness: 16 })
-                                }]
-                            }}
-                            options={opcionesBase(c, { horizontal: true, formato: (v) => `${v} %`, max: 100 })}
-                            plugins={[lineaMeta(meta, c.meta)]}
+                    <Tarjeta
+                        titulo="Puntualidad por campaña" icono={Clock}
+                        subtitulo="De menor a mayor puntualidad"
+                        leyenda={[{ color: c.serie2, texto: `Bajo la meta (${meta} %)` }, { color: c.contexto, texto: 'En la meta o más' }]}
+                        fuente={`Días puntuales ÷ días trabajados del mes.${sinMarcaciones > 0 ? ` ${sinMarcaciones} campaña${sinMarcaciones === 1 ? '' : 's'} sin marcaciones en el mes no aparece${sinMarcaciones === 1 ? '' : 'n'}.` : ''}`}
+                        vacio={conPuntualidad.length === 0 && 'Ninguna campaña tiene jornadas registradas en el mes.'}
+                        tabla={{
+                            columnas: ['Campaña', 'Puntualidad', 'Días trabajados', 'Ausencias'],
+                            filas: conPuntualidad.map((x) => [primeraMayuscula(x.campania), `${x.puntualidad} %`, x.dias_trabajados, x.ausencias])
+                        }}
+                    >
+                        <BarrasH
+                            series={[{ id: 'puntualidad', label: 'Puntualidad', color: c.contexto }]}
+                            filas={conPuntualidad.map((x) => ({
+                                id: x.campania, label: primeraMayuscula(x.campania),
+                                valores: { puntualidad: x.puntualidad },
+                                color: x.puntualidad < meta ? c.serie2 : c.contexto,
+                                pie: `${entero(x.dias_trabajados)} días trabajados · ${entero(x.ausencias)} ausencias`
+                            }))}
+                            formato={(v) => `${v} %`} max={100} meta={meta}
                         />
-                    </div>
-                </Tarjeta>
+                    </Tarjeta>
 
-                <Tarjeta
-                    titulo="Costo de horas extra por campaña"
-                    fuente="Solo campañas con horas extra aprobadas en el mes."
-                    vacio={extraOrdenado.length === 0 && 'No hay horas extra aprobadas en el mes.'}
-                    tabla={{
-                        columnas: ['Campaña', 'Horas', 'Costo'],
-                        filas: extraOrdenado.map((x) => [primeraMayuscula(x.campania), horas(x.horas_extra), cop(x.dinero_extra)])
-                    }}
-                >
-                    <div style={{ height: alto(extraOrdenado.length) }}>
-                        <Bar
-                            data={{
-                                labels: extraOrdenado.map((x) => primeraMayuscula(x.campania)),
-                                datasets: [{ label: 'Costo', data: extraOrdenado.map((x) => x.dinero_extra), backgroundColor: c.serie1, ...barra({ maxBarThickness: 16 }) }]
-                            }}
-                            options={(() => {
-                                const o = opcionesBase(c, { horizontal: true, formato: cop, ejeFormato: copCompacto });
-                                o.plugins.tooltip.callbacks.afterLabel = (ctx) => ` ${horas(extraOrdenado[ctx.dataIndex].horas_extra)}`;
-                                return o;
-                            })()}
+                    <Tarjeta
+                        titulo="Costo de horas extra por campaña" icono={Wallet}
+                        subtitulo="Solo campañas con horas extra aprobadas"
+                        fuente="Horas extra aprobadas en el mes, por la campaña actual del contrato."
+                        vacio={extraOrdenado.length === 0 && 'No hay horas extra aprobadas en el mes.'}
+                        tabla={{
+                            columnas: ['Campaña', 'Horas', 'Costo'],
+                            filas: extraOrdenado.map((x) => [primeraMayuscula(x.campania), horas(x.horas_extra), cop(x.dinero_extra)])
+                        }}
+                    >
+                        <BarrasH
+                            series={[{ id: 'costo', label: 'Costo', color: c.serie1 }]}
+                            filas={extraOrdenado.map((x) => ({
+                                id: x.campania, label: primeraMayuscula(x.campania), valores: { costo: x.dinero_extra }, pie: horas(x.horas_extra)
+                            }))}
+                            formato={cop} formatoEje={copCompacto} valorFinal={copCompacto}
                         />
-                    </div>
-                </Tarjeta>
+                    </Tarjeta>
 
-                <Tarjeta
-                    titulo="Horas extra por clase"
-                    fuente="Recargos pagan solo el %; las extras, la hora completa + el %."
-                    vacio={porClase.every((x) => !x.horas) && 'No hay horas extra aprobadas en el mes.'}
-                    tabla={{
-                        columnas: ['Clase', 'Horas', 'Costo'],
-                        filas: porClase.map((x) => [CLASES[x.clase] || x.clase, horas(x.horas), cop(x.dinero)])
-                    }}
-                >
-                    <div style={{ height: alto(porClase.length) }}>
-                        <Bar
-                            data={{
-                                labels: porClase.map((x) => CLASES[x.clase] || x.clase),
-                                datasets: [{ label: 'Horas', data: porClase.map((x) => x.horas), backgroundColor: c.serie1, ...barra({ maxBarThickness: 16 }) }]
-                            }}
-                            options={(() => {
-                                const o = opcionesBase(c, { horizontal: true, formato: horas });
-                                o.plugins.tooltip.callbacks.afterLabel = (ctx) => ` ${cop(porClase[ctx.dataIndex].dinero)}`;
-                                return o;
-                            })()}
+                    <Tarjeta
+                        titulo="Horas extra por clase" icono={Clock3}
+                        subtitulo="Horas aprobadas del mes"
+                        fuente="Recargos pagan solo el %; las extras, la hora completa + el %."
+                        vacio={porClase.every((x) => !x.horas) && 'No hay horas extra aprobadas en el mes.'}
+                        tabla={{
+                            columnas: ['Clase', 'Horas', 'Costo'],
+                            filas: porClase.map((x) => [CLASES[x.clase] || x.clase, horas(x.horas), cop(x.dinero)])
+                        }}
+                    >
+                        <BarrasH
+                            series={[{ id: 'horas', label: 'Horas', color: c.serie1 }]}
+                            filas={porClase.map((x) => ({ id: x.clase, label: CLASES[x.clase] || x.clase, valores: { horas: x.horas }, pie: cop(x.dinero) }))}
+                            formato={horas}
                         />
-                    </div>
-                </Tarjeta>
+                    </Tarjeta>
 
-                <Tarjeta
-                    titulo="Novedades del mes por tipo"
-                    fuente="Novedades de RRHH cuyo periodo se cruza con el mes."
-                    vacio={novedades.length === 0 && 'No hay novedades registradas en el mes.'}
-                    tabla={{ columnas: ['Tipo', 'Cantidad', 'Días'], filas: novedades.map((n) => [n.tipo, n.cantidad, n.dias]) }}
-                >
-                    <div style={{ height: alto(novedades.length) }}>
-                        <Bar
-                            data={{
-                                labels: novedades.map((n) => n.tipo),
-                                datasets: [{ label: 'Novedades', data: novedades.map((n) => n.cantidad), backgroundColor: c.serie1, ...barra({ maxBarThickness: 16 }) }]
-                            }}
-                            options={(() => {
-                                const o = opcionesBase(c, { horizontal: true });
-                                o.plugins.tooltip.callbacks.afterLabel = (ctx) => ` ${entero(novedades[ctx.dataIndex].dias)} días`;
-                                return o;
-                            })()}
+                    <Tarjeta
+                        titulo="Novedades del mes por tipo" icono={CalendarX}
+                        subtitulo="Cantidad de novedades"
+                        fuente="Novedades de RRHH cuyo periodo se cruza con el mes."
+                        vacio={novedades.length === 0 && 'No hay novedades registradas en el mes.'}
+                        tabla={{ columnas: ['Tipo', 'Cantidad', 'Días'], filas: novedades.map((n) => [n.tipo, n.cantidad, n.dias]) }}
+                    >
+                        <BarrasH
+                            series={[{ id: 'cantidad', label: 'Novedades', color: c.serie1 }]}
+                            filas={novedades.map((n) => ({ id: n.tipo, label: n.tipo, valores: { cantidad: n.cantidad }, pie: `${entero(n.dias)} días` }))}
+                            formato={entero}
                         />
-                    </div>
-                </Tarjeta>
+                    </Tarjeta>
 
-                <div className="ai-panel">
-                    <div className="ai-panel-head">
-                        <h3 className="ai-panel-title">Empleados con más costo de horas extra</h3>
-                        {esFinanciera && <Link to="/recursos-humanos/reportes-horas-extra" className="ai-link" style={{ fontSize: 13 }}>Ver reporte completo</Link>}
-                    </div>
-                    {top.length === 0 ? (
-                        <div className="ai-empty"><p>No hay horas extra aprobadas en el mes.</p></div>
-                    ) : (
+                    <Tarjeta
+                        titulo="Empleados con más costo de horas extra" icono={Trophy}
+                        subtitulo="Ordenado por costo"
+                        fuente="reporte de horas extra del mes."
+                        vacio={top.length === 0 && 'No hay horas extra aprobadas en el mes.'}
+                        accion={esFinanciera && <Link to="/recursos-humanos/reportes-horas-extra" className="ai-monitor-btn" style={{ height: 30 }}>Ver reporte completo</Link>}
+                    >
                         <div style={{ overflowX: 'auto' }}>
-                            <table className="ai-table ai-table--dense">
+                            <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                                 <thead><tr><th>Empleado</th><th>Campaña</th><th className="ai-num">Horas</th><th className="ai-num">Costo</th></tr></thead>
                                 <tbody>
                                     {top.map((e) => (
                                         <tr key={e.users_company_id}>
-                                            <td>
-                                                <div style={{ fontWeight: 600 }}>{nombrePropio(e.nombre)}</div>
-                                                <div className="ai-muted" style={{ fontSize: 12 }}>CC {e.documento}{e.cargo ? ` · ${primeraMayuscula(e.cargo)}` : ''}</div>
+                                            <td className="ai-monitor-nombre">
+                                                <span>
+                                                    <AvatarVista />
+                                                    <span>
+                                                        {nombrePropio(e.nombre).toUpperCase()}
+                                                        <span className="ai-monitor-sub">CC {e.documento}{e.cargo ? ` · ${primeraMayuscula(e.cargo)}` : ''}</span>
+                                                    </span>
+                                                </span>
                                             </td>
                                             <td>{primeraMayuscula(e.campania || '') || '—'}</td>
                                             <td className="ai-num">{horas(e.horas)}</td>
@@ -480,10 +538,9 @@ const Tablero = ({ datos, c }) => {
                                 </tbody>
                             </table>
                         </div>
-                    )}
-                    <p className="ai-muted" style={{ fontSize: 12, margin: '8px 16px 12px' }}>Fuente: reporte de horas extra del mes, ordenado por costo.</p>
+                    </Tarjeta>
                 </div>
-            </div>
+            </PanelVista>
         </>
     );
 };
@@ -527,24 +584,21 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
     ];
 
     return (
-        <div className="ai-panel">
-            <div className="ai-panel-head" style={{ alignItems: 'flex-start' }}>
-                <div style={{ display: 'grid', gap: 4 }}>
-                    <h3 className="ai-panel-title">Costo de nómina</h3>
-                    <span className="ai-muted" style={{ fontSize: 13 }}>
-                        {nombrePeriodo(periodo)}{mes.en_curso ? ' · proyectado al cierre con la nómina de hoy' : ''} · histórico de {historico.length} meses
-                    </span>
-                </div>
+        <PanelVista
+            icono={Landmark}
+            titulo="Costo de nómina"
+            extra={(
                 <div className="ai-row" style={{ gap: 8 }}>
-                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportar}>
-                        <Download size={14} strokeWidth={1.75} /> Exportar
+                    <button type="button" className="ai-monitor-btn" style={{ height: 30 }} onClick={exportar}>
+                        <Download size={14} strokeWidth={2} /> Exportar
                     </button>
-                    <button type="button" className="ai-icon-btn" onClick={() => setVerTabla((v) => !v)}
-                        title={verTabla ? 'Ver gráfica' : 'Ver tabla'} aria-label={verTabla ? 'Ver gráfica' : 'Ver tabla'}>
-                        {verTabla ? <BarChart3 size={16} strokeWidth={1.75} /> : <Table2 size={16} strokeWidth={1.75} />}
-                    </button>
+                    <BotonVista verTabla={verTabla} onClick={() => setVerTabla((v) => !v)} />
                 </div>
-            </div>
+            )}
+        >
+            <p className="ai-muted" style={{ fontSize: 13, margin: '12px 16px 4px' }}>
+                {nombrePeriodo(periodo)}{mes.en_curso ? ' · proyectado al cierre con la nómina de hoy' : ''} · histórico de {historico.length} meses
+            </p>
 
             <div className="ai-kpi-strip" style={{ margin: '0 16px', boxShadow: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                 {tiles.map((t) => (
@@ -569,7 +623,7 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
             <div style={{ padding: '16px 16px 0' }}>
                 {verTabla ? (
                     <div style={{ overflowX: 'auto', maxHeight: 440 }}>
-                        <table className="ai-table ai-table--dense">
+                        <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                             <thead>
                                 <tr>
                                     <th>Mes</th><th className="ai-num">Empleados</th>
@@ -606,9 +660,15 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
                         </table>
                     </div>
                 ) : (
-                    <>
-                        <Leyenda items={LEYENDA_COSTO(c)} />
-                        <div style={{ height: 280, marginTop: 8 }}>
+                    <section className="gm-grafica">
+                        <header className="gm-head">
+                            <div>
+                                <h3><BarChart3 size={17} strokeWidth={2} aria-hidden="true" /> Costo de nómina mes a mes</h3>
+                                <p>Histórico de {historico.length} meses{historico.some((m) => m.en_curso) ? ' · * en curso, proyectado' : ''}</p>
+                            </div>
+                            <Leyenda items={LEYENDA_COSTO(c)} />
+                        </header>
+                        <div style={{ height: 280 }}>
                             <Bar
                                 data={{
                                     labels: historico.map((m) => `${mesCorto(m.periodo)}${m.en_curso ? '*' : ''}`),
@@ -623,7 +683,7 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
                                 })}
                             />
                         </div>
-                    </>
+                    </section>
                 )}
             </div>
 
@@ -649,7 +709,7 @@ const CostoNomina = ({ costo, nomina, periodo, c }) => {
                     {' '}{aportes.filter((f) => f.exonerable).map((f) => f.nombre).join(', ')} exonerados por debajo de 10 SMMLV. Los porcentajes del chip son los efectivos del mes.</>}
                 {historico.some((m) => m.en_curso) ? ' * Mes en curso: proyectado al cierre con la nómina vigente hoy.' : ''}
             </p>
-        </div>
+        </PanelVista>
     );
 };
 
@@ -661,12 +721,11 @@ const NIVEL = {
 };
 
 const Hallazgos = ({ lista }) => (
-    <div className="ai-panel">
-        <div className="ai-panel-head"><h3 className="ai-panel-title">Lo que hay que mirar este mes</h3></div>
+    <PanelVista icono={Lightbulb} titulo="Lo que hay que mirar este mes">
         {lista.length === 0 ? (
             <p className="ai-muted" style={{ margin: '12px 16px 16px', fontSize: 14 }}>Nada fuera de lo normal: sin cambios fuertes de costo ni de puntualidad.</p>
         ) : (
-            <ul style={{ listStyle: 'none', margin: 0, padding: '0 16px 16px', display: 'grid', gap: 8 }}>
+            <ul style={{ listStyle: 'none', margin: 0, padding: '12px 16px 16px', display: 'grid', gap: 8 }}>
                 {lista.map((h, i) => {
                     const n = NIVEL[h.nivel] || NIVEL.info;
                     const Icono = n.icon;
@@ -681,15 +740,22 @@ const Hallazgos = ({ lista }) => (
                 })}
             </ul>
         )}
-    </div>
+    </PanelVista>
 );
 
-const Kpi = ({ label, valor, titulo, icon, pie, alerta, hero }) => (
-    <div className={`ai-kpi${hero ? ' ai-kpi--hero' : ''}`} style={alerta ? { borderColor: 'var(--danger)' } : undefined}>
-        <div className="ai-kpi-head"><span className="ai-kpi-label">{label}</span><span className="ai-kpi-icon" style={hero ? { background: 'rgba(255,255,255,.16)', color: '#fff' } : undefined}>{icon}</span></div>
-        <div className="ai-kpi-value" title={titulo}>{valor}</div>
-        {pie && <div className="ai-kpi-foot">{pie}</div>}
-    </div>
+// Variación como texto, con flecha y signo, para el detalle de un mosaico (que ya tiene su color).
+function deltaTexto(valor, sufijo, texto) {
+    if (valor == null) return 'Sin base de comparación';
+    const flecha = valor > 0 ? '▲' : valor < 0 ? '▼' : '=';
+    return `${flecha} ${valor > 0 ? '+' : ''}${String(valor).replace('.', ',')}${sufijo} ${texto}`;
+}
+
+// Alternar gráfica ↔ tabla dentro de un encabezado navy.
+const BotonVista = ({ verTabla, onClick }) => (
+    <button type="button" className="ai-monitor-btn" style={{ height: 30, width: 34, padding: 0, justifyContent: 'center' }} onClick={onClick}
+        title={verTabla ? 'Ver gráfica' : 'Ver tabla'} aria-label={verTabla ? 'Ver gráfica' : 'Ver tabla'}>
+        {verTabla ? <BarChart3 size={15} strokeWidth={2} /> : <Table2 size={15} strokeWidth={2} />}
+    </button>
 );
 
 // Variación con flecha + signo (no solo color). `subirEsMalo` invierte el color (p. ej. costos).
@@ -710,46 +776,44 @@ const Delta = ({ valor, sufijo, texto, subirEsMalo, neutro }) => {
 };
 
 const Leyenda = ({ items }) => (
-    <span className="ai-row" style={{ gap: 12, flexWrap: 'wrap' }}>
+    <div className="gm-leyenda" aria-label="Leyenda">
         {items.map((it) => (
-            <span key={it.texto} className="ai-row" style={{ gap: 5, fontSize: 12, color: 'var(--ink-muted)' }}>
-                <i style={{ width: 10, height: 10, borderRadius: 2, background: it.color, display: 'inline-block' }} />{it.texto}
-            </span>
+            <span key={it.texto}><i style={{ background: it.color }} aria-hidden="true" />{it.texto}</span>
         ))}
-    </span>
+    </div>
 );
 
-// Tarjeta de gráfica: título, fuente del dato y alternancia gráfica ↔ tabla (accesibilidad).
-const Tarjeta = ({ titulo, subtitulo, fuente, vacio, tabla, children }) => {
+// Tarjeta de gráfica con el diseño del Histórico de Equipo (.gm-grafica): título con ícono, subtítulo,
+// leyenda a la derecha, alternancia gráfica ↔ tabla (accesibilidad) y la fuente del dato al pie.
+const Tarjeta = ({ titulo, icono = BarChart3, subtitulo, leyenda, fuente, vacio, tabla, accion, children }) => {
     const [verTabla, setVerTabla] = useState(false);
     return (
-        <div className="ai-panel" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <div className="ai-panel-head" style={{ alignItems: 'flex-start' }}>
-                <div style={{ display: 'grid', gap: 4 }}>
-                    <h3 className="ai-panel-title">{titulo}</h3>
-                    {subtitulo}
+        <section className="gm-grafica fin-tarjeta">
+            <header className="gm-head">
+                <div>
+                    <h3>{React.createElement(icono, { size: 17, strokeWidth: 2, 'aria-hidden': 'true' })} {titulo}</h3>
+                    {subtitulo && <p>{subtitulo}</p>}
                 </div>
-                {!vacio && tabla && (
-                    <button type="button" className="ai-icon-btn" onClick={() => setVerTabla((v) => !v)}
-                        title={verTabla ? 'Ver gráfica' : 'Ver tabla'} aria-label={verTabla ? 'Ver gráfica' : 'Ver tabla'}>
-                        {verTabla ? <BarChart3 size={16} strokeWidth={1.75} /> : <Table2 size={16} strokeWidth={1.75} />}
-                    </button>
-                )}
-            </div>
-            <div style={{ padding: '0 16px', flex: 1 }}>
+                <div className="fin-tarjeta-acciones">
+                    {leyenda && !vacio && !verTabla && <Leyenda items={leyenda} />}
+                    {accion}
+                    {!vacio && tabla && <BotonVista verTabla={verTabla} onClick={() => setVerTabla((v) => !v)} />}
+                </div>
+            </header>
+            <div className="fin-tarjeta-cuerpo">
                 {vacio ? (
                     <div className="ai-empty" style={{ padding: '32px 0' }}><p>{vacio}</p></div>
                 ) : verTabla ? (
                     <div style={{ overflowX: 'auto', maxHeight: 420 }}>
-                        <table className="ai-table ai-table--dense">
+                        <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                             <thead><tr>{tabla.columnas.map((col, i) => <th key={col} className={i > 0 ? 'ai-num' : undefined}>{col}</th>)}</tr></thead>
-                            <tbody>{tabla.filas.map((f, i) => <tr key={i}>{f.map((v, j) => <td key={j} className={j > 0 ? 'ai-num' : undefined}>{v}</td>)}</tr>)}</tbody>
+                            <tbody>{tabla.filas.map((fila, i) => <tr key={i}>{fila.map((v, j) => <td key={j} className={j > 0 ? 'ai-num' : undefined}>{v}</td>)}</tr>)}</tbody>
                         </table>
                     </div>
                 ) : children}
             </div>
-            <p className="ai-muted" style={{ fontSize: 12, margin: '8px 16px 12px' }}>Fuente: {fuente}</p>
-        </div>
+            <p className="fin-fuente">Fuente: {fuente}</p>
+        </section>
     );
 };
 

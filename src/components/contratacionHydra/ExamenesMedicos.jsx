@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Stethoscope, CheckCircle2, XCircle, CalendarX, CalendarCheck, Loader2, ArrowRightCircle, Ban } from 'lucide-react';
+import { Stethoscope, CheckCircle2, XCircle, CalendarX, CalendarCheck, Loader2, ArrowRightCircle, Ban, History } from 'lucide-react';
 import { contratacionHydraService } from '../../services/api';
 import { ESTADO_EXAMEN, mensajeError } from './seccionesUI';
+import { PanelVista, Pastilla, COLOR_EXAMEN, TONO } from '../ui';
 
 const fmtInstante = (v) => (v ? new Date(v).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }) : '');
 
@@ -82,13 +83,12 @@ const ExamenesMedicos = ({ candidato, puedeMarcar, onCambio }) => {
 
     return (
         <div className="ai-stack" style={{ gap: 12 }}>
-            <div className="ai-card" style={{ padding: 16 }}>
-                <div className="ai-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-                    <p className="ai-overline" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Stethoscope size={14} strokeWidth={1.75} /> Exámenes médicos
-                    </p>
-                    {estado && <span className={`ai-badge ${estado.clase}`}><span className="ai-dot" />{estado.texto}</span>}
-                </div>
+            <PanelVista
+                icono={Stethoscope}
+                titulo="Exámenes médicos"
+                extra={estado && <Pastilla color={COLOR_EXAMEN[examen] || TONO.neutro} punto>{estado.texto}</Pastilla>}
+            >
+            <div style={{ padding: 16 }}>
                 <p className="ai-help" style={{ margin: 0 }}>
                     {examen ? AYUDA[examen] : 'Este candidato llegó antes del control de exámenes médicos de SST.'}
                 </p>
@@ -141,9 +141,10 @@ const ExamenesMedicos = ({ candidato, puedeMarcar, onCambio }) => {
                     </div>
                 )}
             </div>
+            </PanelVista>
 
-            <div className="ai-card" style={{ padding: 16 }}>
-                <p className="ai-overline" style={{ marginBottom: 10 }}>Trazabilidad</p>
+            <PanelVista icono={History} titulo="Trazabilidad">
+            <div style={{ padding: 16 }}>
                 {traza.length === 0 ? (
                     <p className="ai-help" style={{ margin: 0 }}>Todavía no hay marcas.</p>
                 ) : (
@@ -167,6 +168,7 @@ const ExamenesMedicos = ({ candidato, puedeMarcar, onCambio }) => {
                     </ol>
                 )}
             </div>
+            </PanelVista>
         </div>
     );
 };

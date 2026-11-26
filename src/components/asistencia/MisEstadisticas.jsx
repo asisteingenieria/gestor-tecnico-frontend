@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, CalendarDays, BarChart3 } from 'lucide-react';
+import { Loader2, CalendarDays, BarChart3, Clock, AlertTriangle, Timer, PieChart, CalendarRange } from 'lucide-react';
+import { EncabezadoVista, Mosaicos, Mosaico, PanelVista, CargandoVista, VistaVacia, TONO } from '../ui';
 import { tardeExacto } from '../../utils/llegadaAsistencia';
 import { useAuth } from '../../context/AuthContext';
 import { asistenciaService } from '../../services/api';
@@ -125,101 +126,67 @@ const MisEstadisticas = () => {
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Mis estadísticas</h1>
-                    <p className="ai-page-sub">Puntualidad y horas laboradas del periodo</p>
-                </div>
-                <div className="ai-row">
+            <EncabezadoVista icono={PieChart} titulo="Mis estadísticas" subtitulo="Puntualidad y horas laboradas del periodo">
+                <div className="ai-seg" role="tablist" aria-label="Periodo">
                     {PERIODOS.map((p) => (
-                        <button
-                            key={p.id}
-                            type="button"
-                            className={`ai-btn ai-btn--sm ${periodo === p.id && !personalizado ? 'ai-btn--primary' : 'ai-btn--secondary'}`}
+                        <span key={p.id} role="tab" tabIndex={0} aria-selected={periodo === p.id && !personalizado}
+                            className={periodo === p.id && !personalizado ? 'is-active' : ''} style={{ cursor: 'pointer' }}
                             onClick={() => elegirPeriodo(p)}
-                        >
+                            onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') elegirPeriodo(p); }}>
                             {p.label}
-                        </button>
+                        </span>
                     ))}
-                    <button
-                        type="button"
-                        className={`ai-btn ai-btn--sm ${personalizado ? 'ai-btn--primary' : 'ai-btn--secondary'}`}
+                    <span role="tab" tabIndex={0} aria-selected={personalizado} className={personalizado ? 'is-active' : ''} style={{ cursor: 'pointer' }}
                         onClick={() => setPersonalizado((v) => !v)}
-                    >
+                        onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') setPersonalizado((v) => !v); }}>
                         Personalizado
-                    </button>
+                    </span>
                 </div>
-            </div>
+            </EncabezadoVista>
 
             {personalizado && (
-                <div className="ai-row">
-                    <div className="ai-field" style={{ maxWidth: 180 }}>
-                        <label className="ai-label">Desde</label>
-                        <input type="date" className="ai-input" value={desde} max={hasta} onChange={(e) => setDesde(e.target.value)} />
-                    </div>
-                    <div className="ai-field" style={{ maxWidth: 180 }}>
-                        <label className="ai-label">Hasta</label>
-                        <input type="date" className="ai-input" value={hasta} max={hoyIso()} min={desde} onChange={(e) => setHasta(e.target.value)} />
-                    </div>
+                <div className="ai-monitor-barra">
+                    <label className="ai-row" style={{ gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                        Desde
+                        <input type="date" className="ai-input" style={{ width: 'auto', flex: 'none' }} value={desde} max={hasta} onChange={(e) => setDesde(e.target.value)} />
+                    </label>
+                    <label className="ai-row" style={{ gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                        Hasta
+                        <input type="date" className="ai-input" style={{ width: 'auto', flex: 'none' }} value={hasta} max={hoyIso()} min={desde} onChange={(e) => setHasta(e.target.value)} />
+                    </label>
                 </div>
             )}
 
-            {loading && (
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
-            )}
+            {loading && <CargandoVista />}
 
-            {!loading && error && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
+            {!loading && error && <VistaVacia error>{error}</VistaVacia>}
 
             {!loading && stats && (
                 <>
-                    <div className="ai-kpis">
-                        <div className="ai-kpi">
-                            <div className="ai-kpi-head">
-                                <span className="ai-kpi-label">Días trabajados</span>
-                                <span className="ai-kpi-icon"><CalendarDays size={18} strokeWidth={1.75} /></span>
-                            </div>
-                            <div className="ai-kpi-value">{stats.dias_trabajados}</div>
-                            <div className="ai-kpi-foot">{stats.ausencias} ausencia{stats.ausencias === 1 ? '' : 's'}</div>
-                        </div>
-
-                        <div className="ai-kpi">
-                            <div className="ai-kpi-head">
-                                <span className="ai-kpi-label">Puntualidad</span>
-                            </div>
-                            <div className="ai-kpi-value">{stats.porcentaje_puntualidad != null ? `${stats.porcentaje_puntualidad}%` : '—'}</div>
-                            <div className="ai-kpi-bar"><span style={{ width: `${stats.porcentaje_puntualidad ?? 0}%` }} /></div>
-                        </div>
-
-                        <div className="ai-kpi">
-                            <div className="ai-kpi-head">
-                                <span className="ai-kpi-label">Tiempo tarde</span>
-                            </div>
-                            <div className="ai-kpi-value">{stats.minutos_tarde_acumulados > 0 ? tardeExacto(stats.segundos_tarde_acumulados, stats.minutos_tarde_acumulados) : 0}</div>
-                            <div className="ai-kpi-foot">{diasConTarde} día{diasConTarde === 1 ? '' : 's'} con tardanza</div>
-                        </div>
-
-                        <div className="ai-kpi ai-kpi--hero">
-                            <div className="ai-kpi-head">
-                                <span className="ai-kpi-label">Horas trabajadas</span>
-                                <span className="ai-kpi-icon"><BarChart3 size={18} strokeWidth={1.75} /></span>
-                            </div>
-                            <div className="ai-kpi-value">{formatearDuracion(stats.minutos_trabajados_acumulados)}</div>
-                            <div className="ai-kpi-foot">+{formatearDuracion(stats.minutos_extra_acumulados)} extra aprobadas</div>
-                        </div>
-                    </div>
+                    <Mosaicos>
+                        <Mosaico color="conectado" icono={CalendarDays} valor={stats.dias_trabajados} label="Días trabajados"
+                            detalle={`${stats.ausencias} ausencia${stats.ausencias === 1 ? '' : 's'}`} />
+                        <Mosaico
+                            color={stats.porcentaje_puntualidad == null ? TONO.suave : stats.porcentaje_puntualidad >= 90 ? TONO.exito : stats.porcentaje_puntualidad >= 75 ? TONO.alerta : TONO.peligro}
+                            icono={Clock} valor={stats.porcentaje_puntualidad != null ? `${stats.porcentaje_puntualidad}%` : '—'} label="Puntualidad" />
+                        <Mosaico color={diasConTarde > 0 ? 'almuerzo' : TONO.suave} icono={AlertTriangle}
+                            valor={stats.minutos_tarde_acumulados > 0 ? tardeExacto(stats.segundos_tarde_acumulados, stats.minutos_tarde_acumulados) : 0}
+                            label="Tiempo tarde" detalle={`${diasConTarde} día${diasConTarde === 1 ? '' : 's'} con tardanza`} />
+                        <Mosaico color={TONO.info} icono={Timer} valor={formatearDuracion(stats.minutos_trabajados_acumulados)} label="Horas trabajadas"
+                            detalle={`+${formatearDuracion(stats.minutos_extra_acumulados)} extra aprobadas`} />
+                    </Mosaicos>
 
                     <div className="ai-grid-2">
-                        <div className="ai-panel">
-                            <div className="ai-panel-head">
-                                <h3 className="ai-panel-title">Calendario del mes</h3>
-                                <div className="ai-datenav">
-                                    <button type="button" className="ai-icon-btn" aria-label="Mes anterior" onClick={() => setMesRef((r) => { const m = r.mes - 1; return m < 0 ? { anio: r.anio - 1, mes: 11 } : { ...r, mes: m }; })}>‹</button>
-                                    <b style={{ textTransform: 'capitalize' }}>{MESES_LABEL[mesRef.mes]} {mesRef.anio}</b>
-                                    <button type="button" className="ai-icon-btn" aria-label="Mes siguiente" onClick={() => setMesRef((r) => { const m = r.mes + 1; return m > 11 ? { anio: r.anio + 1, mes: 0 } : { ...r, mes: m }; })}>›</button>
+                        <PanelVista
+                            icono={CalendarRange}
+                            titulo={`Calendario · ${MESES_LABEL[mesRef.mes]} ${mesRef.anio}`}
+                            extra={(
+                                <div className="ai-row" style={{ gap: 6 }}>
+                                    <button type="button" className="ai-monitor-btn" style={{ height: 30, width: 34, padding: 0, justifyContent: 'center' }} aria-label="Mes anterior" onClick={() => setMesRef((r) => { const m = r.mes - 1; return m < 0 ? { anio: r.anio - 1, mes: 11 } : { ...r, mes: m }; })}>‹</button>
+                                    <button type="button" className="ai-monitor-btn" style={{ height: 30, width: 34, padding: 0, justifyContent: 'center' }} aria-label="Mes siguiente" onClick={() => setMesRef((r) => { const m = r.mes + 1; return m > 11 ? { anio: r.anio + 1, mes: 0 } : { ...r, mes: m }; })}>›</button>
                                 </div>
-                            </div>
+                            )}
+                        >
                             <div className="ai-panel-body">
                                 <div className="ai-legend" style={{ marginBottom: 10 }}>
                                     <span><i style={{ background: 'var(--success-soft)', border: '1px solid var(--success)' }} /> Puntual</span>
@@ -262,10 +229,9 @@ const MisEstadisticas = () => {
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </PanelVista>
 
-                        <div className="ai-panel">
-                            <div className="ai-panel-head"><h3 className="ai-panel-title">Horas por día</h3></div>
+                        <PanelVista icono={BarChart3} titulo="Horas por día">
                             <div className="ai-panel-body">
                                 {loadingMes ? (
                                     <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
@@ -302,7 +268,7 @@ const MisEstadisticas = () => {
                                     </>
                                 )}
                             </div>
-                        </div>
+                        </PanelVista>
                     </div>
                 </>
             )}

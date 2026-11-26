@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
-    Loader2, Users, Clock, CalendarX, AlertTriangle, Download, CalendarRange, Search,
+    Users, Clock, CalendarX, AlertTriangle, Download, CalendarRange,
     CalendarDays, CheckCircle2, Timer, User, Bath, Coffee, Utensils, GraduationCap, Table2, BarChart3, ClipboardList, Moon
 } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
@@ -17,6 +17,10 @@ import GraficasEquipoMes from './GraficasEquipoMes';
 import NovedadChip from './NovedadChip';
 import { etiquetaNovedad } from '../../utils/novedadesAsistencia';
 import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
+import {
+    EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Leyenda,
+    TablaVista, FilaGrupo, AvatarVista, PanelVista, Pastilla, CargandoVista, VistaVacia
+} from '../ui';
 
 // Histórico del equipo para el jefe (asistencia.md §35): KPIs del mes, un calendario tipo heatmap
 // (día × empleado) agrupado por centro de costo o por cargo, y la tabla detallada por empleado.
@@ -179,51 +183,40 @@ const EquipoMensual = () => {
 
     return (
         <div className="ai-content">
-            <div className="ai-monitor-head">
-                <div className="ai-monitor-titulo">
-                    <Users size={52} strokeWidth={1.6} aria-hidden="true" />
-                    <div>
-                        <h1>Equipo</h1>
-                        <p>
-                            Histórico · {nombrePeriodo(periodo)}{nombreCampania ? ` · ${nombreCampania} · solo consulta` : ''}
-                            {datos ? ` · ${filtrando ? `${empleados.length} de ${todos.length}` : todos.length} ${todos.length === 1 ? 'persona' : 'personas'}` : ''}
-                        </p>
-                    </div>
-                </div>
-                <div className="ai-monitor-acciones">
-                    <SelectorVistaEquipo />
-                    {verTodas && (
-                        <FiltroCampaniaEquipo alcance={alcance} campanias={campanias} onChange={cambiarCampania} incluirTodas={false} />
-                    )}
-                    <input
-                        type="month" className="ai-monitor-btn ai-monitor-mes" value={periodo} max={periodoActual()}
-                        onChange={(e) => e.target.value && setSearchParams((prev) => {
-                            const params = new URLSearchParams(prev);
-                            params.set('periodo', e.target.value);
-                            return params;
-                        })} aria-label="Mes"
-                    />
-                    <button type="button" className="ai-monitor-btn" onClick={exportar} disabled={empleados.length === 0}>
-                        <Download size={15} strokeWidth={2} /> Exportar
-                    </button>
-                </div>
-            </div>
+            <EncabezadoVista
+                icono={Users}
+                titulo="Equipo"
+                subtitulo={`Histórico · ${nombrePeriodo(periodo)}${nombreCampania ? ` · ${nombreCampania} · solo consulta` : ''}${datos ? ` · ${filtrando ? `${empleados.length} de ${todos.length}` : todos.length} ${todos.length === 1 ? 'persona' : 'personas'}` : ''}`}
+            >
+                <SelectorVistaEquipo />
+                {verTodas && (
+                    <FiltroCampaniaEquipo alcance={alcance} campanias={campanias} onChange={cambiarCampania} incluirTodas={false} />
+                )}
+                <input
+                    type="month" className="ai-monitor-btn ai-monitor-mes" value={periodo} max={periodoActual()}
+                    onChange={(e) => e.target.value && setSearchParams((prev) => {
+                        const params = new URLSearchParams(prev);
+                        params.set('periodo', e.target.value);
+                        return params;
+                    })} aria-label="Mes"
+                />
+                <button type="button" className="ai-monitor-btn" onClick={exportar} disabled={empleados.length === 0}>
+                    <Download size={15} strokeWidth={2} /> Exportar
+                </button>
+            </EncabezadoVista>
 
             {loading ? (
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
+                <CargandoVista />
             ) : error ? (
-                <div className="ai-panel ai-empty"><p style={{ color: 'var(--danger)' }}>{error}</p></div>
+                <VistaVacia error>{error}</VistaVacia>
             ) : todos.length === 0 ? (
-                <div className="ai-panel ai-empty">
-                    <CalendarRange size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                    <p>{nombreCampania ? `${nombreCampania} no tiene personal activo` : `No tienes empleados a cargo con datos en ${nombrePeriodo(periodo).toLowerCase()}`}.</p>
-                </div>
+                <VistaVacia icono={CalendarRange}>
+                    {nombreCampania ? `${nombreCampania} no tiene personal activo` : `No tienes empleados a cargo con datos en ${nombrePeriodo(periodo).toLowerCase()}`}.
+                </VistaVacia>
             ) : (
                 <>
                     {/* KPIs del mes en mosaicos, con los colores de los estados de la vista Hoy. */}
-                    <div className="ai-monitor-mosaicos">
+                    <Mosaicos>
                         <Mosaico color="conectado" icono={CheckCircle2} valor={totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'} label="Puntualidad" />
                         <Mosaico color="en_turno" icono={Users} valor={totales.dias_trabajados} label="Días trabajados" />
                         <Mosaico color="bano" icono={Timer} valor={hFmt(totales.minutos_trabajados)} label="Horas trabajadas" />
@@ -232,16 +225,10 @@ const EquipoMensual = () => {
                         <Mosaico color="descanso" icono={Moon} valor={totales.dias_descanso || 0} label="Días de descanso" />
                         <Mosaico color="almuerzo" icono={AlertTriangle} valor={totales.dias_tarde} label="Días tarde" />
                         <Mosaico color="capacitacion" icono={Clock} valor={hFmt(totales.minutos_extra)} label="Horas extra" />
-                    </div>
+                    </Mosaicos>
 
-                    <div className="ai-monitor-barra">
-                        <div className="ai-input">
-                            <Search size={16} strokeWidth={1.75} className="ai-ic" />
-                            <input
-                                type="text" placeholder="Buscar por nombre o cédula..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
-                                style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
-                            />
-                        </div>
+                    <BarraFiltros>
+                        <CampoBusqueda value={busqueda} onChange={setBusqueda} />
                         <select className="ai-input ai-monitor-select" value={filtroCentro} onChange={(e) => setFiltroCentro(e.target.value)} aria-label="Centro de costo">
                             <option value="">Todos los centros de costo ({centros.length})</option>
                             {centros.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -256,20 +243,13 @@ const EquipoMensual = () => {
                                 <span key={a.id} className={agrupar === a.id ? 'is-active' : ''} style={{ cursor: 'pointer' }} onClick={() => setAgrupar(a.id)}>{a.label}</span>
                             ))}
                         </div>
-                    </div>
+                    </BarraFiltros>
 
-                    <div className="ai-monitor-panel">
-                        <div className="ai-monitor-panel-head">
-                            <h3><CalendarDays size={18} strokeWidth={2} aria-hidden="true" /> Calendario del mes</h3>
-                            <div className="ai-monitor-leyenda" style={{ borderLeft: 0, paddingLeft: 0 }}>
-                                {LEYENDA.map((k) => (
-                                    <span key={k}>
-                                        <i style={{ width: 12, height: 12, borderRadius: 3, background: CELDA[k].bg, display: 'inline-block' }} />
-                                        {CELDA[k].label}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
+                    <PanelVista
+                        icono={CalendarDays}
+                        titulo="Calendario del mes"
+                        extra={<Leyenda enPanel ariaLabel="Colores del calendario" items={LEYENDA.map((k) => ({ id: k, fondo: CELDA[k].bg, label: CELDA[k].label }))} />}
+                    >
                         {empleados.length === 0 ? (
                             <div className="ai-empty"><p>Nadie coincide con los filtros.</p></div>
                         ) : (
@@ -346,7 +326,7 @@ const EquipoMensual = () => {
                                 </table>
                             </div>
                         )}
-                    </div>
+                    </PanelVista>
 
                     {empleados.length > 0 && (
                         <div className="ai-monitor-detalle-head">
@@ -367,42 +347,43 @@ const EquipoMensual = () => {
                     )}
 
                     {empleados.length > 0 && vistaDetalle === 'grafica' && (
-                        <div className="ai-monitor-panel">
+                        <PanelVista>
                             <GraficasEquipoMes
                                 empleados={empleados}
                                 hrefDe={(e) => `${baseEquipo}/equipo/${e.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`}
                             />
-                        </div>
+                        </PanelVista>
                     )}
 
                     {empleados.length > 0 && vistaDetalle === 'tabla' && (
-                        <div className="ai-monitor-tabla-wrap">
-                            <table className="ai-monitor-tabla ai-monitor-tabla--fija">
-                                <thead>
-                                    <tr>
-                                        {COLUMNAS_DETALLE.map((c) => (
-                                            <th key={c.id} title={c.title}>
-                                                <span className="ai-monitor-th"><c.icono size={17} strokeWidth={1.9} aria-hidden="true" />{c.label}</span>
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        <TablaVista
+                            columnas={COLUMNAS_DETALLE}
+                            fija
+                            pie={<>
+                                <td>Total ({totales.empleados})</td>
+                                <td className="ai-monitor-centro">{totales.dias_trabajados}</td>
+                                <td className="ai-monitor-centro">{totales.ausencias}</td>
+                                <td className="ai-monitor-centro">{totales.dias_novedad}</td>
+                                <td className="ai-monitor-centro">{totales.dias_tarde}</td>
+                                <td className="ai-monitor-centro">{totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'}</td>
+                                <td className="ai-monitor-centro">{hFmt(totales.minutos_trabajados)}</td>
+                                <td className="ai-monitor-centro">{hFmt(totales.minutos_extra)}</td>
+                                <td className="ai-monitor-centro">{hFmt(totales.minutos_bano)}</td>
+                                <td className="ai-monitor-centro">{hFmt(totales.minutos_break)}</td>
+                                <td className="ai-monitor-centro">{hFmt(totales.minutos_almuerzo)}</td>
+                                <td className="ai-monitor-centro">{hFmt(totales.minutos_capacitacion)}</td>
+                            </>}
+                        >
                                     {grupos.map((g) => (
                                         <React.Fragment key={g.nombre || 'todos'}>
                                             {g.nombre && (
-                                                <tr className="ai-monitor-fila-grupo">
-                                                    <td colSpan={COLUMNAS_DETALLE.length} className="ai-monitor-grupo">
-                                                        {agrupar === 'cargo' ? primeraMayuscula(g.nombre) : g.nombre}
-                                                        <span className="ai-monitor-grupo-n"> · {g.empleados.length}</span>
-                                                    </td>
-                                                </tr>
+                                                <FilaGrupo colSpan={COLUMNAS_DETALLE.length} nombre={agrupar === 'cargo' ? primeraMayuscula(g.nombre) : g.nombre} cantidad={g.empleados.length} />
                                             )}
                                             {g.empleados.map((e) => (
                                                 <tr key={e.users_company_id}>
                                                     <td className="ai-monitor-nombre">
                                                         <Link to={`${baseEquipo}/equipo/${e.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}>
-                                                            <i className="ai-monitor-avatar" aria-hidden="true"><User size={16} strokeWidth={2.4} /></i>
+                                                            <AvatarVista />
                                                             <span>
                                                                 <div>
                                                                     {nombrePropio(e.nombre).toUpperCase()}
@@ -422,19 +403,19 @@ const EquipoMensual = () => {
                                                     </td>
                                                     <td className="ai-monitor-centro" style={{ fontWeight: 700 }}>{e.dias_trabajados}</td>
                                                     <td className="ai-monitor-centro">
-                                                        {e.ausencias > 0 ? <Pastilla color="no_llego">{e.ausencias}</Pastilla> : 0}
+                                                        {e.ausencias > 0 ? <Pastilla minWidth={44} color="no_llego">{e.ausencias}</Pastilla> : 0}
                                                     </td>
                                                     <td className="ai-monitor-centro" title={tiposNovedad(e).join(', ') || undefined}>
-                                                        {e.dias_novedad > 0 ? <Pastilla color="novedad">{e.dias_novedad}</Pastilla> : 0}
+                                                        {e.dias_novedad > 0 ? <Pastilla minWidth={44} color="novedad">{e.dias_novedad}</Pastilla> : 0}
                                                     </td>
                                                     <td className="ai-monitor-centro">
                                                         {e.dias_tarde > 0
-                                                            ? <Pastilla color="almuerzo">{e.dias_tarde}{e.minutos_tarde > 0 ? ` · ${tardeExacto(e.segundos_tarde, e.minutos_tarde)}` : ''}</Pastilla>
+                                                            ? <Pastilla minWidth={44} color="almuerzo">{e.dias_tarde}{e.minutos_tarde > 0 ? ` · ${tardeExacto(e.segundos_tarde, e.minutos_tarde)}` : ''}</Pastilla>
                                                             : 0}
                                                     </td>
                                                     <td className="ai-monitor-centro">
                                                         {e.porcentaje_puntualidad != null
-                                                            ? <Pastilla color={e.porcentaje_puntualidad >= 90 ? 'conectado' : e.porcentaje_puntualidad >= 70 ? 'break' : 'no_llego'}>{e.porcentaje_puntualidad}%</Pastilla>
+                                                            ? <Pastilla minWidth={44} color={e.porcentaje_puntualidad >= 90 ? 'conectado' : e.porcentaje_puntualidad >= 70 ? 'break' : 'no_llego'}>{e.porcentaje_puntualidad}%</Pastilla>
                                                             : '—'}
                                                     </td>
                                                     <td className="ai-monitor-centro" style={{ fontWeight: 700 }}>{hFmt(e.minutos_trabajados)}</td>
@@ -447,25 +428,7 @@ const EquipoMensual = () => {
                                             ))}
                                         </React.Fragment>
                                     ))}
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td>Total ({totales.empleados})</td>
-                                        <td className="ai-monitor-centro">{totales.dias_trabajados}</td>
-                                        <td className="ai-monitor-centro">{totales.ausencias}</td>
-                                        <td className="ai-monitor-centro">{totales.dias_novedad}</td>
-                                        <td className="ai-monitor-centro">{totales.dias_tarde}</td>
-                                        <td className="ai-monitor-centro">{totales.porcentaje_puntualidad != null ? `${totales.porcentaje_puntualidad}%` : '—'}</td>
-                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_trabajados)}</td>
-                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_extra)}</td>
-                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_bano)}</td>
-                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_break)}</td>
-                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_almuerzo)}</td>
-                                        <td className="ai-monitor-centro">{hFmt(totales.minutos_capacitacion)}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
+                        </TablaVista>
                     )}
                 </>
             )}
@@ -488,18 +451,5 @@ const COLUMNAS_DETALLE = [
     { id: 'almuerzo', label: 'Almuerzo', icono: Utensils },
     { id: 'capacitacion', label: 'Capac.', icono: GraduationCap, title: 'Capacitación (cuenta como laborada)' }
 ];
-
-// KPI del mes con el estilo de los mosaicos de la vista Hoy (colores .ai-st--*); no filtra.
-const Mosaico = ({ color, icono, valor, label }) => (
-    <div className={`ai-monitor-mosaico ai-monitor-mosaico--estatico ai-st--${color}`}>
-        {React.createElement(icono, { size: 26, strokeWidth: 2, className: "ai-monitor-ic", "aria-hidden": "true" })}
-        <span className="ai-monitor-num">{valor}</span>
-        <span className="ai-monitor-lbl">{label}</span>
-    </div>
-);
-
-const Pastilla = ({ color, children }) => (
-    <span className={`ai-monitor-pill ai-monitor-pill--acum ai-st--${color}`} style={{ minWidth: 44 }}>{children}</span>
-);
 
 export default EquipoMensual;

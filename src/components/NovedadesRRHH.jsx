@@ -3,11 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import { novedadRrhhService } from '../services/api';
 import NovedadForm from './NovedadForm';
 import Pagination from './Pagination';
-import { nombrePropio, iniciales, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
+import { nombrePropio, claseCampania, primeraMayuscula } from '../utils/formatoRRHH';
 import NovedadDetalleModal from './NovedadDetalleModal';
 import FiltroChip from './FiltroChip';
 import { esVacaciones, detalleVacaciones } from '../utils/camposNovedad';
-import { ClipboardList, Plus, Search, Edit3, Trash2, AlertCircle, FileCheck, FileText, Eye, Download, Loader2 } from 'lucide-react';
+import { ClipboardList, Plus, Edit3, Trash2, AlertCircle, FileCheck, FileText, Eye, Download, Loader2, FileWarning, CalendarDays, CheckCircle2 } from 'lucide-react';
+import { EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Pastilla, AvatarVista, CargandoVista, VistaVacia, TONO, colorTipoNovedad } from './ui';
 
 const PAGE_SIZE = 10;
 
@@ -217,6 +218,13 @@ const NovedadesRRHH = () => {
 
     const fmtFecha = (v) => v ? new Date(v).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
+    // Mosaicos: los de soportes filtran por "Soportes" (un solo valor; otro clic lo quita).
+    const etiquetaSoporte = (valor) => SOPORTES.find(s => s.valor === valor).etiqueta;
+    const cuentaSoporte = (valor) => filtered.filter(n => estadoSoportes(n) === valor).length;
+    const soporteActivo = (valor) => filtroSoportes.size === 1 && filtroSoportes.has(etiquetaSoporte(valor));
+    const filtrarSoporte = (valor) => setFiltroSoportes(soporteActivo(valor) ? new Set() : new Set([etiquetaSoporte(valor)]));
+    const totalDias = filtered.reduce((a, n) => a + (Number(n.total_dias) || 0), 0);
+
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
@@ -238,104 +246,89 @@ const NovedadesRRHH = () => {
     return (
         <div className="ai-scope">
             <div className="ai-content">
-                <div className="ai-page-head">
-                    <div>
-                        <h1 className="ai-page-title">Consolidado de novedades</h1>
-                        <p className="ai-page-sub">Incapacidades, licencias y demás novedades de RRHH por empleado</p>
-                    </div>
-                    <div className="ai-row" style={{ gap: 8 }}>
-                        <button
-                            onClick={descargarExcel}
-                            className="ai-btn ai-btn--secondary"
-                            disabled={descargando || rangoInvalido}
-                            title="Excel con las novedades que se ven en la tabla, con los filtros aplicados"
-                        >
-                            {descargando ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                            {descargando ? 'Descargando…' : 'Descargar Excel'}
-                        </button>
-                        <button onClick={handleCreate} className="ai-btn ai-btn--primary">
-                            <Plus size={16} />
-                            Nueva novedad
-                        </button>
-                    </div>
-                </div>
+                <EncabezadoVista
+                    icono={ClipboardList}
+                    titulo="Consolidado de novedades"
+                    subtitulo="Incapacidades, licencias y demás novedades de RRHH por empleado"
+                >
+                    <button
+                        type="button"
+                        onClick={descargarExcel}
+                        className="ai-monitor-btn"
+                        disabled={descargando || rangoInvalido}
+                        title="Excel con las novedades que se ven en la tabla, con los filtros aplicados"
+                    >
+                        {descargando ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} strokeWidth={2} />}
+                        {descargando ? 'Descargando…' : 'Descargar Excel'}
+                    </button>
+                    <button type="button" onClick={handleCreate} className="ai-monitor-btn ai-monitor-btn--primario">
+                        <Plus size={15} strokeWidth={2} /> Nueva novedad
+                    </button>
+                </EncabezadoVista>
 
-                {error && (
-                    <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', width: 'fit-content' }}>
-                        <span className="ai-dot" />
-                        {error}
-                    </div>
-                )}
+                {error && <div style={{ marginBottom: 12 }}><Pastilla color={TONO.peligro} punto>{error}</Pastilla></div>}
+                {avisoDescarga && <div style={{ marginBottom: 12 }}><Pastilla color={TONO.exito} punto>{avisoDescarga}</Pastilla></div>}
 
-                {avisoDescarga && (
-                    <div className="ai-badge ai-badge--success" style={{ height: 'auto', padding: '10px 14px', width: 'fit-content' }}>
-                        <span className="ai-dot" />
-                        {avisoDescarga}
-                    </div>
-                )}
+                <Mosaicos>
+                    <Mosaico
+                        color={TONO.info} icono={ClipboardList} valor={filtered.length} label="Novedades"
+                        detalle={hayFiltros ? `Según los filtros · ${novedades.length} en total` : null}
+                    />
+                    <Mosaico color={TONO.alerta} icono={FileWarning} valor={cuentaSoporte('pendientes')} label="Soportes pendientes"
+                        activo={soporteActivo('pendientes')} onClick={() => filtrarSoporte('pendientes')} />
+                    <Mosaico color={TONO.exito} icono={CheckCircle2} valor={cuentaSoporte('completos')} label="Soportes completos"
+                        activo={soporteActivo('completos')} onClick={() => filtrarSoporte('completos')} />
+                    <Mosaico color={TONO.acento} icono={FileText} valor={cuentaSoporte('expediente')} label="Con documento del expediente"
+                        activo={soporteActivo('expediente')} onClick={() => filtrarSoporte('expediente')} />
+                    <Mosaico color={TONO.cian} icono={CalendarDays} valor={totalDias.toLocaleString('es-CO')} label="Días" />
+                </Mosaicos>
 
-                <div className="ai-card">
-                    <div className="ai-toolbar">
-                        <div className="ai-search" style={{ flex: 1 }}>
-                            <Search size={16} />
-                            <input
-                                type="text"
-                                placeholder="Buscar por empleado, identificación, tipo de novedad o campaña..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{ border: 0, outline: 'none', background: 'transparent', flex: 1, font: 'inherit', color: 'inherit' }}
-                            />
-                        </div>
-                        <FiltroChip etiqueta="Tipo" opciones={opcionesTipo} seleccion={filtroTipos} onChange={setFiltroTipos} />
-                        <FiltroChip etiqueta="Campaña" opciones={opcionesCampania} seleccion={filtroCampanias} onChange={setFiltroCampanias} />
-                        <FiltroChip etiqueta="Soportes" opciones={SOPORTES.map(s => s.etiqueta)} seleccion={filtroSoportes} onChange={setFiltroSoportes} />
-                    </div>
+                <BarraFiltros>
+                    <CampoBusqueda value={searchTerm} onChange={setSearchTerm} placeholder="Buscar por empleado, identificación, tipo de novedad o campaña..." />
+                    <FiltroChip etiqueta="Tipo" opciones={opcionesTipo} seleccion={filtroTipos} onChange={setFiltroTipos} />
+                    <FiltroChip etiqueta="Campaña" opciones={opcionesCampania} seleccion={filtroCampanias} onChange={setFiltroCampanias} />
+                    <FiltroChip etiqueta="Soportes" opciones={SOPORTES.map(s => s.etiqueta)} seleccion={filtroSoportes} onChange={setFiltroSoportes} />
+                </BarraFiltros>
 
-                    <div className="ai-row" style={{ gap: 18, flexWrap: 'wrap', padding: '0 16px 12px', alignItems: 'flex-end' }}>
-                        <div>
-                            <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Rango sobre</label>
-                            <select className="ai-input" value={rangoCampo} onChange={(e) => setRangoCampo(e.target.value)}>
-                                {CAMPOS_RANGO.map(({ valor, etiqueta }) => <option key={valor} value={valor}>{etiqueta}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Desde</label>
-                            <input type="date" className="ai-input" value={rangoDesde} max={rangoHasta || undefined} onChange={(e) => setRangoDesde(e.target.value)} />
-                        </div>
-                        <div>
-                            <label className="ai-overline" style={{ display: 'block', marginBottom: 4 }}>Hasta</label>
-                            <input type="date" className="ai-input" value={rangoHasta} min={rangoDesde || undefined} onChange={(e) => setRangoHasta(e.target.value)} />
-                        </div>
-                        {hayFiltros && (
-                            <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={limpiarFiltros}>
-                                Limpiar filtros
-                            </button>
-                        )}
-                        {hayFiltros && !rangoInvalido && (
-                            <span className="ai-muted" style={{ fontSize: 13, paddingBottom: 8 }}>
-                                <strong className="ai-num">{filtered.length}</strong> de {novedades.length} novedades
-                                {hayRango ? ` con ${ETIQUETA_CAMPO_RANGO[rangoCampo].toLowerCase()} en el rango` : ''}
-                            </span>
-                        )}
-                        {rangoInvalido && (
-                            <span style={{ color: 'var(--danger)', fontSize: 13, paddingBottom: 8 }}>La fecha Desde no puede ser posterior a Hasta</span>
-                        )}
-                    </div>
+                <BarraFiltros>
+                    <label className="ai-row" style={{ gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                        Rango sobre
+                        <select className="ai-input" style={{ width: 'auto', flex: 'none' }} value={rangoCampo} onChange={(e) => setRangoCampo(e.target.value)}>
+                            {CAMPOS_RANGO.map(({ valor, etiqueta }) => <option key={valor} value={valor}>{etiqueta}</option>)}
+                        </select>
+                    </label>
+                    <label className="ai-row" style={{ gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                        Desde
+                        <input type="date" className="ai-input" style={{ width: 'auto', flex: 'none' }} value={rangoDesde} max={rangoHasta || undefined} onChange={(e) => setRangoDesde(e.target.value)} />
+                    </label>
+                    <label className="ai-row" style={{ gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                        Hasta
+                        <input type="date" className="ai-input" style={{ width: 'auto', flex: 'none' }} value={rangoHasta} min={rangoDesde || undefined} onChange={(e) => setRangoHasta(e.target.value)} />
+                    </label>
+                    {hayFiltros && (
+                        <button type="button" className="ai-btn ai-btn--ghost ai-btn--sm" onClick={limpiarFiltros}>Limpiar filtros</button>
+                    )}
+                    {hayFiltros && !rangoInvalido && (
+                        <span className="ai-muted" style={{ fontSize: 13 }}>
+                            <strong className="ai-num">{filtered.length}</strong> de {novedades.length} novedades
+                            {hayRango ? ` con ${ETIQUETA_CAMPO_RANGO[rangoCampo].toLowerCase()} en el rango` : ''}
+                        </span>
+                    )}
+                    {rangoInvalido && (
+                        <span style={{ color: 'var(--danger)', fontSize: 13 }}>La fecha Desde no puede ser posterior a Hasta</span>
+                    )}
+                </BarraFiltros>
 
+                <div>
                     {loading ? (
-                        <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: 'var(--primary)' }} />
-                        </div>
+                        <CargandoVista />
                     ) : filtered.length === 0 ? (
-                        <div style={{ padding: 48, textAlign: 'center' }}>
-                            <ClipboardList size={36} style={{ margin: '0 auto 10px', color: 'var(--ink-subtle)' }} />
-                            <p style={{ fontWeight: 600, margin: 0 }}>No hay novedades</p>
-                            <p className="ai-muted" style={{ marginTop: 4 }}>
-                                {hayFiltros ? 'Ninguna novedad coincide con los filtros.' : 'Registra una nueva novedad para empezar.'}
-                            </p>
-                        </div>
+                        <VistaVacia icono={ClipboardList}>
+                            {hayFiltros ? 'Ninguna novedad coincide con los filtros.' : 'No hay novedades. Registra una nueva novedad para empezar.'}
+                        </VistaVacia>
                     ) : (
-                        <table className="ai-table ai-table--dense">
+                        <div className="ai-monitor-tabla-wrap" style={{ marginBottom: 12 }}>
+                        <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                             <thead>
                                 <tr>
                                     <th>Registrada</th>
@@ -356,16 +349,16 @@ const NovedadesRRHH = () => {
                                     const requeridos = Number(n.soportes_requeridos) || 0;
                                     const chip = claseCampania(n.campania_nombre);
                                     return (
-                                            <tr key={n.idnovedad_rrhh}>
+                                            <tr key={n.idnovedad_rrhh} className="is-clicable" onClick={() => setDetalle(n)} title="Ver detalle">
                                                 <td className="ai-muted ai-num" style={{ whiteSpace: 'nowrap' }}>{fmtRegistro(n.created_at)}</td>
-                                                <td>
-                                                    <div className="ai-person">
-                                                        <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(n.empleado_nombre)}</span>
-                                                        <div>
-                                                            <div className="ai-person-name">{nombrePropio(n.empleado_nombre)}</div>
-                                                            <div className="ai-person-sub">{n.empleado_identificacion}</div>
-                                                        </div>
-                                                    </div>
+                                                <td className="ai-monitor-nombre">
+                                                    <span>
+                                                        <AvatarVista />
+                                                        <span>
+                                                            {nombrePropio(n.empleado_nombre).toUpperCase()}
+                                                            <span className="ai-monitor-sub">CC {n.empleado_identificacion}</span>
+                                                        </span>
+                                                    </span>
                                                 </td>
                                                 <td>
                                                     {n.campania_nombre ? (
@@ -373,18 +366,12 @@ const NovedadesRRHH = () => {
                                                     ) : <span className="ai-muted">—</span>}
                                                 </td>
                                                 <td>
-                                                    <span className="ai-badge ai-badge--info">
-                                                        <span className="ai-dot" />
-                                                        {n.tipo_novedad_nombre}
-                                                    </span>
+                                                    <Pastilla color={colorTipoNovedad(n.tipo_novedad_nombre)} punto>{n.tipo_novedad_nombre}</Pastilla>
                                                     {esVacaciones(n.tipo_novedad_nombre) && (
                                                         <div className="ai-muted" style={{ fontSize: 12, marginTop: 2 }}>{detalleVacaciones(n)}</div>
                                                     )}
                                                     {!!n.accidente_transito && (
-                                                        <span className="ai-badge ai-badge--danger" style={{ marginLeft: 6 }}>
-                                                            <span className="ai-dot" />
-                                                            accidente tránsito
-                                                        </span>
+                                                        <span style={{ marginLeft: 6 }}><Pastilla color={TONO.peligro} punto>accidente tránsito</Pastilla></span>
                                                     )}
                                                 </td>
                                                 <td className="ai-muted">{fmtFecha(n.fecha_inicial)}</td>
@@ -394,20 +381,17 @@ const NovedadesRRHH = () => {
                                                     {/* Con documento del expediente (cargue masivo, 098), que trae los soportes juntos,
                                                         la novedad cuenta como soportada aunque no tenga cada soporte por separado. */}
                                                     {Number(n.documentos_expediente) > 0 ? (
-                                                        <span className="ai-badge ai-badge--success" title="Documento del expediente enlazado a la novedad (incluye los soportes)">
+                                                        <Pastilla color={TONO.exito} title="Documento del expediente enlazado a la novedad (incluye los soportes)">
                                                             <FileText size={12} /> Expediente
-                                                        </span>
+                                                        </Pastilla>
                                                     ) : (
-                                                        <span
-                                                            className={`ai-badge${requeridos > 0 && soportes === requeridos ? ' ai-badge--success' : soportes > 0 ? ' ai-badge--warning' : ''}`}
-                                                            style={soportes === 0 || requeridos === 0 ? { background: 'var(--surface-200)', color: 'var(--ink-muted)' } : undefined}
-                                                        >
+                                                        <Pastilla color={requeridos === 0 ? TONO.suave : soportes >= requeridos ? TONO.exito : soportes > 0 ? TONO.alerta : TONO.peligro}>
                                                             <FileCheck size={12} /> {requeridos > 0 ? `${soportes}/${requeridos}` : '—'}
-                                                        </span>
+                                                        </Pastilla>
                                                     )}
                                                 </td>
                                                 <td className="ai-muted">{n.responsable_nombre ? nombrePropio(n.responsable_nombre) : '—'}</td>
-                                                <td className="ai-td-actions">
+                                                <td className="ai-td-actions" onClick={(ev) => ev.stopPropagation()}>
                                                     <div className="ai-row-actions">
                                                         <button onClick={() => setDetalle(n)} className="ai-icon-btn" aria-label="Ver detalle" title="Ver detalle">
                                                             <Eye size={16} />
@@ -425,6 +409,7 @@ const NovedadesRRHH = () => {
                                 })}
                             </tbody>
                         </table>
+                        </div>
                     )}
 
                     <Pagination

@@ -16,8 +16,8 @@ const NAV_ITEMS = [
     { to: '/recursos-humanos/novedades', label: 'Novedades', icon: ClipboardList, countKey: 'novedades' },
     { to: '/recursos-humanos/traspasos', label: 'Traspasos', icon: ArrowLeftRight },
     { to: '/recursos-humanos/vacaciones', label: 'Pasivo vacacional', icon: CalendarDays },
-    // Catálogo de cargos con sus clientes y sueldo de referencia (§61).
-    { to: '/recursos-humanos/cargos', label: 'Cargos', icon: Briefcase },
+    // Catálogo de cargos con sus clientes y sueldo de referencia (§61). Solo Recursos Humanos: financiera no lo ve.
+    { to: '/recursos-humanos/cargos', label: 'Cargos', icon: Briefcase, soloRrhh: true },
     // Su propia asistencia (asistencia.md §19): RRHH no tiene cuenta de empleado aparte.
     { to: '/asistencia', label: 'Mi asistencia', icon: Clock }
 ];
@@ -66,11 +66,12 @@ const RecursosHumanosLayout = () => {
     const navItems = isSst
         ? NAV_ITEMS.filter(i => i.countKey === 'contratacion' || i.to === '/asistencia')
         : isFinanciera
-            ? [NAV_FINANCIERA[0], ...NAV_ITEMS.slice(0, -1), ...NAV_FINANCIERA.slice(1), NAV_ITEMS[NAV_ITEMS.length - 1]]
+            ? [NAV_FINANCIERA[0], ...NAV_ITEMS.slice(0, -1).filter(i => !i.soloRrhh), ...NAV_FINANCIERA.slice(1), NAV_ITEMS[NAV_ITEMS.length - 1]]
             : NAV_ITEMS;
-    // Financiera tiene 11 opciones y no caben junto a la marca y el menú de usuario: van en una segunda fila
-    // que se parte en dos renglones si la pantalla es angosta, para que siempre se vean todas.
-    const navEnSegundaFila = navItems.length > 7;
+    // Con más de 5 opciones (RRHH tiene 7, financiera 12) no caben junto a la marca, la búsqueda y el menú de
+    // usuario en pantallas de 1366 px o menos: van en una segunda fila que se parte en dos renglones si la
+    // pantalla es angosta, para que siempre se vean todas.
+    const navEnSegundaFila = navItems.length > 5;
 
     const enlacesNav = navItems.map(({ to, label, icon: Icon, end, countKey }) => (
         <NavLink

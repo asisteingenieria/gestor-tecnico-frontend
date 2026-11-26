@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Loader2, UserCheck, Users, CheckCircle2, Clock, UserX, ArrowRight, AlertCircle, Stethoscope } from 'lucide-react';
+import { ChevronRight, UserCheck, Users, CheckCircle2, Clock, UserX, ArrowRight, AlertCircle, Stethoscope, Inbox } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api, { contratacionHydraService } from '../../services/api';
-import { iniciales, nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
+import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import CandidatoHydraDrawer from './CandidatoHydraDrawer';
 import RegistrarLoteModal from './RegistrarLoteModal';
 import { SECCIONES_UI, ESTADO_CANDIDATO, ESTADO_LOTE, ESTADO_EXAMEN, mensajeError } from './seccionesUI';
+import { EncabezadoVista, Mosaicos, Mosaico, Pastilla, AvatarVista, CargandoVista, COLOR_LOTE, COLOR_CANDIDATO, COLOR_EXAMEN, TONO } from '../ui';
 
 const COLOR_SECCION = { completo: 'var(--success)', pendiente: 'var(--warning)', desactualizada: 'var(--danger)' };
 const fmtFecha = (v) => (v ? new Date(`${String(v).slice(0, 10)}T00:00:00`).toLocaleDateString('es-CO') : '—');
@@ -63,50 +64,39 @@ const LoteHydra = () => {
                     <b>{lote?.nombre ?? 'Lote'}</b>
                 </div>
 
-                <div className="ai-page-head">
-                    <div>
-                        <h1 className="ai-page-title">{lote?.nombre ?? 'Cargando…'}</h1>
-                        {lote && (
-                            <p className="ai-page-sub">
-                                {lote.lote_externo_id} · Ingreso sugerido {fmtFecha(lote.fecha_ingreso_sugerida)} · Recibido {new Date(lote.created_at).toLocaleDateString('es-CO')}
-                            </p>
-                        )}
-                    </div>
-                    {lote && (
-                        <div className="ai-row" style={{ gap: 12 }}>
-                            <span className={`ai-badge ${estadoLote.clase}`}><span className="ai-dot" />{estadoLote.texto}</span>
-                            {lote.estado !== 'registrado' && !isSst && (
-                                <button
-                                    className="ai-btn ai-btn--primary"
-                                    disabled={lote.estado !== 'listo'}
-                                    onClick={() => setRegistrando(true)}
-                                    title={lote.estado !== 'listo' ? 'Todos los candidatos deben estar listos —datos verificados y examen médico aprobado— (o fuera del lote) para registrar' : undefined}
-                                >
-                                    <UserCheck size={16} /> Registrar lote
-                                </button>
-                            )}
-                        </div>
+                <EncabezadoVista
+                    icono={Inbox}
+                    titulo={lote?.nombre ?? 'Cargando…'}
+                    subtitulo={lote ? `${lote.lote_externo_id} · Ingreso sugerido ${fmtFecha(lote.fecha_ingreso_sugerida)} · Recibido ${new Date(lote.created_at).toLocaleDateString('es-CO')}` : ''}
+                >
+                    {lote && <Pastilla color={COLOR_LOTE[lote.estado] || TONO.neutro} punto>{estadoLote.texto}</Pastilla>}
+                    {lote && lote.estado !== 'registrado' && !isSst && (
+                        <button
+                            type="button"
+                            className="ai-monitor-btn ai-monitor-btn--primario"
+                            disabled={lote.estado !== 'listo'}
+                            onClick={() => setRegistrando(true)}
+                            title={lote.estado !== 'listo' ? 'Todos los candidatos deben estar listos —datos verificados y examen médico aprobado— (o fuera del lote) para registrar' : undefined}
+                        >
+                            <UserCheck size={15} strokeWidth={2} /> Registrar lote
+                        </button>
                     )}
-                </div>
+                </EncabezadoVista>
 
-                {error && (
-                    <div className="ai-badge ai-badge--danger" style={{ height: 'auto', padding: '10px 14px', width: 'fit-content' }}>
-                        <span className="ai-dot" />{error}
-                    </div>
-                )}
+                {error && <div style={{ marginBottom: 12 }}><Pastilla color={TONO.peligro} punto>{error}</Pastilla></div>}
 
                 {lote && (
-                    <div className="ai-kpi-strip">
-                        <div><Users size={20} strokeWidth={1.75} style={{ color: 'var(--primary)' }} /><div><div className="ai-kpi-label">Candidatos</div><div className="ai-kpi-value">{candidatos.length}</div></div></div>
-                        <div><CheckCircle2 size={20} strokeWidth={1.75} style={{ color: 'var(--success)' }} /><div><div className="ai-kpi-label">Listos</div><div className="ai-kpi-value">{cuenta(['listo', 'registrado'])}</div></div></div>
-                        <div><Clock size={20} strokeWidth={1.75} style={{ color: 'var(--warning)' }} /><div><div className="ai-kpi-label">Pendientes</div><div className="ai-kpi-value">{pendientes}</div></div></div>
-                        <div><Stethoscope size={20} strokeWidth={1.75} style={{ color: 'var(--warning)' }} /><div><div className="ai-kpi-label">Exámenes por resolver</div><div className="ai-kpi-value">{examenesPorResolver}</div></div></div>
-                        <div><UserX size={20} strokeWidth={1.75} style={{ color: 'var(--ink-subtle)' }} /><div><div className="ai-kpi-label">Fuera del lote</div><div className="ai-kpi-value">{cuenta(['descartado', 'cancelado_hydra', 'no_apto'])}</div></div></div>
-                    </div>
+                    <Mosaicos>
+                        <Mosaico color={TONO.info} icono={Users} valor={candidatos.length} label="Candidatos" />
+                        <Mosaico color={TONO.exito} icono={CheckCircle2} valor={cuenta(['listo', 'registrado'])} label="Listos" />
+                        <Mosaico color={pendientes > 0 ? TONO.alerta : TONO.suave} icono={Clock} valor={pendientes} label="Pendientes" />
+                        <Mosaico color={examenesPorResolver > 0 ? TONO.novedad : TONO.suave} icono={Stethoscope} valor={examenesPorResolver} label="Exámenes por resolver" />
+                        <Mosaico color={TONO.neutro} icono={UserX} valor={cuenta(['descartado', 'cancelado_hydra', 'no_apto'])} label="Fuera del lote" />
+                    </Mosaicos>
                 )}
 
                 {lote && lote.estado === 'abierto' && pendientes > 0 && (
-                    <p className="ai-help" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <p className="ai-help" style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
                         <AlertCircle size={14} />
                         {isSst
                             ? `Hay ${examenesPorResolver} candidato(s) con exámenes médicos por resolver. Abre cada uno para marcar asistencia y resultado.`
@@ -114,13 +104,12 @@ const LoteHydra = () => {
                     </p>
                 )}
 
-                <div className="ai-card">
+                <div>
                     {!lote && !error ? (
-                        <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
-                            <Loader2 size={32} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                        </div>
+                        <CargandoVista />
                     ) : (
-                        <table className="ai-table ai-table--dense">
+                        <div className="ai-monitor-tabla-wrap">
+                        <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                             <thead>
                                 <tr>
                                     <th>Candidato</th>
@@ -136,15 +125,15 @@ const LoteHydra = () => {
                                     const estado = ESTADO_CANDIDATO[c.estado] ?? ESTADO_CANDIDATO.pendiente;
                                     const examen = c.examen_estado ? ESTADO_EXAMEN[c.examen_estado] : null;
                                     return (
-                                        <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => setAbierto(c.id)}>
-                                            <td>
-                                                <div className="ai-person">
-                                                    <span className="ai-avatar ai-avatar--sm ai-avatar--brand">{iniciales(c.nombre_completo)}</span>
-                                                    <div>
-                                                        <div className="ai-person-name">{nombrePropio(c.nombre_completo)}</div>
-                                                        <div className="ai-person-sub">{c.tipo_identificacion} {c.numero_identificacion}</div>
-                                                    </div>
-                                                </div>
+                                        <tr key={c.id} className="is-clicable" onClick={() => setAbierto(c.id)}>
+                                            <td className="ai-monitor-nombre">
+                                                <span>
+                                                    <AvatarVista />
+                                                    <span>
+                                                        {nombrePropio(c.nombre_completo).toUpperCase()}
+                                                        <span className="ai-monitor-sub">{c.tipo_identificacion} {c.numero_identificacion}</span>
+                                                    </span>
+                                                </span>
                                             </td>
                                             <td className="ai-muted">{primeraMayuscula(c.cargo_hydra) || '—'}</td>
                                             <td>
@@ -163,11 +152,11 @@ const LoteHydra = () => {
                                                 </div>
                                             </td>
                                             <td>
-                                                {examen ? <span className={`ai-badge ${examen.clase}`}><span className="ai-dot" />{examen.texto}</span> : <span className="ai-help">No aplica</span>}
+                                                {examen ? <Pastilla color={COLOR_EXAMEN[c.examen_estado] || TONO.neutro} punto>{examen.texto}</Pastilla> : <span className="ai-help">No aplica</span>}
                                             </td>
                                             <td>
-                                                <span className={`ai-badge ${estado.clase}`}><span className="ai-dot" />{estado.texto}</span>
-                                                {c.reintegro_users_company_id && <span className="ai-badge ai-badge--danger" style={{ marginLeft: 6 }}>Reintegro</span>}
+                                                <Pastilla color={COLOR_CANDIDATO[c.estado] || TONO.neutro} punto>{estado.texto}</Pastilla>
+                                                {c.reintegro_users_company_id && <span style={{ marginLeft: 6 }}><Pastilla color={TONO.peligro}>Reintegro</Pastilla></span>}
                                                 {c.users_company_id && <div className="ai-help">Empleado #{c.users_company_id}</div>}
                                             </td>
                                             <td className="ai-td-actions">
@@ -178,6 +167,7 @@ const LoteHydra = () => {
                                 })}
                             </tbody>
                         </table>
+                        </div>
                     )}
                 </div>
             </div>

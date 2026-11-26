@@ -1,117 +1,85 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { Loader2, Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, Search, FileText, BarChart3, ClipboardList, Moon, LogOut } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+    Users, UserCheck, Coffee, Clock, AlertTriangle, UserX, RefreshCw, Download, BarChart3, ClipboardList, Moon, LogOut,
+    User, CalendarDays, Laptop, Activity, Timer
+} from 'lucide-react';
 import { asistenciaService, financieraService } from '../../services/api';
-import { nombrePropio, iniciales, primeraMayuscula } from '../../utils/formatoRRHH';
-import { formatearDuracion } from '../../utils/tiempoAsistencia';
+import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
+import { formatearDuracion, formatearHora12 } from '../../utils/tiempoAsistencia';
 import { descargarCsv } from '../../utils/csv';
-import { formatearHora12 } from '../../utils/tiempoAsistencia';
 import { BadgeIngreso } from './IngresoAsislock';
 import { MODALIDAD_INGRESO, textoConexion } from '../../utils/asislock';
-import { datosPausa } from '../../utils/pausasAsistencia';
 import { escucharAsistencia, escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 import { useBaseEquipo } from '../../utils/rutaEquipo';
-import CuadroLlegada from './CuadroLlegada';
 import FiltroCampaniaEquipo from './FiltroCampaniaEquipo';
 import { useAlcanceEquipo, paramsAlcance, sufijoAlcance, TODAS } from '../../hooks/useAlcanceEquipo';
-import { CELDA, claseDia, tardeExacto } from '../../utils/llegadaAsistencia';
+import { claseDia, tardeExacto } from '../../utils/llegadaAsistencia';
 import NovedadChip from './NovedadChip';
 import { etiquetaNovedad, noAsistioPorNovedad } from '../../utils/novedadesAsistencia';
+import { CeldaLogin, CeldaTiempoTotal, CeldasEstado } from './CeldasMonitor';
+import { estadoMonitor, colorMonitor, COLUMNAS_ESTADO, horaLoginDe } from '../../utils/monitorAsistencia';
+import { useTiemposEnVivo } from '../../hooks/useTiemposEnVivo';
+import {
+    EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Leyenda,
+    TablaVista, AvatarVista, siguienteOrden, Pastilla, CargandoVista, VistaVacia, claseEstado
+} from '../ui';
+
+// Tablero en vivo de la jornada de hoy, con el diseño de Equipo del coordinador (asistencia.md §70, plan de
+// rediseño, Ola 1). El jefe ve su equipo ("Equipo hoy"); financiera, con `financiera`, ve a toda la empresa
+// filtrando por campaña y centro de costo (§47). Los mosaicos son los siete estados del día y suman siempre el
+// total (§78); "Llegaron tarde" va aparte porque no es un estado. La tabla es la del monitor del coordinador:
+// login, estado fino (conectado, cada pausa, desconectado…), tiempo total y acumulado por estado.
 
 const POLL_MS = 30000;
 // Financiera ve a toda la empresa: los avisos de una ráfaga (cambio de turno) se agrupan en una recarga.
 const ESPERA_AVISOS_FINANCIERA_MS = 3000;
 
-const BadgePausa = ({ pausa }) => {
-    const { etiqueta, Icono, badge } = datosPausa(pausa.tipo);
-    return (
-        <span className={`ai-badge ${badge}`}>
-            <Icono size={12} strokeWidth={1.75} />
-            {etiqueta} · {pausa.minutosTranscurridos} min
-        </span>
-    );
-};
-
-const ESTADO_BADGE = {
-    pendiente: { label: 'Sin iniciar', clase: 'ai-badge--neutral' },
-    en_curso: { label: 'En turno', clase: 'ai-badge--success' },
-    en_pausa: { label: 'En pausa', clase: 'ai-badge--info' },
-    finalizada: { label: 'Terminó', clase: 'ai-badge--neutral' },
-    ausente: { label: 'Ausente', clase: 'ai-badge--danger' },
-    // Novedad de RRHH que cubre hoy (§71): no vino, pero no es ausencia ni "aún no llega".
-    novedad: { label: 'Con novedad', clase: 'ai-nov-badge' },
-    // Día de descanso de su malla (§73): no es "Sin iniciar" ni "Aún no llega".
-    descanso: { label: 'Descanso', clase: 'ai-desc-badge' }
-};
-
-// Estado con el que se cuenta, filtra y ordena a la persona: la novedad reemplaza a 'pendiente'/'ausente'.
+// Estado del día con el que se cuenta y filtra a la persona: la novedad y el descanso reemplazan a 'pendiente'/'ausente'.
 const estadoVista = (emp) => {
     if (noAsistioPorNovedad(emp)) return 'novedad';
     if (emp.turno?.es_descanso && emp.estado === 'pendiente') return 'descanso';
     return emp.estado;
 };
 
-const ORDEN_ESTADO = { ausente: 0, en_pausa: 1, en_curso: 2, pendiente: 3, novedad: 4, descanso: 5, finalizada: 6 };
-
-// Los estados del día: cada persona está en uno solo, así que sus tarjetas suman siempre el total.
+// Los estados del día: cada persona está en uno solo, así que sus mosaicos suman siempre el total.
 // "En pausa" incluye a quien se desconectó de AsisLock y no ha vuelto (el estado de su jornada es en_pausa).
 const ESTADOS_DIA = [
-    { id: 'en_curso', label: 'En turno', color: 'var(--success)' },
-    { id: 'en_pausa', label: 'En pausa', color: 'var(--primary)' },
-    { id: 'pendiente', label: 'Sin iniciar', color: '#94a3b8' },
-    { id: 'finalizada', label: 'Terminaron', color: 'var(--ink-subtle)' },
-    { id: 'ausente', label: 'Ausentes', color: 'var(--danger)' },
-    { id: 'novedad', label: 'Con novedad', color: '#a8338f' },
-    { id: 'descanso', label: 'Descanso', color: '#0e7490' }
+    { id: 'en_curso', label: 'En turno', color: 'conectado', icono: UserCheck, titulo: 'Conectados y trabajando en este momento' },
+    { id: 'en_pausa', label: 'En pausa', color: 'break', icono: Coffee, titulo: 'En baño, break, almuerzo o capacitación, o desconectados de AsisLock sin volver' },
+    { id: 'pendiente', label: 'Sin iniciar', color: 'sin_iniciar', icono: Clock, titulo: 'Todavía no se han logueado hoy (en la tabla, "No ha llegado" si su turno ya empezó)' },
+    { id: 'finalizada', label: 'Terminaron', color: 'finalizado', icono: LogOut, titulo: 'Ya marcaron salida o su jornada de hoy se cerró' },
+    { id: 'ausente', label: 'Ausentes', color: 'no_llego', icono: UserX, titulo: 'Tenían turno y no se loguearon (se marca al cierre del día)' },
+    { id: 'novedad', label: 'Con novedad', color: 'novedad', icono: ClipboardList, titulo: 'Incapacidades, vacaciones, licencias y suspensiones de RRHH que cubren hoy; no cuentan como ausentes' },
+    { id: 'descanso', label: 'Descanso', color: 'descanso', icono: Moon, titulo: 'Hoy tienen día de descanso en su malla' }
 ];
+const ESTADO_LABEL = { ...Object.fromEntries(ESTADOS_DIA.map((e) => [e.id, e.label])), pendiente: 'Sin iniciar', finalizada: 'Terminó', ausente: 'Ausente' };
 
-// "Llegaron tarde" no es un estado (quien llegó tarde puede estar en turno, en pausa o ya haber terminado):
-// va al final, como filtro aparte.
-const TABS = [{ id: 'todos', label: 'Todos' }, ...ESTADOS_DIA, { id: 'tarde', label: 'Llegaron tarde' }];
+// Leyenda de las pastillas de la tabla (estado fino de estadoMonitor).
+const LEYENDA = [
+    { id: 'conectado', label: 'Conectado' }, { id: 'break', label: 'Break' }, { id: 'bano', label: 'Baño' },
+    { id: 'almuerzo', label: 'Almuerzo' }, { id: 'capacitacion', label: 'Capacitación' }, { id: 'desconectado', label: 'Desconectado' },
+    { id: 'sin_iniciar', label: 'Sin iniciar' }, { id: 'no_llego', label: 'No ha llegado / ausente' }, { id: 'finalizado', label: 'Finalizado' },
+    { id: 'novedad', label: 'Novedad RRHH' }, { id: 'descanso', label: 'Descanso' }
+].map((l) => ({ ...l, color: colorMonitor(l.id) }));
 
 const SIN_CENTRO = 'Sin centro de costo';
 
-const ICONO_KPI = {
-    en_curso: <UserCheck size={16} strokeWidth={1.75} />,
-    en_pausa: <Coffee size={16} strokeWidth={1.75} />,
-    pendiente: <Clock size={16} strokeWidth={1.75} />,
-    finalizada: <LogOut size={16} strokeWidth={1.75} />,
-    ausente: <UserX size={16} strokeWidth={1.75} />,
-    novedad: <ClipboardList size={16} strokeWidth={1.75} />,
-    descanso: <Moon size={16} strokeWidth={1.75} />
-};
-
-const TITULO_KPI = {
-    en_curso: 'Conectados y trabajando en este momento',
-    en_pausa: 'En baño, break, almuerzo o capacitación, o desconectados de AsisLock sin volver',
-    pendiente: 'Todavía no se han logueado hoy',
-    finalizada: 'Ya marcaron salida o su jornada de hoy se cerró',
-    ausente: 'Tenían turno y no se loguearon (se marca al cierre del día)',
-    novedad: 'Incapacidades, vacaciones, licencias y suspensiones de RRHH que cubren hoy',
-    descanso: 'Hoy tienen día de descanso en su malla'
-};
-
-// Pie de cada tarjeta: el detalle que explica el número.
-function pieKpi(estado, k) {
+// Detalle de cada mosaico (va en su title): lo que explica el número.
+function detalleKpi(estado, k) {
     if (estado === 'en_curso') return `${k.presencial} presencial · ${k.teletrabajo} teletrabajo`;
     if (estado === 'en_pausa') {
         const partes = [['baño', k.bano], ['break', k.breaks], ['almuerzo', k.almuerzo], ['capacitación', k.capacitacion], ['desconectados', k.desconectados]]
             .filter(([, n]) => n > 0).map(([t, n]) => `${n} ${t}`);
         return partes.length ? partes.join(' · ') : 'Nadie en pausa';
     }
-    if (estado === 'pendiente') return 'Aún no se loguean';
-    if (estado === 'finalizada') return 'Ya salieron hoy';
-    if (estado === 'ausente') return 'Tenían turno y no vinieron';
-    if (estado === 'novedad') return 'No cuentan como ausentes';
-    return 'Día libre de su malla';
+    return '';
 }
 
-function esTarde(emp) {
-    return emp.alertas?.includes('llegada_tarde');
-}
+const esTarde = (emp) => emp.alertas?.includes('llegada_tarde');
 
-// Alertas del día (domain/asistencia/calcularJornada.js). La llegada tarde va en su propia columna.
+// Alertas del día (domain/asistencia/calcularJornada.js). La llegada tarde va junto a la hora de login.
 const ALERTA_LABEL = {
     bano_excedido: 'Baño excedido',
     almuerzo_excedido: 'Almuerzo excedido',
@@ -121,28 +89,18 @@ const ALERTA_LABEL = {
 };
 const otrasAlertas = (emp) => (emp.alertas || []).filter((a) => a !== 'llegada_tarde');
 
-// Cuadrito de hoy. Sin turno, o en su día de descanso, no se sabe si llegó tarde: gris en vez de verde.
-function claseHoy(emp) {
-    if (noAsistioPorNovedad(emp)) return 'novedad';
-    if (estadoVista(emp) === 'descanso') return 'descanso';
-    const clase = claseDia(emp);
-    if (!clase || clase === 'pendiente' || clase === 'ausente') return clase;
-    if (emp.turno && !emp.turno.es_descanso) return clase;
-    return clase.startsWith('curso_') ? 'curso_sin_horario' : 'sin_horario';
-}
-
-// Texto de la columna "Llegada": cómo llegó hoy y si sigue en turno.
+// Cómo llegó hoy (para la descarga). Sin turno, o en su día de descanso, no se sabe si llegó tarde.
 function textoLlegada(emp) {
-    const clase = claseHoy(emp);
+    if (noAsistioPorNovedad(emp)) return `Novedad · ${etiquetaNovedad(emp.novedad.tipo)}`;
+    if (estadoVista(emp) === 'descanso') return 'Día de descanso';
+    const clase = claseDia(emp);
     if (!clase) return '';
     if (clase === 'pendiente') return 'Aún no llega';
     if (clase === 'ausente') return 'Ausente';
-    if (clase === 'novedad') return `Novedad · ${etiquetaNovedad(emp.novedad.tipo)}`;
-    if (clase === 'descanso') return 'Día de descanso';
-    if (clase === 'curso_sin_horario') return 'Sin horario · en turno';
-    if (clase === 'sin_horario') return 'Sin horario · terminó';
+    const enTurno = clase.startsWith('curso_');
+    if (!emp.turno || emp.turno.es_descanso) return enTurno ? 'Sin horario · en turno' : 'Sin horario · terminó';
     const llegada = emp.minutos_tarde > 0 ? `Tarde · ${tardeExacto(emp.segundos_tarde, emp.minutos_tarde)}` : 'Puntual';
-    return clase.startsWith('curso_') ? `${llegada} · en turno` : `${llegada} · terminó`;
+    return enTurno ? `${llegada} · en turno` : `${llegada} · terminó`;
 }
 
 // "Outbound 7-4 · 07:00–16:00", "Descanso" o "Sin horario" (§46).
@@ -153,23 +111,37 @@ function textoTurno(turno) {
     return turno.plantilla ? `${turno.plantilla} · ${horas}` : horas;
 }
 
-// Tablero en vivo de la jornada de hoy. El jefe ve su equipo ("Equipo hoy"); financiera, con
-// `financiera`, ve a toda la empresa filtrando por campaña y centro de costo (asistencia.md §47).
-// El histórico de cada persona es su trazabilidad día a día y el reporte mensual.
+const COLUMNAS = [
+    { id: 'login', label: 'Hora Login', icono: Clock },
+    { id: 'nombre', label: 'Empleado', icono: User },
+    { id: 'turno', label: 'Centro de costo · turno', icono: CalendarDays },
+    { id: 'ingreso', label: 'Ingreso', icono: Laptop, ordenable: false },
+    { id: 'estado', label: 'Estado', icono: Activity, title: 'Ordena primero ausentes y llegadas tarde' },
+    { id: 'tiempo', label: 'Tiempo total', icono: Timer },
+    ...COLUMNAS_ESTADO
+];
+
+// Orden por "Estado": primero ausentes y llegadas tarde, luego por estado del día.
+const ORDEN_ESTADO = { ausente: 0, en_pausa: 1, en_curso: 2, pendiente: 3, novedad: 4, descanso: 5, finalizada: 6 };
+const prioridad = (emp) => ((estadoVista(emp) === 'ausente' || esTarde(emp)) ? 0 : ORDEN_ESTADO[estadoVista(emp)] ?? 9);
+
 const EquipoAsistencia = ({ financiera = false }) => {
+    const navigate = useNavigate();
     const baseEquipo = useBaseEquipo();
     const [equipo, setEquipo] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [actualizando, setActualizando] = useState(false);
-    const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
+    const [cargadoEn, setCargadoEn] = useState(null);
     const [haceSegundos, setHaceSegundos] = useState(0);
-    const [tab, setTab] = useState('todos');
+    const [filtro, setFiltro] = useState(null);
     const [busqueda, setBusqueda] = useState('');
     const [centro, setCentro] = useState('');
     const [campanias, setCampanias] = useState([]);
     const [campaniaId, setCampaniaId] = useState('');
+    const [orden, setOrden] = useState({ col: 'estado', asc: true });
     const pausadoRef = useRef(false);
+    const { totalDe, enEstadoDe, acumuladoDe } = useTiemposEnVivo(cargadoEn);
     // Director de Tecnología (§68): entra con su equipo y el filtro cambia a todas o a una campaña.
     const { verTodas, campanias: campaniasEquipo, alcance, cambiarAlcance } = useAlcanceEquipo();
     const otroAlcance = !financiera && Boolean(alcance);
@@ -179,7 +151,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
         try {
             const { data } = financiera ? await financieraService.getEnVivo(campaniaId) : await asistenciaService.getEquipo(paramsAlcance(alcance));
             setEquipo(data);
-            setUltimaActualizacion(Date.now());
+            setCargadoEn(Date.now());
             setError(null);
         } catch (err) {
             setError(err.response?.data?.message || 'No se pudo cargar la asistencia');
@@ -211,10 +183,10 @@ const EquipoAsistencia = ({ financiera = false }) => {
 
     useEffect(() => {
         const id = setInterval(() => {
-            if (ultimaActualizacion) setHaceSegundos(Math.floor((Date.now() - ultimaActualizacion) / 1000));
+            if (cargadoEn) setHaceSegundos(Math.floor((Date.now() - cargadoEn) / 1000));
         }, 1000);
         return () => clearInterval(id);
-    }, [ultimaActualizacion]);
+    }, [cargadoEn]);
 
     // Centros de costo presentes, con su conteo: los turnos se definen por centro (§45).
     const centros = useMemo(() => {
@@ -226,7 +198,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
         return [...conteo.entries()].sort(([a], [b]) => a.localeCompare(b));
     }, [equipo]);
 
-    // Lo que cuentan los KPIs y las pestañas: el filtro de centro de costo aplica a todo el tablero.
+    // Lo que cuentan los mosaicos: el filtro de centro de costo aplica a todo el tablero.
     const delCentro = useMemo(
         () => (centro ? equipo.filter((e) => (e.centro_costo || SIN_CENTRO) === centro) : equipo),
         [equipo, centro]
@@ -248,7 +220,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
         const sinHorario = llegaron.filter((e) => !esTarde(e) && (!e.turno || e.turno.es_descanso)).length;
         return {
             porEstado,
-            // Modalidad solo de quienes están en turno ahora (antes contaba a todos los del día).
+            // Modalidad solo de quienes están en turno ahora.
             presencial: enTurno.filter((e) => e.asislock?.modalidad === 'presencial').length,
             teletrabajo: enTurno.filter((e) => e.asislock?.modalidad === 'teletrabajo').length,
             bano: pausa('bano'),
@@ -263,30 +235,37 @@ const EquipoAsistencia = ({ financiera = false }) => {
         };
     }, [delCentro]);
 
-    const filtrado = useMemo(() => {
+    const visibles = useMemo(() => {
         let lista = delCentro;
-        if (tab === 'tarde') lista = lista.filter(esTarde);
-        else if (tab !== 'todos') lista = lista.filter((e) => estadoVista(e) === tab);
-        if (busqueda.trim()) {
-            const q = busqueda.trim().toLowerCase();
-            lista = lista.filter((e) => (e.nombre || '').toLowerCase().includes(q) || e.cedula?.includes(q));
-        }
-        return [...lista].sort((a, b) => {
-            const pa = (estadoVista(a) === 'ausente' || esTarde(a)) ? 0 : ORDEN_ESTADO[estadoVista(a)] ?? 9;
-            const pb = (estadoVista(b) === 'ausente' || esTarde(b)) ? 0 : ORDEN_ESTADO[estadoVista(b)] ?? 9;
-            if (pa !== pb) return pa - pb;
-            return (a.nombre || '').localeCompare(b.nombre || '');
+        if (filtro === 'tarde') lista = lista.filter(esTarde);
+        else if (filtro) lista = lista.filter((e) => estadoVista(e) === filtro);
+        const q = busqueda.trim().toLowerCase();
+        if (q) lista = lista.filter((e) => (e.nombre || '').toLowerCase().includes(q) || e.cedula?.includes(q));
+        const filas = lista.map((emp) => ({ emp, est: estadoMonitor(emp) }));
+        const valor = {
+            login: (f) => horaLoginDe(f.emp) || '9',
+            nombre: (f) => (f.emp.nombre || '').toUpperCase(),
+            turno: (f) => `${f.emp.centro_costo || '~'} ${f.emp.turno && !f.emp.turno.es_descanso ? f.emp.turno.hora_entrada : '99'}`,
+            estado: (f) => prioridad(f.emp),
+            tiempo: (f) => totalDe(f) ?? -1,
+            ...Object.fromEntries(COLUMNAS_ESTADO.map((c) => [c.id, (f) => acumuladoDe(f, c) ?? -1]))
+        }[orden.col];
+        return filas.sort((a, b) => {
+            const va = valor(a);
+            const vb = valor(b);
+            const cmp = typeof va === 'number' ? va - vb : va.localeCompare(vb);
+            return (orden.asc ? cmp : -cmp) || (a.emp.nombre || '').localeCompare(b.emp.nombre || '');
         });
-    }, [delCentro, tab, busqueda]);
+    }, [delCentro, filtro, busqueda, orden, totalDe, acumuladoDe]);
 
     const exportar = () => {
-        const filas = filtrado.map((e) => [
+        const filas = visibles.map(({ emp: e }) => [
             nombrePropio(e.nombre), e.cedula || '', primeraMayuscula(e.cargo || ''),
             primeraMayuscula(e.campania || ''), e.centro_costo || '', e.jefe_area ? nombrePropio(e.jefe_area) : '', textoTurno(e.turno),
             MODALIDAD_INGRESO[e.asislock?.modalidad]?.label || '',
             e.asislock?.primer_login ? formatearHora12(e.asislock.primer_login) : '',
             textoConexion(e.asislock) || '',
-            textoLlegada(e), formatearDuracion(e.minutos_trabajados), (noAsistioPorNovedad(e) ? `Novedad: ${e.novedad.tipo}` : ESTADO_BADGE[estadoVista(e)]?.label || e.estado),
+            textoLlegada(e), formatearDuracion(e.minutos_trabajados), (noAsistioPorNovedad(e) ? `Novedad: ${e.novedad.tipo}` : ESTADO_LABEL[estadoVista(e)] || e.estado),
             otrasAlertas(e).map((a) => ALERTA_LABEL[a] || a).join(', ')
         ]);
         descargarCsv(
@@ -308,14 +287,12 @@ const EquipoAsistencia = ({ financiera = false }) => {
         setLoading(true);
     };
 
+    const rutaDetalle = (emp) => (financiera
+        ? `/recursos-humanos/trazabilidad/${emp.users_company_id}?origen=en-vivo`
+        : `${baseEquipo}/equipo/${emp.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`);
+
     if (loading) {
-        return (
-            <div className="ai-content">
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
-            </div>
-        );
+        return <div className="ai-content"><CargandoVista /></div>;
     }
 
     const nombreCampania = campanias.find((c) => String(c.idcampania) === String(campaniaId))?.nombre;
@@ -323,248 +300,158 @@ const EquipoAsistencia = ({ financiera = false }) => {
         ? 'todas las campañas'
         : primeraMayuscula(campaniasEquipo.find((c) => String(c.idcampania) === alcance)?.nombre || 'campaña');
     const personas = `${equipo.length} persona${equipo.length === 1 ? '' : 's'}`;
+    const subtitulo = financiera
+        ? `${personas} · ${nombreCampania ? primeraMayuscula(nombreCampania) : 'todas las campañas'}`
+        : otroAlcance ? `${personas} · ${nombreAlcance} · solo consulta` : `${personas} a tu cargo`;
+    const conVariasLineas = financiera || otroAlcance;
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">{financiera ? 'Asistencia en vivo' : 'Equipo'}</h1>
-                    <p className="ai-page-sub">
-                        {financiera
-                            ? `${equipo.length} persona${equipo.length === 1 ? '' : 's'} · ${nombreCampania ? primeraMayuscula(nombreCampania) : 'todas las campañas'}`
-                            : otroAlcance ? `${personas} · ${nombreAlcance} · solo consulta` : `${personas} a tu cargo`}
-                    </p>
-                </div>
-                <div className="ai-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    {!financiera && <SelectorVistaEquipo />}
-                    <span className="ai-live">En vivo · actualizado hace {haceSegundos}s</span>
-                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => cargar(true)}>
-                        <RefreshCw size={14} strokeWidth={1.75} className={actualizando ? 'animate-spin' : ''} /> Actualizar
-                    </button>
-                    {financiera && (
-                        <Link to={`/recursos-humanos/asistencia-mensual${campaniaId ? `?campania=${campaniaId}` : ''}`} className="ai-btn ai-btn--secondary ai-btn--sm">
-                            <BarChart3 size={14} strokeWidth={1.75} /> Histórico mensual
-                        </Link>
-                    )}
-                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportar} disabled={filtrado.length === 0}>
-                        <Download size={14} strokeWidth={1.75} /> Exportar
-                    </button>
-                </div>
-            </div>
+            <EncabezadoVista
+                icono={Users}
+                titulo={financiera ? 'Asistencia en vivo' : 'Equipo'}
+                subtitulo={`${subtitulo} · actualizado hace ${haceSegundos}s`}
+                enVivo
+            >
+                {!financiera && <SelectorVistaEquipo />}
+                {!financiera && verTodas && (
+                    <FiltroCampaniaEquipo alcance={alcance} campanias={campaniasEquipo} onChange={cambiarAlcanceEquipo} />
+                )}
+                <button type="button" className="ai-monitor-btn" onClick={() => cargar(true)}>
+                    <RefreshCw size={15} strokeWidth={2} className={actualizando ? 'animate-spin' : ''} /> Actualizar
+                </button>
+                {financiera && (
+                    <Link to={`/recursos-humanos/asistencia-mensual${campaniaId ? `?campania=${campaniaId}` : ''}`} className="ai-monitor-btn" style={{ textDecoration: 'none' }}>
+                        <BarChart3 size={15} strokeWidth={2} /> Histórico mensual
+                    </Link>
+                )}
+                <button type="button" className="ai-monitor-btn" onClick={exportar} disabled={visibles.length === 0}>
+                    <Download size={15} strokeWidth={2} /> Exportar
+                </button>
+            </EncabezadoVista>
 
             {error && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
 
-            {/* Reparto del día: una barra con los 7 estados, que suman el total de personas. */}
-            <div className="ai-panel" style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div className="ai-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                    <span style={{ font: '600 14px var(--font-sans)', color: 'var(--ink)' }}>
-                        {delCentro.length} persona{delCentro.length === 1 ? '' : 's'} hoy · cada una está en un solo estado
-                    </span>
-                    {/* Las llegadas son un desglose de quienes ya entraron (En turno + En pausa + Terminaron), no un estado más. */}
-                    <div className="ai-row" style={{ gap: 6, flexWrap: 'wrap', font: '400 13px var(--font-sans)', color: 'var(--ink-muted)' }}>
-                        <span>
-                            De los <b style={{ color: 'var(--ink)' }}>{kpis.llegaron}</b> que llegaron hoy
-                            <span title="En turno + En pausa + Terminaron"> (en turno, en pausa y terminaron)</span>:
-                        </span>
-                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>{kpis.aTiempo} a tiempo</span>
-                        <span>·</span>
-                        <button
-                            type="button"
-                            onClick={() => setTab(tab === 'tarde' ? 'todos' : 'tarde')}
-                            className="ai-row"
-                            title="Ver quiénes llegaron tarde"
-                            style={{
-                                gap: 6, padding: '2px 10px', borderRadius: 999, cursor: 'pointer', font: '600 13px var(--font-sans)',
-                                border: `1px solid ${tab === 'tarde' ? 'var(--warning)' : 'var(--border)'}`,
-                                background: kpis.tarde > 0 ? 'var(--warning-soft)' : 'transparent',
-                                color: kpis.tarde > 0 ? 'var(--warning)' : 'var(--ink-muted)'
-                            }}
-                        >
-                            <AlertTriangle size={14} strokeWidth={1.75} />
-                            {kpis.tarde} tarde
-                        </button>
-                        {kpis.sinHorario > 0 && (
-                            <>
-                                <span>·</span>
-                                <span title="Entraron sin turno asignado hoy: no se puede saber si llegaron tarde">{kpis.sinHorario} sin horario</span>
-                            </>
-                        )}
-                    </div>
-                </div>
-                <div style={{ display: 'flex', height: 10, borderRadius: 999, overflow: 'hidden', background: 'var(--surface-200)' }}>
-                    {delCentro.length > 0 && ESTADOS_DIA.map((e) => kpis.porEstado[e.id] > 0 && (
-                        <div
-                            key={e.id}
-                            title={`${e.label}: ${kpis.porEstado[e.id]}`}
-                            style={{ width: `${(kpis.porEstado[e.id] / delCentro.length) * 100}%`, background: e.color }}
-                        />
-                    ))}
-                </div>
-            </div>
-
-            <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+            {/* Los siete estados del día suman el total (§78); "Llegaron tarde" es un desglose aparte. */}
+            <Mosaicos>
                 {ESTADOS_DIA.map((e) => {
-                    const valor = kpis.porEstado[e.id];
-                    const activa = tab === e.id;
+                    const detalle = detalleKpi(e.id, kpis);
                     return (
-                        <button
+                        <Mosaico
                             key={e.id}
-                            type="button"
-                            className="ai-kpi"
-                            onClick={() => setTab(activa ? 'todos' : e.id)}
-                            title={TITULO_KPI[e.id]}
-                            style={{ textAlign: 'left', cursor: 'pointer', borderColor: activa ? 'var(--primary)' : (e.id === 'ausente' && valor > 0 ? 'var(--danger)' : undefined), boxShadow: activa ? '0 0 0 1px var(--primary)' : undefined }}
-                        >
-                            <div className="ai-kpi-head">
-                                <span className="ai-kpi-label ai-row" style={{ gap: 6 }}>
-                                    <span style={{ width: 8, height: 8, borderRadius: 999, background: e.color, flex: 'none' }} />
-                                    {e.label}
-                                </span>
-                                <span className="ai-kpi-icon">{ICONO_KPI[e.id]}</span>
-                            </div>
-                            <div className="ai-kpi-value" style={{ color: valor > 0 && e.id !== 'pendiente' && e.id !== 'finalizada' ? e.color : undefined }}>{valor}</div>
-                            <div className="ai-kpi-foot">{pieKpi(e.id, kpis)}</div>
-                        </button>
+                            color={e.color}
+                            icono={e.icono}
+                            valor={kpis.porEstado[e.id]}
+                            label={e.label}
+                            activo={filtro === e.id}
+                            onClick={() => setFiltro((f) => (f === e.id ? null : e.id))}
+                            title={`${e.titulo}${detalle ? ` · ${detalle}` : ''}${filtro === e.id ? ' · clic para quitar el filtro' : ''}`}
+                        />
                     );
                 })}
-            </div>
+                <Mosaico
+                    color="almuerzo"
+                    icono={AlertTriangle}
+                    valor={kpis.tarde}
+                    label="Llegaron tarde"
+                    activo={filtro === 'tarde'}
+                    onClick={() => setFiltro((f) => (f === 'tarde' ? null : 'tarde'))}
+                    title="No es un estado: de quienes llegaron hoy (en turno, en pausa y terminaron), los que llegaron tarde a su turno"
+                />
+            </Mosaicos>
 
-            <div className="ai-panel">
-                <div className="ai-tabs">
-                    {TABS.map((t) => (
-                        <button
-                            key={t.id}
-                            type="button"
-                            className={`ai-tab ${tab === t.id ? 'is-active' : ''}`}
-                            style={{ background: 'none', border: 0, cursor: 'pointer' }}
-                            onClick={() => setTab(t.id)}
-                        >
-                            {t.label}
-                            <span className="ai-count">{t.id === 'todos' ? delCentro.length : t.id === 'tarde' ? kpis.tarde : kpis.porEstado[t.id]}</span>
-                        </button>
+            {/* Reparto del día: una barra con los siete estados y cómo llegaron quienes ya entraron. */}
+            <BarraFiltros>
+                <span className="ai-monitor-reparto-txt">
+                    <b>{delCentro.length}</b> persona{delCentro.length === 1 ? '' : 's'} hoy · cada una en un solo estado
+                </span>
+                <div className="ai-monitor-reparto" role="img" aria-label={ESTADOS_DIA.map((e) => `${e.label}: ${kpis.porEstado[e.id]}`).join(', ')}>
+                    {delCentro.length > 0 && ESTADOS_DIA.map((e) => kpis.porEstado[e.id] > 0 && (
+                        <i key={e.id} className={claseEstado(e.color)} title={`${e.label}: ${kpis.porEstado[e.id]}`}
+                            style={{ width: `${(kpis.porEstado[e.id] / delCentro.length) * 100}%` }} />
                     ))}
                 </div>
-                <div className="ai-panel-body ai-row" style={{ paddingBottom: 0, gap: 12, flexWrap: 'wrap' }}>
-                    <div className="ai-input" style={{ maxWidth: 320, flex: 1 }}>
-                        <Search size={16} strokeWidth={1.75} className="ai-ic" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre o cédula"
-                            value={busqueda}
-                            onChange={(e) => setBusqueda(e.target.value)}
-                            style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
-                        />
-                    </div>
-                    {financiera && (
-                        <select className="ai-input" style={{ maxWidth: 240 }} value={campaniaId} onChange={(e) => cambiarCampania(e.target.value)} aria-label="Campaña">
-                            <option value="">Todas las campañas</option>
-                            {campanias.map((c) => <option key={c.idcampania} value={c.idcampania}>{primeraMayuscula(c.nombre)} ({c.empleados})</option>)}
-                        </select>
-                    )}
-                    {!financiera && verTodas && (
-                        <FiltroCampaniaEquipo alcance={alcance} campanias={campaniasEquipo} onChange={cambiarAlcanceEquipo} />
-                    )}
-                    {centros.length > 1 && (
-                        <select className="ai-input" style={{ maxWidth: 260 }} value={centro} onChange={(e) => setCentro(e.target.value)} aria-label="Centro de costo">
-                            <option value="">Todos los centros de costo ({equipo.length})</option>
-                            {centros.map(([nombreCentro, total]) => <option key={nombreCentro} value={nombreCentro}>{nombreCentro} ({total})</option>)}
-                        </select>
-                    )}
-                </div>
+                <span className="ai-monitor-reparto-txt" title="En turno + En pausa + Terminaron">
+                    De los <b>{kpis.llegaron}</b> que llegaron: <Pastilla color="conectado">{kpis.aTiempo} a tiempo</Pastilla>{' '}
+                    <Pastilla color="almuerzo">{kpis.tarde} tarde</Pastilla>
+                    {kpis.sinHorario > 0 && <>{' '}<Pastilla color="sin_iniciar" title="Entraron sin turno asignado hoy: no se puede saber si llegaron tarde">{kpis.sinHorario} sin horario</Pastilla></>}
+                </span>
+            </BarraFiltros>
 
-                {filtrado.length === 0 ? (
-                    <div className="ai-empty">
-                        <Users size={40} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                        <p>{equipo.length === 0 ? ((financiera || otroAlcance) ? 'No hay empleados activos.' : 'No tienes empleados a cargo.') : 'Nadie coincide con este filtro.'}</p>
-                    </div>
-                ) : (
-                    <table className="ai-table ai-table--dense">
-                        <thead>
-                            <tr>
-                                <th>Empleado</th>
-                                <th>Centro de costo · turno</th>
-                                <th>Ingreso</th>
-                                <th>Llegada</th>
-                                <th>Tiempo hoy</th>
-                                <th>Pausa</th>
-                                <th>Estado</th>
-                                <th>Detalle</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtrado.map((emp) => {
-                                const badge = ESTADO_BADGE[estadoVista(emp)] || ESTADO_BADGE.pendiente;
-                                return (
-                                    <tr key={emp.users_company_id}>
-                                        <td>
-                                            <span className="ai-row" style={{ gap: 10 }}>
-                                                <span className="ai-avatar">{iniciales(emp.nombre)}</span>
-                                                <span>
-                                                    <div style={{ fontWeight: 600 }}>{nombrePropio(emp.nombre)}<NovedadChip novedad={emp.novedad} /></div>
-                                                    <div className="ai-muted" style={{ fontSize: 12 }}>{primeraMayuscula(emp.cargo || '')} · CC {emp.cedula}</div>
-                                                </span>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{emp.centro_costo || SIN_CENTRO}</div>
-                                            <div className="ai-muted" style={{ fontSize: 12 }}>{textoTurno(emp.turno)}</div>
-                                            {((financiera || otroAlcance) ? (emp.campania || emp.jefe_area) : (emp.jefe_area || emp.jefe_inmediato)) && (
-                                                <div className="ai-muted" style={{ fontSize: 11 }}>
-                                                    {primeraMayuscula(emp.campania || '')}{emp.campania && emp.jefe_area ? ' · ' : ''}{emp.jefe_area ? `Jefe: ${nombrePropio(emp.jefe_area)}` : ''}{!financiera && emp.jefe_inmediato ? `${emp.campania || emp.jefe_area ? ' · ' : ''}Coord.: ${nombrePropio(emp.jefe_inmediato)}` : ''}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td title={emp.asislock ? textoConexion(emp.asislock) : 'Sin registros de AsisLock hoy'}>
-                                            <BadgeIngreso modalidad={emp.asislock?.modalidad} />
-                                            {emp.asislock?.primer_login && (
-                                                <div className="ai-muted" style={{ fontSize: 12, marginTop: 2 }}>Login {formatearHora12(emp.asislock.primer_login)}</div>
-                                            )}
-                                        </td>
-                                        <td>
-                                            {claseHoy(emp) ? (
-                                                <span className="ai-row" style={{ gap: 6, whiteSpace: 'nowrap', fontSize: 12 }} title={CELDA[claseHoy(emp)].label}>
-                                                    <CuadroLlegada clase={claseHoy(emp)} />
-                                                    <span style={{ color: emp.minutos_tarde > 0 ? '#b45309' : 'var(--ink-muted)', fontWeight: emp.minutos_tarde > 0 ? 600 : 400 }}>{textoLlegada(emp)}</span>
-                                                </span>
-                                            ) : <span className="ai-muted">—</span>}
-                                        </td>
-                                        <td className="ai-num">{formatearDuracion(emp.minutos_trabajados)}</td>
-                                        <td>
-                                            {emp.pausa_activa ? (
-                                                <BadgePausa pausa={emp.pausa_activa} />
-                                            ) : emp.desconexion_activa ? (
-                                                <span className="ai-badge ai-badge--warning">
-                                                    Desconectado de AsisLock · {emp.desconexion_activa.minutosTranscurridos} min
-                                                </span>
-                                            ) : <span className="ai-muted">—</span>}
-                                        </td>
-                                        <td>
-                                            <span className="ai-row" style={{ gap: 4, flexWrap: 'wrap' }}>
-                                                <span className={`ai-badge ${badge.clase}`}>{badge.label}</span>
-                                                {otrasAlertas(emp).map((a) => (
-                                                    <span key={a} className="ai-badge ai-badge--warning" title="Alerta del día">
-                                                        <AlertTriangle size={11} strokeWidth={1.75} /> {ALERTA_LABEL[a] || a}
-                                                    </span>
-                                                ))}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {/* Abre la trazabilidad de hoy (entrada, pausas, alertas); desde ahí se navega a días anteriores. */}
-                                            <Link
-                                                to={financiera ? `/recursos-humanos/trazabilidad/${emp.users_company_id}?origen=en-vivo` : `${baseEquipo}/equipo/${emp.users_company_id}/trazabilidad${sufijoAlcance(alcance)}`}
-                                                className="ai-btn ai-btn--secondary ai-btn--sm" style={{ whiteSpace: 'nowrap' }}
-                                                title="Detalle del empleado hoy: entrada, pausas, alertas y salida" aria-label={`Detalle de hoy de ${nombrePropio(emp.nombre)}`}
-                                            >
-                                                <FileText size={14} strokeWidth={1.75} /> Detalle de hoy
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+            <BarraFiltros>
+                <CampoBusqueda value={busqueda} onChange={setBusqueda} />
+                {financiera && (
+                    <select className="ai-input ai-monitor-select" value={campaniaId} onChange={(e) => cambiarCampania(e.target.value)} aria-label="Campaña">
+                        <option value="">Todas las campañas</option>
+                        {campanias.map((c) => <option key={c.idcampania} value={c.idcampania}>{primeraMayuscula(c.nombre)} ({c.empleados})</option>)}
+                    </select>
                 )}
-            </div>
+                {centros.length > 1 && (
+                    <select className="ai-input ai-monitor-select" value={centro} onChange={(e) => setCentro(e.target.value)} aria-label="Centro de costo">
+                        <option value="">Todos los centros de costo ({equipo.length})</option>
+                        {centros.map(([nombreCentro, total]) => <option key={nombreCentro} value={nombreCentro}>{nombreCentro} ({total})</option>)}
+                    </select>
+                )}
+                <Leyenda items={LEYENDA} />
+                {filtro && (
+                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => setFiltro(null)}>
+                        Ver todos ({delCentro.length})
+                    </button>
+                )}
+            </BarraFiltros>
+
+            {visibles.length === 0 ? (
+                <VistaVacia icono={Users}>
+                    {equipo.length === 0 ? (conVariasLineas ? 'No hay empleados activos.' : 'No tienes empleados a cargo.') : 'Nadie coincide con este filtro.'}
+                </VistaVacia>
+            ) : (
+                <TablaVista columnas={COLUMNAS} orden={orden} onOrdenar={(col) => setOrden(siguienteOrden(col))}>
+                    {visibles.map((fila) => {
+                        const { emp, est } = fila;
+                        const lineas = conVariasLineas
+                            ? [primeraMayuscula(emp.campania || ''), emp.jefe_area && `Jefe: ${nombrePropio(emp.jefe_area)}`]
+                            : [emp.jefe_area && `Jefe: ${nombrePropio(emp.jefe_area)}`, emp.jefe_inmediato && `Coord.: ${nombrePropio(emp.jefe_inmediato)}`];
+                        const jefatura = lineas.filter(Boolean).join(' · ');
+                        return (
+                            <tr key={emp.users_company_id} onClick={() => navigate(rutaDetalle(emp))}
+                                title={`${nombrePropio(emp.nombre)} · CC ${emp.cedula} — ver el detalle de hoy`}>
+                                <CeldaLogin emp={emp} />
+                                <td className="ai-monitor-nombre">
+                                    <span>
+                                        <AvatarVista />
+                                        <span>
+                                            <Link to={rutaDetalle(emp)} onClick={(ev) => ev.stopPropagation()} style={{ color: 'inherit', textDecoration: 'none' }}
+                                                aria-label={`Detalle de hoy de ${nombrePropio(emp.nombre)}`}>
+                                                {(emp.nombre || '').toUpperCase()}
+                                            </Link>
+                                            <NovedadChip novedad={emp.novedad} />
+                                            <span className="ai-monitor-sub">{primeraMayuscula(emp.cargo || '')} · CC {emp.cedula}</span>
+                                        </span>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{emp.centro_costo || SIN_CENTRO}</div>
+                                    <span className="ai-monitor-sub" style={{ whiteSpace: 'nowrap' }}>{textoTurno(emp.turno)}</span>
+                                    {jefatura && <span className="ai-monitor-sub" style={{ whiteSpace: 'nowrap' }}>{jefatura}</span>}
+                                </td>
+                                <td className="ai-monitor-centro" title={emp.asislock ? textoConexion(emp.asislock) : 'Sin registros de AsisLock hoy'}>
+                                    <BadgeIngreso modalidad={emp.asislock?.modalidad} />
+                                </td>
+                                <td className="ai-monitor-centro">
+                                    <Pastilla color={colorMonitor(est.clave)} punto>{est.label}</Pastilla>
+                                    {otrasAlertas(emp).map((a) => (
+                                        <span key={a} className="ai-monitor-sub" style={{ color: 'var(--warning)' }} title="Alerta del día">
+                                            <AlertTriangle size={11} strokeWidth={2} style={{ verticalAlign: -1 }} /> {ALERTA_LABEL[a] || a}
+                                        </span>
+                                    ))}
+                                </td>
+                                <CeldaTiempoTotal total={totalDe(fila)} />
+                                <CeldasEstado fila={fila} acumuladoDe={acumuladoDe} enEstadoDe={enEstadoDe} />
+                            </tr>
+                        );
+                    })}
+                </TablaVista>
+            )}
         </div>
     );
 };

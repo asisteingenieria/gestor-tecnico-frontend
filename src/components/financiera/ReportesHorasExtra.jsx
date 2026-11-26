@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, FileSpreadsheet, Download, DollarSign, Clock, Users } from 'lucide-react';
+import { FileSpreadsheet, Download, DollarSign, Clock, Users, Building2, ListOrdered } from 'lucide-react';
 import { financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import { descargarCsv } from '../../utils/csv';
 import { CLASES_HORAS, formatearHoras, formatearPesos, periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
+import { EncabezadoVista, Mosaicos, Mosaico, PanelVista, AvatarVista, CargandoVista, VistaVacia, TONO } from '../ui';
 
 // Reporte de horas extras para financiera (asistencia.md §32). Es el mismo reporte que ve el jefe
 // pero de todos los empleados (o de una campaña), con el valor en dinero de cada hora, en vivo a
@@ -69,54 +70,39 @@ const ReportesHorasExtra = () => {
 
     return (
         <div className="ai-content">
-            <div className="ai-page-head">
-                <div>
-                    <h1 className="ai-page-title">Reporte de horas extras</h1>
-                    <p className="ai-page-sub">{nombrePeriodo(periodo)} · horas y costo en dinero, en tiempo real</p>
-                </div>
-                <div className="ai-row">
-                    <select className="ai-input" style={{ width: 220 }} value={campaniaId} onChange={(e) => cambiar('campania', e.target.value)} aria-label="Campaña">
-                        <option value="">Todas las campañas</option>
-                        {campanias.map((c) => <option key={c.idcampania} value={c.idcampania}>{primeraMayuscula(c.nombre)}</option>)}
-                    </select>
-                    <input
-                        type="month" className="ai-input" style={{ width: 170 }} value={periodo} max={periodoActual()}
-                        onChange={(e) => e.target.value && cambiar('periodo', e.target.value)} aria-label="Mes"
-                    />
-                    <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportar} disabled={filas.length === 0}>
-                        <Download size={14} strokeWidth={1.75} /> Exportar
-                    </button>
-                </div>
-            </div>
+            <EncabezadoVista
+                icono={FileSpreadsheet}
+                titulo="Reporte de horas extras"
+                subtitulo={`${nombrePeriodo(periodo)} · horas y costo en dinero, en tiempo real`}
+            >
+                <select className="ai-monitor-btn ai-monitor-select" value={campaniaId} onChange={(e) => cambiar('campania', e.target.value)} aria-label="Campaña">
+                    <option value="">Todas las campañas</option>
+                    {campanias.map((c) => <option key={c.idcampania} value={c.idcampania}>{primeraMayuscula(c.nombre)}</option>)}
+                </select>
+                <input
+                    type="month" className="ai-monitor-btn ai-monitor-mes" value={periodo} max={periodoActual()}
+                    onChange={(e) => e.target.value && cambiar('periodo', e.target.value)} aria-label="Mes"
+                />
+                <button type="button" className="ai-monitor-btn" onClick={exportar} disabled={filas.length === 0}>
+                    <Download size={15} strokeWidth={2} /> Exportar
+                </button>
+            </EncabezadoVista>
 
             {loading ? (
-                <div className="ai-panel" style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                    <Loader2 size={24} strokeWidth={1.75} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
+                <CargandoVista />
             ) : !datos ? (
-                <div className="ai-panel ai-empty"><p style={{ color: 'var(--danger)' }}>{error}</p></div>
+                <VistaVacia error>{error}</VistaVacia>
             ) : (
                 <>
-                    <div className="ai-kpis" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-                        <div className="ai-kpi">
-                            <div className="ai-kpi-head"><span className="ai-kpi-label">Costo total</span><span className="ai-kpi-icon"><DollarSign size={16} strokeWidth={1.75} /></span></div>
-                            <div className="ai-kpi-value">{formatearPesos(totales?.total_dinero)}</div>
-                            <div className="ai-kpi-foot">horas extra del mes</div>
-                        </div>
-                        <div className="ai-kpi">
-                            <div className="ai-kpi-head"><span className="ai-kpi-label">Horas</span><span className="ai-kpi-icon"><Clock size={16} strokeWidth={1.75} /></span></div>
-                            <div className="ai-kpi-value">{formatearHoras(totales?.total_horas)}</div>
-                        </div>
-                        <div className="ai-kpi">
-                            <div className="ai-kpi-head"><span className="ai-kpi-label">Empleados</span><span className="ai-kpi-icon"><Users size={16} strokeWidth={1.75} /></span></div>
-                            <div className="ai-kpi-value">{totales?.empleados ?? 0}</div>
-                        </div>
-                    </div>
+                    <Mosaicos>
+                        <Mosaico color={TONO.exito} icono={DollarSign} valor={formatearPesos(totales?.total_dinero)} label="Costo total" detalle="horas extra del mes" />
+                        <Mosaico color={TONO.acento} icono={Clock} valor={formatearHoras(totales?.total_horas)} label="Horas" />
+                        <Mosaico color={TONO.info} icono={Users} valor={totales?.empleados ?? 0} label="Empleados" />
+                    </Mosaicos>
 
                     {(datos.por_campania?.length ?? 0) > 1 && (
-                        <div className="ai-panel">
-                            <div className="ai-panel-head"><h3 className="ai-panel-title">Por campaña</h3></div>
-                            <table className="ai-table ai-table--dense">
+                        <PanelVista icono={Building2} titulo="Por campaña">
+                            <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                                 <thead>
                                     <tr><th>Campaña</th><th className="ai-num">Empleados</th><th className="ai-num">Horas</th><th className="ai-num">Costo</th></tr>
                                 </thead>
@@ -141,19 +127,19 @@ const ReportesHorasExtra = () => {
                                     </tfoot>
                                 )}
                             </table>
-                        </div>
+                        </PanelVista>
                     )}
 
-                    <div className="ai-panel">
-                        <div className="ai-panel-head"><h3 className="ai-panel-title">Detalle por empleado</h3></div>
-                        {filas.length === 0 ? (
-                            <div className="ai-empty">
-                                <FileSpreadsheet size={36} strokeWidth={1.5} style={{ color: 'var(--ink-subtle)' }} />
-                                <p>No hay horas extra aprobadas en {nombrePeriodo(periodo).toLowerCase()}{campaniaId ? ' para esta campaña' : ''}.</p>
-                            </div>
-                        ) : (
-                            <div style={{ overflowX: 'auto' }}>
-                                <table className="ai-table ai-table--dense">
+                    <div className="ai-monitor-detalle-head">
+                        <h3><ListOrdered size={18} strokeWidth={2} aria-hidden="true" /> Detalle por empleado</h3>
+                    </div>
+                    {filas.length === 0 ? (
+                        <VistaVacia icono={FileSpreadsheet}>
+                            No hay horas extra aprobadas en {nombrePeriodo(periodo).toLowerCase()}{campaniaId ? ' para esta campaña' : ''}.
+                        </VistaVacia>
+                    ) : (
+                            <div className="ai-monitor-tabla-wrap" style={{ marginBottom: 12 }}>
+                                <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                                     <thead>
                                         <tr>
                                             <th>Empleado</th>
@@ -167,9 +153,14 @@ const ReportesHorasExtra = () => {
                                     <tbody>
                                         {filas.map((f) => (
                                             <tr key={f.users_company_id}>
-                                                <td>
-                                                    <div style={{ fontWeight: 600 }}>{nombrePropio(f.nombre)}</div>
-                                                    <div className="ai-muted" style={{ fontSize: 12 }}>CC {f.documento}</div>
+                                                <td className="ai-monitor-nombre">
+                                                    <span>
+                                                        <AvatarVista />
+                                                        <span>
+                                                            {nombrePropio(f.nombre).toUpperCase()}
+                                                            <span className="ai-monitor-sub">CC {f.documento}</span>
+                                                        </span>
+                                                    </span>
                                                 </td>
                                                 <td className="ai-muted" style={{ fontSize: 12 }}>
                                                     {[f.campania, f.cargo].filter(Boolean).map(primeraMayuscula).join(' · ') || '—'}
@@ -198,8 +189,7 @@ const ReportesHorasExtra = () => {
                                     )}
                                 </table>
                             </div>
-                        )}
-                    </div>
+                    )}
                     {filas.some((f) => !f.valor_hora) && (
                         <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>
                             Los empleados sin salario registrado aparecen con costo $0: hay que cargarles el salario en su ficha para que el dinero cuadre.

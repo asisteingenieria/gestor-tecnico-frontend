@@ -403,6 +403,8 @@
 /* Descanso (§73): rayas cian; la textura lo separa del Baño (cian sólido). Validado con los colores del calendario. */
 .ai-st--descanso     { --st-tile: repeating-linear-gradient(135deg, #0891b2 0 9px, #0e7490 9px 18px); --st-ink: #fff; --st-bar: #a5f3fc; --st-pill: repeating-linear-gradient(135deg, #cffafe 0 5px, #ecfeff 5px 10px); --st-dot: #06b6d4; --st-icon: #fff; }
 .ai-st--no_llego     { --st-tile: #fde0e0; --st-ink: #0f2b5b; --st-bar: #e0302a; --st-pill: #fde0e0; --st-dot: #e0302a; --st-icon: #e0302a; }
+/* Peligro (retiro, rechazo, no apto) de las vistas de RRHH/financiera; ver src/components/ui/paletasEstado.js. */
+.ai-st--peligro      { --st-tile: #c8221c; --st-ink: #fff;    --st-bar: #f19c98; --st-pill: #fbdcda; --st-dot: #c8221c; --st-icon: #fff; }
 [data-theme="dark"] .ai-st--break        { --st-tile: #5a4313; --st-ink: #fde9c4; --st-icon: #fde9c4; --st-pill: #4a3810; }
 [data-theme="dark"] .ai-st--bano         { --st-tile: #12505e; --st-ink: #c4f0fb; --st-icon: #c4f0fb; --st-pill: #10414d; }
 [data-theme="dark"] .ai-st--sin_iniciar  { --st-tile: #2a3547; --st-ink: #e8eef7; --st-icon: #e8eef7; --st-pill: #2a3547; }
@@ -414,6 +416,7 @@
 [data-theme="dark"] .ai-st--desconectado { --st-pill: #2f3846; }
 [data-theme="dark"] .ai-st--finalizado   { --st-pill: #173a24; }
 [data-theme="dark"] .ai-st--novedad      { --st-pill: #43183a; }
+[data-theme="dark"] .ai-st--peligro      { --st-pill: #4a1a18; }
 [data-theme="dark"] .ai-st--descanso     { --st-pill: repeating-linear-gradient(135deg, #134e5e 0 5px, #0f3b47 5px 10px); }
 /* Distintivo de novedad junto al nombre (NovedadChip.jsx). */
 .ai-badge.ai-nov-badge { background: #f6e1f1; color: #7d1f69; }
@@ -477,6 +480,7 @@
 .ai-monitor-sub { display: block; margin-top: 3px; font: 600 11px/14px var(--font-sans); color: var(--ink-muted); }
 /* Histórico del equipo (EquipoMensual.jsx) con el mismo diseño: mosaicos fijos, paneles y tabla de detalle. */
 .ai-monitor-mosaico--estatico { cursor: default; }
+.ai-monitor-det { font-size: 11.5px; line-height: 15px; opacity: .88; text-align: center; font-variant-numeric: tabular-nums; }
 .ai-monitor-detalle-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 10px; }
 .ai-monitor-detalle-head h3 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font: 800 16px/20px var(--font-sans); color: var(--mon-ink); }
 .ai-monitor-mosaico--estatico:hover { transform: none; box-shadow: 0 2px 6px rgba(15,43,91,.12); }
@@ -488,6 +492,8 @@
 .ai-monitor-panel-head .ai-monitor-leyenda span { color: var(--mon-head-ink); }
 .ai-monitor-grupo { padding: 8px 12px !important; background: var(--mon-avatar) !important; color: var(--mon-head); font: 800 11.5px/15px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; }
 .ai-monitor-grupo-n { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--ink-muted); }
+/* En oscuro --mon-head es casi el fondo de la fila: el texto del grupo va con la tinta clara. */
+[data-theme="dark"] .ai-monitor-grupo { color: var(--mon-ink); }
 .ai-monitor-th { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 8px 10px; font: 600 12.5px/15px var(--font-sans); color: var(--mon-head-ink); white-space: nowrap; }
 .ai-monitor-tabla--fija tbody tr { cursor: default; }
 .ai-monitor-tabla--fija tbody tr.ai-monitor-fila-grupo:hover td { background: var(--mon-avatar); }
@@ -536,12 +542,54 @@
 .gm-tip-fila span { flex: 1; color: var(--ink-muted); }
 .gm-tip-fila b { font-variant-numeric: tabular-nums; }
 .gm-tip-pie { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); font-weight: 600; }
+
+/* Home de financiera: las mismas tarjetas de gráfica del Histórico de Equipo (gm-*). */
+/* Dos columnas: cada fila junta gráficas de altura parecida (meses | meses, campañas | campañas). */
+.fin-graficas { grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); }
+.gm-grafica.fin-tarjeta { display: flex; flex-direction: column; min-width: 0; }
+.fin-tarjeta-acciones { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.fin-tarjeta-cuerpo { flex: 1; min-width: 0; }
+.fin-fuente { margin: 10px 0 2px; font: 500 11.5px/16px var(--font-sans); color: var(--ink-subtle); }
+.fin-fila { cursor: default; }
+.fin-barras--meta { padding-top: 18px; }
+.gm-rejilla .fin-meta { width: 0; background: none; opacity: 1; border-left: 1.5px dashed var(--mon-ink); }
+.fin-meta em { position: absolute; top: 0; right: 5px; font: 600 11px/14px var(--font-sans); font-style: normal; color: var(--mon-ink); white-space: nowrap; }
 @media (max-width: 640px) {
   .gm-graficas { grid-template-columns: 1fr; padding: 10px; }
   .gm-nombre { width: 110px; }
   .gm-rejilla { left: 118px; }
   .gm-ver { margin-left: 0; }
 }
+/* Tabla del diseño de Equipo con encabezados de solo texto (pantallas migradas del sistema "Opción C"):
+   el <th> lleva el texto directo, sin botón de orden. Filas no clicables salvo que la vista lo pida. */
+.ai-monitor-tabla--simple th { padding: 12px 12px; font: 600 12.5px/15px var(--font-sans); color: var(--mon-head-ink); text-align: left; white-space: nowrap; }
+.ai-monitor-tabla--simple th.ai-num, .ai-monitor-tabla--simple td.ai-num { text-align: right; }
+.ai-monitor-tabla--simple tbody tr { cursor: default; }
+.ai-monitor-tabla--simple tbody tr.is-clicable { cursor: pointer; }
+.ai-monitor-tabla--simple td { vertical-align: middle; }
+.ai-monitor-tabla--simple .ai-muted { color: var(--ink-muted); }
+/* Tabla del diseño de Equipo con encabezados de solo texto (pantallas migradas del sistema "Opción C"):
+   el <th> lleva el texto directo, sin botón de orden. Filas no clicables salvo que la vista lo pida. */
+.ai-monitor-tabla--simple th { padding: 12px 12px; font: 600 12.5px/15px var(--font-sans); color: var(--mon-head-ink); text-align: left; white-space: nowrap; }
+.ai-monitor-tabla--simple th.ai-num, .ai-monitor-tabla--simple td.ai-num { text-align: right; }
+.ai-monitor-tabla--simple tbody tr { cursor: default; }
+.ai-monitor-tabla--simple tbody tr.is-clicable { cursor: pointer; }
+.ai-monitor-tabla--simple td { vertical-align: middle; }
+.ai-monitor-tabla--simple .ai-muted { color: var(--ink-muted); }
+/* Acción principal dentro de las pastillas del encabezado (crear, asignar). */
+.ai-monitor-acciones .ai-monitor-btn--primario { background: var(--mon-head); color: #fff; border-color: var(--mon-head); }
+[data-theme="dark"] .ai-monitor-acciones .ai-monitor-btn--primario { background: #2f6fc4; border-color: #2f6fc4; }
+.ai-monitor-acciones .ai-monitor-btn:disabled { opacity: .55; cursor: not-allowed; }
+/* Botones de pastilla fuera del encabezado: dentro de paneles y tablas (Ver detalle, Exportar…). */
+.ai-monitor-panel .ai-monitor-btn, .ai-monitor-tabla .ai-monitor-btn { height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-100); color: var(--mon-ink); font: 700 12px/16px var(--font-sans); letter-spacing: .03em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; text-decoration: none; }
+.ai-monitor-panel-head .ai-monitor-btn { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); color: var(--mon-head-ink); }
+.ai-monitor-panel-head .ai-monitor-btn:hover { background: rgba(255,255,255,.22); }
+.ai-monitor-barra .ai-datenav { flex: none; }
+/* Reparto del día (EquipoAsistencia, §78): barra con los siete estados, con el color de cada mosaico. */
+.ai-monitor-reparto { flex: 1 1 260px; min-width: 200px; display: flex; gap: 2px; height: 12px; border-radius: 999px; overflow: hidden; background: var(--surface-200); }
+.ai-monitor-reparto > i { display: block; height: 100%; background: var(--st-dot); }
+.ai-monitor-reparto-txt { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 500 13px/18px var(--font-sans); color: var(--mon-ink); }
+.ai-monitor-reparto-txt b { font-weight: 800; }
 /* Llegada tarde: pastilla roja junto a la hora de login. */
 .ai-monitor-tarde { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #e0302a; color: #fff; font: 700 10.5px/15px var(--font-sans); letter-spacing: .02em; vertical-align: 1px; }
 @media (max-width: 520px) {
@@ -550,3 +598,50 @@
   .ai-monitor-leyenda { padding-left: 0; border-left: 0; }
   .ai-monitor-titulo h1 { font-size: 24px; }
 }
+
+/* ===== Formularios, ventanas y cajones con el diseño de Equipo (plan rediseño de vistas, Ola 5) =====
+   Todo va acotado a .ai-overlay (las ventanas y cajones de RRHH, financiera y asistencia): encabezado navy como
+   los paneles del monitor, títulos de sección como las bandas de grupo, campos con esquinas de 10 px, botones en
+   pastilla y tablas con cabecera navy. Las páginas no cambian. */
+.ai-overlay .ai-modal { border-radius: 14px; }
+.ai-overlay .ai-modal-head { align-items: center; gap: 12px; padding: 14px 20px; background: var(--mon-head); }
+.ai-overlay .ai-modal-head .ai-modal-icon { width: 36px; height: 36px; border-radius: 10px; background: rgba(255, 255, 255, .14); color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-head .ai-modal-icon--danger { background: #c8221c; color: #fff; }
+.ai-overlay .ai-modal-title { font: 700 16px/22px var(--font-sans); color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-sub { color: var(--mon-head-ink); opacity: .78; }
+.ai-overlay .ai-modal-head .ai-icon-btn { color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-head .ai-icon-btn:hover { background: rgba(255, 255, 255, .15); color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-head .ai-badge { background: rgba(255, 255, 255, .16); color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-body { padding-top: 18px; }
+.ai-overlay .ai-modal-head + .ai-steps { padding-top: 16px; }
+.ai-overlay .ai-modal-foot { padding: 12px 20px; background: var(--mon-fila-impar); }
+
+/* Cajón (ficha del empleado, candidato de Hydra): encabezado navy plano, como los paneles. */
+.ai-overlay .ai-drawer-hero { background: var(--mon-head); color: var(--mon-head-ink); }
+.ai-overlay .ai-drawer-hero .ai-avatar { background: var(--mon-avatar); color: var(--mon-head); }
+.ai-overlay .ai-drawer-hero .ai-icon-btn { color: var(--mon-head-ink); }
+
+/* Títulos de sección del formulario: la banda de grupo del monitor. */
+.ai-overlay .ai-overline { padding: 8px 12px; border-radius: 8px; background: var(--mon-avatar); color: var(--mon-head); font: 800 11.5px/15px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; }
+[data-theme="dark"] .ai-overlay .ai-overline { color: var(--mon-ink); }
+
+/* Campos. */
+.ai-overlay .ai-label { font: 600 12.5px/16px var(--font-sans); color: var(--mon-ink); }
+.ai-overlay .ai-input { border-radius: 10px; }
+.ai-overlay .ai-input:focus, .ai-overlay .ai-input:focus-within { border-color: #2f6fc4; box-shadow: 0 0 0 3px rgba(47, 111, 196, .18); outline: none; }
+
+/* Botones en pastilla, como las acciones del monitor. */
+.ai-overlay .ai-btn { height: 36px; padding: 0 14px; border-radius: 10px; font: 700 12.5px/16px var(--font-sans); letter-spacing: .03em; text-transform: uppercase; }
+.ai-overlay .ai-btn--sm { height: 30px; padding: 0 12px; border-radius: 9px; font-size: 12px; }
+.ai-overlay .ai-btn--primary { background: var(--mon-head); color: #fff; border-color: var(--mon-head); box-shadow: none; }
+.ai-overlay .ai-btn--primary:hover { filter: brightness(1.15); background: var(--mon-head); }
+[data-theme="dark"] .ai-overlay .ai-btn--primary { background: #2f6fc4; border-color: #2f6fc4; }
+.ai-overlay .ai-btn--secondary { color: var(--mon-ink); }
+.ai-overlay .ai-btn:disabled { opacity: .55; cursor: not-allowed; }
+.ai-overlay .ai-drawer-hero .ai-btn--secondary { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .28); color: var(--mon-head-ink); }
+
+/* Tablas dentro de ventanas: cabecera navy y filas alternas, como la tabla del monitor. */
+.ai-overlay .ai-table th { background: var(--mon-head); color: var(--mon-head-ink); letter-spacing: .04em; }
+.ai-overlay .ai-table tbody tr:nth-child(even) td { background: var(--mon-fila-impar); }
+.ai-overlay .ai-card { border-radius: 12px; }
+.ai-overlay .ai-tab.is-active { color: var(--mon-ink); }
