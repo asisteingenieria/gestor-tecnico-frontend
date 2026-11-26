@@ -37,7 +37,8 @@ export function estadoMonitor(emp) {
     // Novedad de RRHH que cubre hoy (incapacidad, vacaciones, licencia…, §71): ni ausente ni "No ha llegado".
     if (noAsistioPorNovedad(emp)) return { clave: 'novedad', label: etiquetaNovedad(emp.novedad.tipo), corre: false };
     // Día de descanso de su malla (§73): no es "Sin iniciar". Si trabaja igual, sale en su estado real.
-    if (emp.turno?.es_descanso && emp.estado === 'pendiente') return { clave: 'descanso', label: 'Descanso', corre: false };
+    // Un libre aprobado (§86) cuenta como descanso, con su propio nombre.
+    if (emp.turno?.es_descanso && emp.estado === 'pendiente') return { clave: 'descanso', label: emp.turno.es_libre ? 'Libre' : 'Descanso', corre: false };
     if (emp.estado === 'ausente') return { clave: 'ausente', label: 'Ausente', corre: false };
     // Sin entrada con su turno ya empezado (lo decide el servidor, §62); si no, aún no le toca, descansa o no tiene horario.
     if (emp.no_ha_llegado) return { clave: 'no_llego', label: 'No ha llegado', corre: false };

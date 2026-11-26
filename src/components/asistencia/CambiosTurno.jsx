@@ -1,22 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarClock, ArrowLeftRight, Check, X, Plus, Search, ArrowRight, Clock3, CheckCircle2, XCircle, Inbox, Send, ListChecks } from 'lucide-react';
+import { CalendarClock, CalendarOff, ArrowLeftRight, Check, X, Plus, Search, ArrowRight, Clock3, CheckCircle2, XCircle, Inbox, Send, ListChecks } from 'lucide-react';
 import { cambioTurnoService } from '../../services/api';
 import { escucharAsistencia } from '../../utils/socketAsistencia';
 import { avisarCambioContadores } from '../../utils/eventosAsistencia';
 import { formatearFecha } from '../../utils/fecha';
 import { nombrePropio } from '../../utils/formatoRRHH';
 import { EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, PanelVista, Pastilla, CargandoVista, VistaVacia, COLOR_SOLICITUD, TONO } from '../ui';
+import { TrazaSolicitud } from './TrazaSolicitud';
+import { TIPO_NOVEDAD } from '../../utils/novedadAsistencia';
+import { normalizarNombre } from '../../utils/catalogosRRHH';
 
-// Cambios de turno (asistencia.md §50, flujo de §51). Una pantalla, tres vistas:
-// - jefe de operaciones (gestiona la asistencia de su equipo): pide cambios para su gente y ve
-//   "Mis solicitudes";
-// - director (el jefe de los jefes): "Por aprobar", aprueba —el horario se reemplaza solo— o rechaza
-//   con un motivo;
+// Novedades de asistencia: cambio de turno, intercambio y libre (asistencia.md §50, §51 y §86). Una pantalla,
+// tres vistas:
+// - quien pide: solo el coordinador, por su gente directa; ve "Mis solicitudes". El agente no pide;
+// - quien aprueba: el jefe de operaciones que gestiona al empleado; no pide.
+//   "Por aprobar": aprueba —el horario se reemplaza solo; el libre deja el día como libre— o rechaza con motivo;
 // - financiera (`financiera`): todas las solicitudes y su estado, solo lectura.
-// Se recarga sola con el aviso `asistencia:notificacion` del socket.
+// Cada tarjeta lleva la traza: cuándo se envió y cuándo y quién la resolvió. Se recarga sola con el aviso
+// `asistencia:notificacion` del socket.
 
 const ESTADO_LABEL = { pendiente: 'Pendiente', aprobada: 'Aprobada', rechazada: 'Rechazada' };
-const TIPO_LABEL = { cambio_horario: 'Cambio de horario', intercambio: 'Intercambio' };
+const TIPO_LABEL = TIPO_NOVEDAD;
+const ICONO_TIPO = { cambio_horario: CalendarClock, intercambio: ArrowLeftRight, libre: CalendarOff };
 
 const hhmm = (h) => (h ? String(h).slice(0, 5) : '');
 const hoyBogota = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
@@ -45,7 +50,7 @@ const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
             else await cambioTurnoService.rechazar(s.idsolicitud_cambio_turno, { motivo_rechazo: texto.trim() });
             setAccion(null);
             setTexto('');
-            onResuelta(accion === 'aprobar' ? 'Solicitud aprobada: el horario ya quedó cambiado.' : 'Solicitud rechazada.');
+            onResuelta(accion !== 'aprobar' ? 'Solicitud rechazada.' : s.tipo === 'libre' ? 'Libre aprobado: el día ya quedó libre en su horario.' : 'Solicitud aprobada: el horario ya quedó cambiado.');
         } catch (err) {
             onError(err.response?.data?.message || 'No se pudo resolver la solicitud');
         } finally {
@@ -55,7 +60,7 @@ const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
 
     return (
         <PanelVista
-            icono={s.tipo === 'intercambio' ? ArrowLeftRight : CalendarClock}
+            icono={ICONO_TIPO[s.tipo] || CalendarClock}
             titulo={`${TIPO_LABEL[s.tipo]} · #${s.idsolicitud_cambio_turno} · ${fmtInstante(s.creado_en)}`}
             extra={(
                 <div className="ai-row" style={{ gap: 6, flexWrap: 'wrap' }}>
@@ -71,12 +76,6 @@ const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
         >
         <div style={{ padding: 16 }}>
 
-            <div className="ai-req-meta">
-                <span>Pedida por <strong>{nombrePropio(s.solicitante)}</strong></span>
-                <span>La aprueba <strong>{nombrePropio(s.aprobador)}</strong></span>
-            </div>
-            <p style={{ fontSize: 13, margin: '8px 0' }}><span className="ai-muted">Motivo:</span> {s.motivo}</p>
-
             <div className="ai-monitor-tabla-wrap" style={{ boxShadow: 'none', border: '1px solid var(--border)' }}>
                 <table className="ai-monitor-tabla ai-monitor-tabla--simple">
                     <thead>
@@ -89,23 +88,14 @@ const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
                                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDia(d.fecha)}</td>
                                 <td className="ai-muted">{textoAnterior(d)}</td>
                                 <td><ArrowRight size={14} strokeWidth={1.75} style={{ color: 'var(--ink-subtle)' }} /></td>
-                                <td style={{ fontWeight: 600 }}>{textoTurno(d)}</td>
+                                <td style={{ fontWeight: 600 }}>{s.tipo === 'libre' ? 'Libre' : textoTurno(d)}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
 
-            {s.estado === 'rechazada' && (
-                <p style={{ fontSize: 13, marginTop: 8, padding: '8px 12px', borderRadius: 'var(--radius-md)', background: 'var(--danger-soft)', color: 'var(--danger)' }}>
-                    Rechazada por {nombrePropio(s.resuelto_por)} el {fmtInstante(s.resuelta_en)}. Motivo: {s.motivo_rechazo}
-                </p>
-            )}
-            {s.estado === 'aprobada' && (
-                <p className="ai-muted" style={{ fontSize: 12, marginTop: 8 }}>
-                    Aprobada por {nombrePropio(s.resuelto_por)} el {fmtInstante(s.resuelta_en)}{s.comentario ? ` · "${s.comentario}"` : ''}
-                </p>
-            )}
+            <div style={{ marginTop: 10 }}><TrazaSolicitud s={s} /></div>
 
             {accion && (
                 <div className="ai-stack" style={{ marginTop: 10, gap: 6 }}>
@@ -136,14 +126,14 @@ const TarjetaSolicitud = ({ s, conAcciones, onResuelta, onError }) => {
 };
 
 // ---------------------------------------------------------------------------------------------
-// Buscador de empleado de su equipo por nombre o cédula (se filtra en el navegador).
+// Listado de su equipo, siempre a la vista, con un buscador por nombre o cédula que lo filtra (en el navegador).
 const SelectorEmpleado = ({ empleados, valor, onCambiar, etiqueta, placeholder }) => {
     const [busqueda, setBusqueda] = useState('');
     const seleccionado = empleados.find((e) => e.users_company_id === valor) || null;
     const filtrados = useMemo(() => {
-        const q = busqueda.trim().toLowerCase();
-        if (q.length < 2) return [];
-        return empleados.filter((e) => e.nombre.toLowerCase().includes(q) || String(e.cedula).includes(q)).slice(0, 8);
+        const q = normalizarNombre(busqueda);
+        if (!q) return empleados;
+        return empleados.filter((e) => normalizarNombre(e.nombre).includes(q) || String(e.cedula).includes(q));
     }, [busqueda, empleados]);
 
     if (seleccionado) {
@@ -159,7 +149,7 @@ const SelectorEmpleado = ({ empleados, valor, onCambiar, etiqueta, placeholder }
                         <div style={{ fontSize: 12, marginTop: 2 }}>
                             {seleccionado.gestor_id
                                 ? <>La solicitud le llega a <strong>{nombrePropio(seleccionado.gestor)}</strong></>
-                                : <span style={{ color: 'var(--danger)' }}>No tienes en RRHH un director que apruebe tus solicitudes</span>}
+                                : <span style={{ color: 'var(--danger)' }}>No hay en RRHH un jefe que apruebe esta solicitud: pide que lo asignen en la ficha</span>}
                         </div>
                     </div>
                     <button type="button" className="ai-icon-btn" onClick={() => { onCambiar(null); setBusqueda(''); }} aria-label="Cambiar empleado"><X size={16} strokeWidth={1.75} /></button>
@@ -177,20 +167,26 @@ const SelectorEmpleado = ({ empleados, valor, onCambiar, etiqueta, placeholder }
                     placeholder={placeholder || 'Nombre o cédula'}
                 />
             </div>
+            <p className="ai-help" style={{ margin: '6px 0 0' }}>
+                {busqueda.trim()
+                    ? `${filtrados.length} de ${empleados.length} personas de tu equipo`
+                    : `Tu equipo · ${empleados.length} ${empleados.length === 1 ? 'persona' : 'personas'}`}
+            </p>
             {filtrados.length > 0 && (
-                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginTop: 4, maxHeight: 240, overflowY: 'auto', background: 'var(--surface-100)' }}>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginTop: 4, maxHeight: 260, overflowY: 'auto', background: 'var(--surface-100)' }}>
                     {filtrados.map((e) => (
                         <button
                             key={e.users_company_id} type="button" onClick={() => onCambiar(e.users_company_id)}
-                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', border: 0, background: 'transparent', cursor: 'pointer', color: 'inherit', font: 'inherit' }}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', border: 0, borderBottom: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'inherit', font: 'inherit' }}
                         >
                             <div style={{ fontSize: 13, fontWeight: 600 }}>{nombrePropio(e.nombre)}</div>
-                            <div className="ai-muted" style={{ fontSize: 12 }}>{[e.cedula, e.campania, e.centro_costo].filter(Boolean).join(' · ')}</div>
+                            <div className="ai-muted" style={{ fontSize: 12 }}>{[e.cedula, e.cargo, e.campania, e.centro_costo].filter(Boolean).join(' · ')}</div>
                         </button>
                     ))}
                 </div>
             )}
-            {busqueda.trim().length >= 2 && filtrados.length === 0 && <p className="ai-help">Sin resultados.</p>}
+            {empleados.length === 0 && <p className="ai-help">No tienes personas a cargo en RRHH.</p>}
+            {empleados.length > 0 && filtrados.length === 0 && <p className="ai-help">Nadie de tu equipo coincide con la búsqueda.</p>}
         </div>
     );
 };
@@ -250,6 +246,8 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
         let datos;
         if (form.tipo === 'intercambio') {
             datos = { ...base, empleado2_id: form.empleado2, fecha: form.fecha };
+        } else if (form.tipo === 'libre') {
+            datos = { ...base, desde: form.desde, hasta: form.hasta || form.desde };
         } else {
             datos = { ...base, desde: form.desde, hasta: form.hasta || form.desde };
             if (form.modo === 'descanso') datos.es_descanso = true;
@@ -259,7 +257,7 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
         setEnviando(true);
         try {
             await cambioTurnoService.solicitar(datos);
-            onEnviada();
+            onEnviada(emp1?.gestor);
         } catch (err) {
             const msg = err.response?.data?.message || 'No se pudo enviar la solicitud';
             const detalles = err.response?.data?.detalles;
@@ -270,13 +268,14 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
     };
 
     const nuevoValido = form.modo === 'descanso' || (form.modo === 'plantilla' ? Boolean(form.plantillaId) : Boolean(form.entrada && form.salida && form.salida > form.entrada));
+    const rangoValido = Boolean(form.desde && (!form.hasta || form.hasta >= form.desde));
     const valido = Boolean(form.motivo.trim() && emp1?.gestor_id) && (form.tipo === 'intercambio'
         ? Boolean(form.empleado2 && form.fecha)
-        : Boolean(form.desde && (!form.hasta || form.hasta >= form.desde) && nuevoValido));
+        : rangoValido && (form.tipo === 'libre' || nuevoValido));
 
     // Fechas del rango (para la vista previa del cambio de horario), como mucho 31.
     const fechasRango = useMemo(() => {
-        if (form.tipo !== 'cambio_horario' || !desde || !hasta || hasta < desde) return [];
+        if (form.tipo === 'intercambio' || !desde || !hasta || hasta < desde) return [];
         const lista = [];
         for (let d = new Date(`${desde}T00:00:00Z`); d <= new Date(`${hasta}T00:00:00Z`) && lista.length < 31; d.setUTCDate(d.getUTCDate() + 1)) {
             lista.push(d.toISOString().slice(0, 10));
@@ -284,7 +283,7 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
         return lista;
     }, [form.tipo, desde, hasta]);
 
-    const textoNuevo = form.modo === 'descanso'
+    const textoNuevo = form.tipo === 'libre' ? 'Libre' : form.modo === 'descanso'
         ? 'Descanso'
         : form.modo === 'plantilla'
             ? (plantilla ? textoTurno(plantilla) : '—')
@@ -295,13 +294,13 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
             <div className="ai-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="ai-modal-head">
                     <span className="ai-modal-icon"><CalendarClock size={20} strokeWidth={1.75} /></span>
-                    <div><h3 className="ai-modal-title">Solicitar cambio de turno</h3><p className="ai-modal-sub">De alguien de tu equipo · lo aprueba tu director</p></div>
+                    <div><h3 className="ai-modal-title">Nueva novedad de asistencia</h3><p className="ai-modal-sub">Cambio de turno o libre de alguien de tu equipo · le llega a su jefe de operaciones</p></div>
                     <button type="button" className="ai-icon-btn" onClick={onCerrar} aria-label="Cerrar"><X size={18} strokeWidth={1.75} /></button>
                 </div>
                 <form onSubmit={enviar}>
                     <div className="ai-modal-body ai-stack" style={{ maxHeight: '68vh', overflowY: 'auto' }}>
                         <div className="ai-seg" style={{ alignSelf: 'flex-start' }}>
-                            {[['cambio_horario', 'Cambio de horario'], ['intercambio', 'Intercambio entre dos']].map(([valor, texto]) => (
+                            {[['cambio_horario', 'Cambio de turno'], ['libre', 'Libre'], ['intercambio', 'Intercambio entre dos']].map(([valor, texto]) => (
                                 <span key={valor} className={form.tipo === valor ? 'is-active' : ''} style={{ cursor: 'pointer' }}
                                     onClick={() => setForm((f) => ({ ...f, tipo: valor, empleado2: null }))}>{texto}</span>
                             ))}
@@ -339,16 +338,20 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
                                         <input type="date" min={form.desde || hoy} className="ai-input" value={form.hasta} onChange={(e) => set('hasta', e.target.value)} />
                                     </div>
                                 </div>
+                                {form.tipo === 'libre' && (
+                                    <p className="ai-help">Día(s) libre(s) completo(s). Al aprobarse, el día queda libre en su horario: no cuenta como ausencia ni llegada tarde. Los días que ya son de descanso no se piden.</p>
+                                )}
+                                {form.tipo === 'cambio_horario' && (
                                 <div className="ai-field">
                                     <label className="ai-label">Turno nuevo <em>*</em></label>
                                     <div className="ai-seg" style={{ alignSelf: 'flex-start', marginBottom: 8 }}>
-                                        {[['plantilla', 'Mis plantillas'], ['horas', 'Horas'], ['descanso', 'Descanso']].map(([valor, texto]) => (
+                                        {[['plantilla', 'Plantillas'], ['horas', 'Horas'], ['descanso', 'Descanso']].map(([valor, texto]) => (
                                             <span key={valor} className={form.modo === valor ? 'is-active' : ''} style={{ cursor: 'pointer' }} onClick={() => set('modo', valor)}>{texto}</span>
                                         ))}
                                     </div>
                                     {form.modo === 'plantilla' && (
                                         form.empleado && plantillas.length === 0
-                                            ? <p className="ai-help">No tienes plantillas: indica las horas.</p>
+                                            ? <p className="ai-help">No hay plantillas: indica las horas.</p>
                                             : (
                                                 <select className="ai-input" value={form.plantillaId} onChange={(e) => set('plantillaId', e.target.value)} disabled={!form.empleado}>
                                                     <option value="">{form.empleado ? 'Selecciona una plantilla' : 'Primero elige el empleado'}</option>
@@ -371,11 +374,12 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
                                         <p className="ai-help is-error">La salida debe ser después de la entrada (no se manejan turnos que cruzan la medianoche).</p>
                                     )}
                                 </div>
+                                )}
                             </>
                         )}
 
                         {/* Vista previa: turno actual → turno nuevo */}
-                        {form.tipo === 'cambio_horario' && emp1 && fechasRango.length > 0 && (
+                        {form.tipo !== 'intercambio' && emp1 && fechasRango.length > 0 && (
                             <div className="ai-field">
                                 <label className="ai-label">Así quedaría</label>
                                 <table className="ai-table" style={{ fontSize: 13 }}>
@@ -387,7 +391,7 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
                                                     <td style={{ whiteSpace: 'nowrap' }}>{fmtDia(f)}</td>
                                                     <td className="ai-muted">{actual ? textoTurno(actual) : 'Sin horario'}</td>
                                                     <td><ArrowRight size={14} strokeWidth={1.75} style={{ color: 'var(--ink-subtle)' }} /></td>
-                                                    <td style={{ fontWeight: 600 }}>{textoNuevo}</td>
+                                                    <td style={{ fontWeight: 600 }}>{form.tipo === 'libre' && actual?.es_descanso ? 'Ya es descanso (no se pide)' : textoNuevo}</td>
                                                 </tr>
                                             );
                                         })}
@@ -416,7 +420,7 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
                         <div className="ai-field">
                             <label className="ai-label">Motivo <em>*</em></label>
                             <textarea required className="ai-input" rows={3} style={{ height: 'auto', padding: '10px 12px' }}
-                                value={form.motivo} onChange={(e) => set('motivo', e.target.value)} placeholder="Por qué se necesita el cambio" />
+                                value={form.motivo} onChange={(e) => set('motivo', e.target.value)} placeholder={form.tipo === 'libre' ? 'Por qué se necesita el libre' : 'Por qué se necesita el cambio'} />
                         </div>
                         {error && <p className="ai-help is-error">{error}</p>}
                     </div>
@@ -439,6 +443,7 @@ const CambiosTurno = ({ financiera = false }) => {
     const [todas, setTodas] = useState([]);
     const [filtro, setFiltro] = useState(financiera ? '' : 'pendiente');
     const [busqueda, setBusqueda] = useState('');
+    const [tipo, setTipo] = useState('');
     const [loading, setLoading] = useState(true);
     const [mensaje, setMensaje] = useState(null);
     const [aviso, setAviso] = useState(null);
@@ -453,9 +458,10 @@ const CambiosTurno = ({ financiera = false }) => {
             }
             const { data: p } = await cambioTurnoService.getPermisos();
             setPermisos(p);
-            setTab((t) => t || (p.puede_aprobar ? 'bandeja' : 'mias'));
+            const aprueba = p.puede_aprobar || p.puede_aprobar_novedades;
+            setTab((t) => t || (aprueba ? 'bandeja' : 'mias'));
             const [b, m] = await Promise.all([
-                p.puede_aprobar ? cambioTurnoService.getBandeja() : Promise.resolve({ data: [] }),
+                aprueba ? cambioTurnoService.getBandeja() : Promise.resolve({ data: [] }),
                 p.puede_solicitar ? cambioTurnoService.getMias() : Promise.resolve({ data: [] })
             ]);
             setBandeja(b.data);
@@ -472,10 +478,10 @@ const CambiosTurno = ({ financiera = false }) => {
 
     const fuente = tab === 'bandeja' ? bandeja : tab === 'mias' ? mias : todas;
     const visibles = useMemo(() => {
-        const q = busqueda.trim().toLowerCase();
-        return fuente.filter((s) => (!filtro || s.estado === filtro) && (!q || [s.solicitante, s.aprobador, ...s.dias.map((d) => d.empleado)]
-            .some((n) => String(n || '').toLowerCase().includes(q))));
-    }, [fuente, filtro, busqueda]);
+        const q = normalizarNombre(busqueda);
+        return fuente.filter((s) => (!filtro || s.estado === filtro) && (!tipo || s.tipo === tipo) && (!q || [s.solicitante, s.aprobador, ...s.dias.map((d) => d.empleado)]
+            .some((n) => normalizarNombre(n).includes(q))));
+    }, [fuente, filtro, tipo, busqueda]);
 
     const resuelta = async (texto) => {
         setMensaje(null);
@@ -487,7 +493,7 @@ const CambiosTurno = ({ financiera = false }) => {
     if (loading) return <div className="ai-content"><CargandoVista /></div>;
 
     const tabs = [
-        ...(permisos?.puede_aprobar ? [{ id: 'bandeja', label: 'Por aprobar', icono: Inbox, count: bandeja.filter((s) => s.estado === 'pendiente').length }] : []),
+        ...(permisos?.puede_aprobar || permisos?.puede_aprobar_novedades ? [{ id: 'bandeja', label: 'Por aprobar', icono: Inbox, count: bandeja.filter((s) => s.estado === 'pendiente').length }] : []),
         ...(permisos?.puede_solicitar ? [{ id: 'mias', label: 'Mis solicitudes', icono: Send, count: mias.filter((s) => s.estado === 'pendiente').length }] : [])
     ];
     const cuenta = (e) => fuente.filter((s) => s.estado === e).length;
@@ -497,12 +503,14 @@ const CambiosTurno = ({ financiera = false }) => {
         <div className="ai-content">
             <EncabezadoVista
                 icono={CalendarClock}
-                titulo="Cambios de turno"
-                subtitulo={financiera ? 'Todas las solicitudes de los jefes y la respuesta de su director' : 'Los pide el jefe de operaciones y los aprueba su director'}
+                titulo="Novedades de asistencia"
+                subtitulo={financiera
+                    ? 'Cambios de turno y libres: quién los pidió, cuándo y la respuesta de su jefe'
+                    : 'Cambio de turno y libre · los pide el coordinador y los aprueba el jefe de operaciones'}
             >
                 {permisos?.puede_solicitar && (
                     <button type="button" className="ai-monitor-btn" onClick={() => { setAviso(null); setModal(true); }}>
-                        <Plus size={15} strokeWidth={2} /> Solicitar cambio de turno
+                        <Plus size={15} strokeWidth={2} /> Nueva novedad
                     </button>
                 )}
             </EncabezadoVista>
@@ -515,7 +523,7 @@ const CambiosTurno = ({ financiera = false }) => {
             )}
 
             {!financiera && tabs.length === 0 ? (
-                <VistaVacia icono={CalendarClock}>Los cambios de turno los pide el jefe de operaciones y los aprueba su director.</VistaVacia>
+                <VistaVacia icono={CalendarClock}>Las novedades de asistencia las piden los coordinadores por su gente y las aprueba el jefe de operaciones.</VistaVacia>
             ) : (
                 <>
                     {/* Cada mosaico filtra por su estado; "Todas" quita el filtro. */}
@@ -528,6 +536,10 @@ const CambiosTurno = ({ financiera = false }) => {
 
                     <BarraFiltros>
                         <CampoBusqueda value={busqueda} onChange={setBusqueda} placeholder="Buscar por nombre..." />
+                        <select className="ai-input ai-monitor-select" value={tipo} onChange={(e) => setTipo(e.target.value)} aria-label="Tipo de novedad">
+                            <option value="">Todos los tipos</option>
+                            {Object.entries(TIPO_LABEL).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
+                        </select>
                         {tabs.length > 1 && (
                             <div className="ai-seg" role="tablist" aria-label="Bandeja">
                                 {tabs.map((t) => (
@@ -556,11 +568,11 @@ const CambiosTurno = ({ financiera = false }) => {
             {modal && (
                 <ModalSolicitud
                     onCerrar={() => setModal(false)}
-                    onEnviada={async () => {
+                    onEnviada={async (aprobador) => {
                         setModal(false);
                         setTab('mias');
                         setFiltro('');
-                        setAviso('Solicitud enviada. Le llegó a tu director y te avisaremos cuando la responda.');
+                        setAviso(`Solicitud enviada${aprobador ? ` a ${nombrePropio(aprobador)}` : ''}. Te avisaremos cuando la responda.`);
                         await cargar();
                     }}
                 />

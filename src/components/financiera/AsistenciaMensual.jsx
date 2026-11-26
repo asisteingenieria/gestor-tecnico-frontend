@@ -27,6 +27,8 @@ const CELDA = {
     novedad: { bg: '#a8338f', label: 'Novedad RRHH' },
     // Día de descanso de su malla (§73): rayas cian, igual que en el histórico de los jefes.
     descanso: { bg: 'repeating-linear-gradient(135deg, #06b6d4 0 3px, #cffafe 3px 6px)', label: 'Descanso' },
+    // Libre aprobado (novedad de asistencia, §86), como en el histórico de los jefes.
+    libre: { bg: 'repeating-linear-gradient(135deg, #7c3aed 0 3px, #ede9fe 3px 6px)', label: 'Libre' },
     curso: { bg: 'var(--primary)', label: 'En curso' },
     pendiente: { bg: 'var(--border)', label: 'Pendiente' }
 };
@@ -34,7 +36,7 @@ const CELDA = {
 function claseDia(dia) {
     if (!dia) return null;
     if (dia.estado === 'novedad') return 'novedad';
-    if (dia.estado === 'descanso') return 'descanso';
+    if (dia.estado === 'descanso') return dia.libre ? 'libre' : 'descanso';
     if (dia.estado === 'ausente') return 'ausente';
     if (dia.estado === 'pendiente') return 'pendiente';
     if (dia.estado === 'en_curso' || dia.estado === 'en_pausa') return 'curso';
@@ -375,7 +377,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                 <div className="ai-panel-head">
                                     <h3 className="ai-panel-title">Calendario diario <span className="ai-muted" style={{ fontWeight: 400, fontSize: 13 }}>· clic en un día para ver su trazabilidad</span></h3>
                                     <div className="ai-row" style={{ gap: 12, flexWrap: 'wrap' }}>
-                                        {['puntual', 'tarde', 'ausente', 'novedad', 'descanso', 'curso', 'pendiente'].map((k) => (
+                                        {['puntual', 'tarde', 'ausente', 'novedad', 'descanso', 'libre', 'curso', 'pendiente'].map((k) => (
                                             <span key={k} className="ai-row" style={{ gap: 5, fontSize: 12, color: 'var(--ink-muted)' }}>
                                                 <i style={{ width: 12, height: 12, borderRadius: 3, background: CELDA[k].bg, display: 'inline-block' }} />{CELDA[k].label}
                                             </span>
@@ -402,7 +404,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                                             const cfg = clase ? CELDA[clase] : null;
                                                             const celda = mapa[d.fecha];
                                                             const turno = turnos[d.fecha];
-                                                            const textoTurnoDia = turno ? ` · turno ${turno.es_descanso ? 'descanso' : textoTurno(turno)}` : ' · sin horario';
+                                                            const textoTurnoDia = turno ? ` · turno ${turno.es_libre ? 'libre' : turno.es_descanso ? 'descanso' : textoTurno(turno)}` : ' · sin horario';
                                                             const titulo = (celda ? `${d.fecha} · ${cfg?.label}${celda.minutos_tarde > 0 ? ` (+${tardeExacto(celda.segundos_tarde, celda.minutos_tarde)})` : ''}${celda.novedad ? ` · ${celda.novedad.tipo}` : ''}` : `${d.fecha} · sin jornada`) + textoTurnoDia;
                                                             return (
                                                                 <td key={d.d} style={{ padding: 0 }}>

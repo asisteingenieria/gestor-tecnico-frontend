@@ -60,7 +60,7 @@ const AsistenciaLayout = () => {
         { to: `${base}/trazabilidad`, label: 'Trazabilidad', icon: History },
         { to: `${base}/estadisticas`, label: 'Estadísticas', icon: BarChart3 },
         ...(!isDirectorOperaciones ? [{ to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3 }] : []),
-        ...(!isDirectorOperaciones && permisosCambioTurno.puede_solicitar ? [{ to: `${base}/cambios-turno`, label: 'Cambios de turno', icon: Repeat }] : []),
+        ...(!isDirectorOperaciones && permisosCambioTurno.puede_solicitar ? [{ to: `${base}/cambios-turno`, label: 'Turnos y libres', icon: Repeat }] : []),
         ...(isRecursosHumanos ? [{ to: '/recursos-humanos', label: 'Recursos Humanos', icon: Users, end: true }] : [])
     ];
 
@@ -70,7 +70,7 @@ const AsistenciaLayout = () => {
         { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true },
         { to: `${base}/horarios`, label: 'Horarios', icon: CalendarClock },
         { to: `${base}/horas-extra`, label: 'Horas extra', icon: Clock3, count: pendientesHorasExtra },
-        { to: `${base}/cambios-turno`, label: 'Cambios de turno', icon: Repeat, count: pendientesCambioTurno, alert: true },
+        { to: `${base}/cambios-turno`, label: 'Turnos y libres', icon: Repeat, count: pendientesCambioTurno, alert: true },
         { to: `${base}/reporte-horas-extra`, label: 'Reporte horas extra', icon: FileSpreadsheet }
     ] : puedeVerEquipo ? [
         // Coordinador: solo consulta (hoy, histórico y novedades), sin horarios ni horas extra del equipo.
@@ -122,7 +122,8 @@ const AsistenciaLayout = () => {
             cambioTurnoService.getPermisos()
                 .then(({ data }) => {
                     setPermisosCambioTurno(data);
-                    if (!data.puede_aprobar) return setPendientesCambioTurno(null);
+                    // Aprueba el director (lo de sus jefes) y el jefe de operaciones (lo de sus coordinadores, §86).
+                    if (!data.puede_aprobar && !data.puede_aprobar_novedades) return setPendientesCambioTurno(null);
                     return cambioTurnoService.getBandeja({ estado: 'pendiente' }).then((r) => setPendientesCambioTurno(r.data.length));
                 })
                 .catch(() => setPendientesCambioTurno(null));
@@ -229,7 +230,7 @@ const AsistenciaLayout = () => {
                 <div className="ai-row" style={{ marginLeft: 'auto', gap: 8 }} data-topnav-actions>
                     <span className="ai-clock-chip">{horaActual}</span>
                     <CampanaAlertas
-                        rutaCambiosTurno={permisosCambioTurno.puede_solicitar || permisosCambioTurno.puede_aprobar ? `${base}/cambios-turno` : null}
+                        rutaCambiosTurno={permisosCambioTurno.puede_solicitar || permisosCambioTurno.puede_aprobar || permisosCambioTurno.puede_aprobar_novedades ? `${base}/cambios-turno` : null}
                         rutaHorasExtra={`${base}/horas-extra`}
                         rutaRetiros={isDirectorOperaciones ? `${base}/equipo/retiros` : null}
                     />

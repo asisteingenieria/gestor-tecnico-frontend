@@ -27,7 +27,7 @@ import {
 // Es la segunda vista de "Equipo"; la primera es hoy en vivo (EquipoAsistencia).
 
 const AZUL = 'var(--primary)';
-const LEYENDA = ['puntual', 'tarde', 'ausente', 'novedad', 'descanso', 'curso_puntual', 'curso_tarde', 'pendiente'];
+const LEYENDA = ['puntual', 'tarde', 'ausente', 'novedad', 'descanso', 'libre', 'curso_puntual', 'curso_tarde', 'pendiente'];
 
 // Tipos de novedad de RRHH que tuvo la persona en el mes (para el distintivo y su title, §71).
 const tiposNovedad = (e) => [...new Set((e.dias || []).filter((d) => d.novedad).map((d) => d.novedad.tipo))];
