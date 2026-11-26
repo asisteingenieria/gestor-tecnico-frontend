@@ -1,7 +1,7 @@
 import React from 'react';
 import { Timer } from 'lucide-react';
 import { Pastilla } from '../ui';
-import { COLUMNAS_ESTADO, colorMonitor, hhmmss, hora24, horaLoginDe } from '../../utils/monitorAsistencia';
+import { COLUMNAS_ESTADO, colorMonitor, hhmmss, hora24, horaLoginDe, usaAsislock } from '../../utils/monitorAsistencia';
 import { tardeExacto } from '../../utils/llegadaAsistencia';
 
 // Celdas del monitor en vivo compartidas por MonitorEquipo (coordinador) y EquipoAsistencia (jefes y financiera).
@@ -28,8 +28,19 @@ export const CeldaTiempoTotal = ({ total }) => (
 
 // Una celda por columna de COLUMNAS_ESTADO: el tiempo en curso en pastilla de color si está en ese estado,
 // el acumulado del día y cuántas veces entró.
-export const CeldasEstado = ({ fila, acumuladoDe, enEstadoDe }) => {
+// Quien no usa AsisLock (staff, §83) no tiene pausas: una sola celda en lugar de seis guiones. Si en la tabla
+// nadie usa AsisLock, las columnas ni se muestran (`conColumnas` en false).
+export const CeldasEstado = ({ fila, acumuladoDe, enEstadoDe, conColumnas = true }) => {
     const { emp, est } = fila;
+    if (!conColumnas) return null;
+    if (!usaAsislock(emp)) {
+        return (
+            <td colSpan={COLUMNAS_ESTADO.length} className="ai-monitor-centro"
+                title="Staff: no entra a AsisLock, así que no tiene break, baño, almuerzo, capacitación ni desconexiones">
+                <span style={{ color: 'var(--text-muted)', fontSize: 12, fontStyle: 'italic' }}>No usa AsisLock · marca por molinete o portal</span>
+            </td>
+        );
+    }
     return COLUMNAS_ESTADO.map((c) => {
         const acum = acumuladoDe(fila, c);
         const activo = est.corre && c.claves.includes(est.clave);

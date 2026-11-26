@@ -19,7 +19,7 @@ import { claseDia, tardeExacto } from '../../utils/llegadaAsistencia';
 import NovedadChip from './NovedadChip';
 import { etiquetaNovedad, noAsistioPorNovedad } from '../../utils/novedadesAsistencia';
 import { CeldaLogin, CeldaTiempoTotal, CeldasEstado } from './CeldasMonitor';
-import { estadoMonitor, colorMonitor, COLUMNAS_ESTADO, horaLoginDe } from '../../utils/monitorAsistencia';
+import { estadoMonitor, colorMonitor, COLUMNAS_ESTADO, horaLoginDe, usaAsislock, columnasMonitor } from '../../utils/monitorAsistencia';
 import { useTiemposEnVivo } from '../../hooks/useTiemposEnVivo';
 import {
     EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Leyenda,
@@ -63,6 +63,10 @@ const LEYENDA = [
     { id: 'sin_iniciar', label: 'Sin iniciar' }, { id: 'no_llego', label: 'No ha llegado / ausente' }, { id: 'finalizado', label: 'Finalizado' },
     { id: 'novedad', label: 'Novedad RRHH' }, { id: 'descanso', label: 'Descanso' }
 ].map((l) => ({ ...l, color: colorMonitor(l.id) }));
+
+// Si nadie de la tabla usa AsisLock (staff, §83), la leyenda no lleva las pausas y "Conectado" es "Presente".
+const PAUSAS_LEYENDA = new Set(['break', 'bano', 'almuerzo', 'capacitacion', 'desconectado']);
+const LEYENDA_STAFF = LEYENDA.filter((l) => !PAUSAS_LEYENDA.has(l.id)).map((l) => (l.id === 'conectado' ? { ...l, label: 'Presente' } : l));
 
 const SIN_CENTRO = 'Sin centro de costo';
 
@@ -392,7 +396,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                         {centros.map(([nombreCentro, total]) => <option key={nombreCentro} value={nombreCentro}>{nombreCentro} ({total})</option>)}
                     </select>
                 )}
-                <Leyenda items={LEYENDA} />
+                <Leyenda items={visibles.some((f) => usaAsislock(f.emp)) ? LEYENDA : LEYENDA_STAFF} />
                 {filtro && (
                     <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => setFiltro(null)}>
                         Ver todos ({delCentro.length})
@@ -405,7 +409,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                     {equipo.length === 0 ? (conVariasLineas ? 'No hay empleados activos.' : 'No tienes empleados a cargo.') : 'Nadie coincide con este filtro.'}
                 </VistaVacia>
             ) : (
-                <TablaVista columnas={COLUMNAS} orden={orden} onOrdenar={(col) => setOrden(siguienteOrden(col))}>
+                <TablaVista columnas={columnasMonitor(COLUMNAS, visibles)} orden={orden} onOrdenar={(col) => setOrden(siguienteOrden(col))}>
                     {visibles.map((fila) => {
                         const { emp, est } = fila;
                         const lineas = conVariasLineas
@@ -434,7 +438,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                     <span className="ai-monitor-sub" style={{ whiteSpace: 'nowrap' }}>{textoTurno(emp.turno)}</span>
                                     {jefatura && <span className="ai-monitor-sub" style={{ whiteSpace: 'nowrap' }}>{jefatura}</span>}
                                 </td>
-                                <td className="ai-monitor-centro" title={emp.asislock ? textoConexion(emp.asislock) : 'Sin registros de AsisLock hoy'}>
+                                <td className="ai-monitor-centro" title={emp.asislock ? textoConexion(emp.asislock) : usaAsislock(emp) ? 'Sin registros de AsisLock hoy' : 'No usa AsisLock: marca por molinete o portal'}>
                                     <BadgeIngreso modalidad={emp.asislock?.modalidad} />
                                 </td>
                                 <td className="ai-monitor-centro">
@@ -446,7 +450,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                     ))}
                                 </td>
                                 <CeldaTiempoTotal total={totalDe(fila)} />
-                                <CeldasEstado fila={fila} acumuladoDe={acumuladoDe} enEstadoDe={enEstadoDe} />
+                                <CeldasEstado fila={fila} acumuladoDe={acumuladoDe} enEstadoDe={enEstadoDe} conColumnas={visibles.some((f) => usaAsislock(f.emp))} />
                             </tr>
                         );
                     })}

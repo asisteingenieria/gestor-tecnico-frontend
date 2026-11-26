@@ -11,8 +11,22 @@ const PAUSAS_CONOCIDAS = ['break', 'bano', 'almuerzo', 'capacitacion'];
 
 // Estado fino de cada persona: conectado, la pausa en que está, desconectado de AsisLock, finalizado,
 // novedad, descanso, ausente, no ha llegado o sin iniciar. `corre` = su tiempo sigue contando.
+// Staff (técnicos, desarrolladores, analistas, jefes…): no entra a AsisLock, marca por molinete o por el portal.
+// Lo decide el servidor (`usa_asislock`, asistencia.md §83); un backend anterior no lo manda y cuenta como sí.
+export const usaAsislock = (emp) => emp?.usa_asislock !== false;
+
+// Columnas del monitor según quién está en la tabla: si nadie usa AsisLock, sin las de pausas y con
+// "Hora entrada" en vez de "Hora Login".
+export function columnasMonitor(columnas, filas) {
+    if (filas.some((f) => usaAsislock(f.emp))) return columnas;
+    const deEstado = new Set(COLUMNAS_ESTADO.map((c) => c.id));
+    return columnas
+        .filter((c) => !deEstado.has(c.id))
+        .map((c) => (c.id === 'login' ? { ...c, label: 'Hora entrada' } : c));
+}
+
 export function estadoMonitor(emp) {
-    if (emp.estado === 'en_curso') return { clave: 'conectado', label: 'Conectado', corre: true };
+    if (emp.estado === 'en_curso') return { clave: 'conectado', label: usaAsislock(emp) ? 'Conectado' : 'Presente', corre: true };
     if (emp.estado === 'en_pausa' && emp.pausa_activa) {
         // Cada pausa de AsisLock con su clave (break, bano, almuerzo, capacitacion); una desconocida, 'pausa'.
         const tipo = emp.pausa_activa.tipo;

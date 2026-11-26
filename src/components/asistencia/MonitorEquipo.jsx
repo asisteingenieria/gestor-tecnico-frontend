@@ -10,7 +10,7 @@ import { escucharAsistencia } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 import NovedadChip from './NovedadChip';
 import { CeldaLogin, CeldaTiempoTotal, CeldasEstado } from './CeldasMonitor';
-import { estadoMonitor, colorMonitor, ORDEN_MONITOR, COLUMNAS_ESTADO, horaLoginDe } from '../../utils/monitorAsistencia';
+import { estadoMonitor, colorMonitor, ORDEN_MONITOR, COLUMNAS_ESTADO, horaLoginDe, usaAsislock, columnasMonitor } from '../../utils/monitorAsistencia';
 import { useTiemposEnVivo } from '../../hooks/useTiemposEnVivo';
 import {
     EncabezadoVista, Mosaicos, Mosaico, BarraFiltros, CampoBusqueda, Leyenda,
@@ -175,7 +175,7 @@ const MonitorEquipo = () => {
                     {equipo.length === 0 ? 'No tienes personas a cargo.' : 'Nadie coincide con este filtro.'}
                 </VistaVacia>
             ) : (
-                <TablaVista columnas={COLUMNAS} orden={orden} onOrdenar={(col) => setOrden(siguienteOrden(col))}>
+                <TablaVista columnas={columnasMonitor(COLUMNAS, visibles)} orden={orden} onOrdenar={(col) => setOrden(siguienteOrden(col))}>
                     {visibles.map((fila) => {
                         const { emp, est } = fila;
                         return (
@@ -197,7 +197,7 @@ const MonitorEquipo = () => {
                                     <Pastilla color={colorMonitor(est.clave)} punto>{est.label}</Pastilla>
                                 </td>
                                 <CeldaTiempoTotal total={totalDe(fila)} />
-                                <CeldasEstado fila={fila} acumuladoDe={acumuladoDe} enEstadoDe={enEstadoDe} />
+                                <CeldasEstado fila={fila} acumuladoDe={acumuladoDe} enEstadoDe={enEstadoDe} conColumnas={visibles.some((f) => usaAsislock(f.emp))} />
                             </tr>
                         );
                     })}
