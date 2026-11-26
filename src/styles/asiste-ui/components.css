@@ -598,3 +598,50 @@
   .ai-monitor-leyenda { padding-left: 0; border-left: 0; }
   .ai-monitor-titulo h1 { font-size: 24px; }
 }
+
+/* ===== Formularios, ventanas y cajones con el diseño de Equipo (plan rediseño de vistas, Ola 5) =====
+   Todo va acotado a .ai-overlay (las ventanas y cajones de RRHH, financiera y asistencia): encabezado navy como
+   los paneles del monitor, títulos de sección como las bandas de grupo, campos con esquinas de 10 px, botones en
+   pastilla y tablas con cabecera navy. Las páginas no cambian. */
+.ai-overlay .ai-modal { border-radius: 14px; }
+.ai-overlay .ai-modal-head { align-items: center; gap: 12px; padding: 14px 20px; background: var(--mon-head); }
+.ai-overlay .ai-modal-head .ai-modal-icon { width: 36px; height: 36px; border-radius: 10px; background: rgba(255, 255, 255, .14); color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-head .ai-modal-icon--danger { background: #c8221c; color: #fff; }
+.ai-overlay .ai-modal-title { font: 700 16px/22px var(--font-sans); color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-sub { color: var(--mon-head-ink); opacity: .78; }
+.ai-overlay .ai-modal-head .ai-icon-btn { color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-head .ai-icon-btn:hover { background: rgba(255, 255, 255, .15); color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-head .ai-badge { background: rgba(255, 255, 255, .16); color: var(--mon-head-ink); }
+.ai-overlay .ai-modal-body { padding-top: 18px; }
+.ai-overlay .ai-modal-head + .ai-steps { padding-top: 16px; }
+.ai-overlay .ai-modal-foot { padding: 12px 20px; background: var(--mon-fila-impar); }
+
+/* Cajón (ficha del empleado, candidato de Hydra): encabezado navy plano, como los paneles. */
+.ai-overlay .ai-drawer-hero { background: var(--mon-head); color: var(--mon-head-ink); }
+.ai-overlay .ai-drawer-hero .ai-avatar { background: var(--mon-avatar); color: var(--mon-head); }
+.ai-overlay .ai-drawer-hero .ai-icon-btn { color: var(--mon-head-ink); }
+
+/* Títulos de sección del formulario: la banda de grupo del monitor. */
+.ai-overlay .ai-overline { padding: 8px 12px; border-radius: 8px; background: var(--mon-avatar); color: var(--mon-head); font: 800 11.5px/15px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; }
+[data-theme="dark"] .ai-overlay .ai-overline { color: var(--mon-ink); }
+
+/* Campos. */
+.ai-overlay .ai-label { font: 600 12.5px/16px var(--font-sans); color: var(--mon-ink); }
+.ai-overlay .ai-input { border-radius: 10px; }
+.ai-overlay .ai-input:focus, .ai-overlay .ai-input:focus-within { border-color: #2f6fc4; box-shadow: 0 0 0 3px rgba(47, 111, 196, .18); outline: none; }
+
+/* Botones en pastilla, como las acciones del monitor. */
+.ai-overlay .ai-btn { height: 36px; padding: 0 14px; border-radius: 10px; font: 700 12.5px/16px var(--font-sans); letter-spacing: .03em; text-transform: uppercase; }
+.ai-overlay .ai-btn--sm { height: 30px; padding: 0 12px; border-radius: 9px; font-size: 12px; }
+.ai-overlay .ai-btn--primary { background: var(--mon-head); color: #fff; border-color: var(--mon-head); box-shadow: none; }
+.ai-overlay .ai-btn--primary:hover { filter: brightness(1.15); background: var(--mon-head); }
+[data-theme="dark"] .ai-overlay .ai-btn--primary { background: #2f6fc4; border-color: #2f6fc4; }
+.ai-overlay .ai-btn--secondary { color: var(--mon-ink); }
+.ai-overlay .ai-btn:disabled { opacity: .55; cursor: not-allowed; }
+.ai-overlay .ai-drawer-hero .ai-btn--secondary { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .28); color: var(--mon-head-ink); }
+
+/* Tablas dentro de ventanas: cabecera navy y filas alternas, como la tabla del monitor. */
+.ai-overlay .ai-table th { background: var(--mon-head); color: var(--mon-head-ink); letter-spacing: .04em; }
+.ai-overlay .ai-table tbody tr:nth-child(even) td { background: var(--mon-fila-impar); }
+.ai-overlay .ai-card { border-radius: 12px; }
+.ai-overlay .ai-tab.is-active { color: var(--mon-ink); }
