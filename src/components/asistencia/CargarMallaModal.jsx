@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FileSpreadsheet, X, Loader2, ChevronDown, ChevronRight, Upload, Download } from 'lucide-react';
+import { FileSpreadsheet, X, Loader2, ChevronDown, ChevronRight, Upload, Download, AlertTriangle } from 'lucide-react';
 import { asistenciaService } from '../../services/api';
 
 // Carga de la malla de horarios en Excel (backend asistencia.md §55). El jefe sube el archivo tal
@@ -32,6 +32,13 @@ const OMITIDO_TEXTO = {
 // 'YYYY-MM-DD' → 'mar 4 nov'. Mediodía local para que la zona horaria no corra el día.
 const fechaCorta = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
 const hora = (h) => String(h ?? '').slice(0, 5);
+const semanaTexto = (d) => `${fechaCorta(d.semana_desde)} – ${fechaCorta(d.semana_hasta)}`;
+// Filas del Excel de esa semana: "9 a 15" si son seguidas, si no la lista.
+const filasTexto = (filas = []) => {
+    if (filas.length === 0) return '—';
+    const seguidas = filas.every((f, i) => i === 0 || f === filas[i - 1] + 1);
+    return seguidas && filas.length > 1 ? `${filas[0]} a ${filas[filas.length - 1]}` : filas.join(', ');
+};
 // La modalidad viene de la columna "Modelo Trabajo" de la malla (§58); solo se señala la virtual.
 const turnoTexto = (h) => (h.es_descanso
     ? `Descanso${h.notas && !['Libre', 'Descanso'].includes(h.notas) ? ` · ${h.notas}` : ''}`
@@ -107,7 +114,9 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
         try {
             const { data } = await asistenciaService.previsualizarMalla(file);
             setVista(data);
-            setTab(data.resumen.a_aplicar > 0 || data.horarios.length > 0 ? 'aplicar' : data.errores.length > 0 ? 'errores' : 'omitidos');
+            // Si alguna persona no cuadra las 42 h o el descanso (§90), eso es lo primero que hay que ver.
+            setTab(data.desajustes_semana?.length > 0 ? 'semanas'
+                : data.resumen.a_aplicar > 0 || data.horarios.length > 0 ? 'aplicar' : data.errores.length > 0 ? 'errores' : 'omitidos');
         } catch (err) {
             setError(err.response?.data?.message || 'No se pudo leer el archivo');
         } finally {
@@ -134,10 +143,16 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
     });
 
     const r = vista?.resumen;
+    const desajustes = vista?.desajustes_semana ?? [];
+    const sinValidar = vista?.semanas_sin_validar ?? [];
+    // Un backend anterior no manda `puede_aplicar`: cuenta como sí.
+    const puedeAplicar = vista?.puede_aplicar !== false;
     const TABS = vista ? [
+        ...(desajustes.length > 0 ? [{ id: 'semanas', label: 'No cuadran 42 h / descanso', total: desajustes.length }] : []),
         { id: 'aplicar', label: 'Tu equipo', total: personas.length },
         { id: 'omitidos', label: 'Omitidos', total: vista.omitidos.length },
-        { id: 'errores', label: 'Con errores', total: r.errores }
+        { id: 'errores', label: 'Con errores', total: r.errores },
+        ...(sinValidar.length > 0 ? [{ id: 'sin_validar', label: 'Semanas sin validar', total: sinValidar.length }] : [])
     ] : [];
 
     return (
@@ -225,6 +240,18 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
                                 </p>
                             )}
 
+                            {!puedeAplicar && (
+                                <div className="ai-row" style={{ gap: 10, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', fontSize: 13 }}>
+                                    <AlertTriangle size={18} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: 1 }} />
+                                    <div>
+                                        <strong>No se puede cargar la malla.</strong> {new Set(desajustes.map((d) => d.users_company_id)).size} de tu equipo no
+                                        {new Set(desajustes.map((d) => d.users_company_id)).size === 1 ? ' cumple' : ' cumplen'} las 42 horas semanales o el día de descanso.
+                                        Cada persona debe sumar exactamente 42 h por semana (lunes a domingo, sin el almuerzo) y tener al menos un descanso.
+                                        Corrige las filas de la pestaña "No cuadran" y vuelve a subir el archivo. No se cargó nada.
+                                    </div>
+                                </div>
+                            )}
+
                             {vista.plantillas_nuevas?.length > 0 && (
                                 <div style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: 13 }}>
                                     <strong>Se crearán {vista.plantillas_nuevas.length} plantillas nuevas</strong>
@@ -293,6 +320,52 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
                                 )
                             )}
 
+                            {tab === 'semanas' && (
+                                <>
+                                    <p className="ai-muted" style={{ fontSize: 13, margin: 0 }}>
+                                        Las horas se cuentan de lunes a domingo, sin el almuerzo. Los días de la semana que no vienen en el archivo se toman del horario que ya tenía la persona.
+                                    </p>
+                                    <table className="ai-table ai-table--dense">
+                                        <thead><tr><th>Filas del Excel</th><th>Persona · qué corregir</th><th>Semana</th><th>Horas</th><th>Descansos</th></tr></thead>
+                                        <tbody>
+                                            {desajustes.map((d) => (
+                                                <tr key={`${d.users_company_id}-${d.semana_desde}`}>
+                                                    <td className="ai-num" style={{ whiteSpace: 'nowrap' }}>{filasTexto(d.filas)}</td>
+                                                    <td style={{ whiteSpace: 'normal' }}>
+                                                        {d.nombre || '—'} <span className="ai-muted" style={{ fontSize: 12 }}>· {d.cedula}</span>
+                                                        {d.problemas.map((t) => <div key={t} style={{ color: 'var(--danger)', fontSize: 12 }}>{t}</div>)}
+                                                    </td>
+                                                    <td className="ai-num" style={{ whiteSpace: 'nowrap' }}>{semanaTexto(d)}</td>
+                                                    <td className="ai-num"><span className="ai-badge ai-badge--danger">{d.horas}</span></td>
+                                                    <td className="ai-num">{d.dias_descanso || <span className="ai-badge ai-badge--danger">0</span>}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </>
+                            )}
+
+                            {tab === 'sin_validar' && (
+                                <>
+                                    <p className="ai-muted" style={{ fontSize: 13, margin: 0 }}>
+                                        Estas semanas no se revisan: les faltan días sin horario (inicio o fin del mes, un ingreso a mitad de semana) o tienen una novedad. No impiden cargar la malla.
+                                    </p>
+                                    <table className="ai-table ai-table--dense">
+                                        <thead><tr><th>Filas del Excel</th><th>Persona</th><th>Semana</th><th>Por qué</th></tr></thead>
+                                        <tbody>
+                                            {sinValidar.map((d) => (
+                                                <tr key={`${d.users_company_id}-${d.semana_desde}`}>
+                                                    <td className="ai-num" style={{ whiteSpace: 'nowrap' }}>{filasTexto(d.filas)}</td>
+                                                    <td style={{ whiteSpace: 'normal' }}>{d.nombre || '—'}<div className="ai-muted" style={{ fontSize: 12 }}>{d.cedula}</div></td>
+                                                    <td className="ai-num" style={{ whiteSpace: 'nowrap' }}>{semanaTexto(d)}</td>
+                                                    <td className="ai-muted" style={{ whiteSpace: 'normal' }}>{d.motivo}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </>
+                            )}
+
                             {tab === 'omitidos' && (
                                 vista.omitidos.length === 0 ? (
                                     <p className="ai-muted" style={{ fontSize: 13 }}>Todas las personas del archivo son de tu equipo.</p>
@@ -346,7 +419,8 @@ const CargarMallaModal = ({ onClose, onAplicada }) => {
 
                 <div className="ai-modal-foot">
                     <button type="button" className="ai-btn ai-btn--secondary" onClick={onClose} disabled={aplicando}>Cancelar</button>
-                    <button type="button" className="ai-btn ai-btn--primary" onClick={aplicar} disabled={!vista || r.a_aplicar === 0 || aplicando || cargando}>
+                    <button type="button" className="ai-btn ai-btn--primary" onClick={aplicar} disabled={!vista || !puedeAplicar || r.a_aplicar === 0 || aplicando || cargando}
+                        title={vista && !puedeAplicar ? 'Hay personas que no cumplen las 42 h semanales o el día de descanso' : undefined}>
                         {aplicando ? 'Aplicando…' : `Aplicar ${r?.a_aplicar ?? 0} horarios`}
                     </button>
                 </div>
