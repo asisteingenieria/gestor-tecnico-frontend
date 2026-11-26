@@ -4,6 +4,8 @@ import { Users, Clock, CalendarX, Download, BarChart3, Search, History, X, Timer
 import { EncabezadoVista, Mosaicos, Mosaico, PanelVista, CargandoVista, VistaVacia, TONO } from '../ui';
 import { financieraService } from '../../services/api';
 import { nombrePropio, primeraMayuscula, iniciales } from '../../utils/formatoRRHH';
+import { SelectoresCentroCargo } from '../asistencia/FiltroCentroCargo';
+import { useFiltroCentroCargo } from '../../hooks/useFiltroCentroCargo';
 import { descargarCsv } from '../../utils/csv';
 import { periodoActual, nombrePeriodo } from '../../utils/reporteHorasExtra';
 import { escucharCambiosEmpleados } from '../../utils/socketAsistencia';
@@ -265,21 +267,15 @@ const AsistenciaMensual = () => {
     );
 };
 
+const SIN_EMPLEADOS = [];
+
 // Ventana con el detalle completo de una campaña en el mes.
 const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania, loading, onClose }) => {
     const [busqueda, setBusqueda] = useState('');
-    const [centro, setCentro] = useState('');
     const dias = useMemo(() => diasDelMes(periodo), [periodo]);
 
-    // Centros de costo de la campaña con su conteo: los horarios se definen por centro (§46).
-    const centros = useMemo(() => {
-        const conteo = new Map();
-        for (const e of campania?.empleados ?? []) {
-            const nombreCentro = e.centro_costo || 'Sin centro de costo';
-            conteo.set(nombreCentro, (conteo.get(nombreCentro) || 0) + 1);
-        }
-        return [...conteo.entries()].sort(([a], [b]) => a.localeCompare(b));
-    }, [campania]);
+    // Centro de costo (los horarios se definen por centro, §46) y cargo (§85).
+    const filtroCC = useFiltroCentroCargo(campania?.empleados ?? SIN_EMPLEADOS);
 
     useEffect(() => {
         const cerrarConEscape = (e) => { if (e.key === 'Escape') onClose(); };
@@ -288,11 +284,11 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
     }, [onClose]);
 
     const empleados = useMemo(() => {
-        const lista = (campania?.empleados ?? []).filter((e) => !centro || (e.centro_costo || 'Sin centro de costo') === centro);
+        const lista = filtroCC.filtrados;
         const q = busqueda.trim().toLowerCase();
         if (!q) return lista;
         return lista.filter((e) => (e.nombre || '').toLowerCase().includes(q) || String(e.documento || '').includes(q));
-    }, [campania, busqueda, centro]);
+    }, [filtroCC.filtrados, busqueda]);
 
     const t = fila?.totales;
 
@@ -368,12 +364,7 @@ const DetalleCampaniaModal = ({ periodo, periodoAnterior, nombre, fila, campania
                                             style={{ border: 0, outline: 'none', flex: 1, background: 'transparent', color: 'var(--ink)', font: 'inherit' }}
                                         />
                                     </div>
-                                    {centros.length > 1 && (
-                                        <select className="ai-input" style={{ maxWidth: 260 }} value={centro} onChange={(e) => setCentro(e.target.value)} aria-label="Centro de costo">
-                                            <option value="">Todos los centros de costo ({campania.empleados.length})</option>
-                                            {centros.map(([nombreCentro, total]) => <option key={nombreCentro} value={nombreCentro}>{nombreCentro} ({total})</option>)}
-                                        </select>
-                                    )}
+                                    <SelectoresCentroCargo filtro={filtroCC} className="ai-input" style={{ maxWidth: 260 }} />
                                 </div>
                                 <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={exportarEmpleados} disabled={campania.empleados.length === 0}>
                                     <Download size={14} strokeWidth={1.75} /> Exportar empleados

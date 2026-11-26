@@ -10,6 +10,8 @@ import { escucharAsistencia } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 import NovedadChip from './NovedadChip';
 import { CeldaLogin, CeldaTiempoTotal, CeldasEstado } from './CeldasMonitor';
+import { SelectoresCentroCargo } from './FiltroCentroCargo';
+import { useFiltroCentroCargo } from '../../hooks/useFiltroCentroCargo';
 import { estadoMonitor, colorMonitor, ORDEN_MONITOR, COLUMNAS_ESTADO, horaLoginDe, usaAsislock, columnasMonitor } from '../../utils/monitorAsistencia';
 import { useTiemposEnVivo } from '../../hooks/useTiemposEnVivo';
 import {
@@ -96,7 +98,9 @@ const MonitorEquipo = () => {
     // Cada cambio de jornada del equipo llega por socket y recarga (asistencia.md §43, §57).
     useEffect(() => escucharAsistencia('asistencia:equipo', () => { cargar(true); }), [cargar]);
 
-    const filas = useMemo(() => equipo.map((emp) => ({ emp, est: estadoMonitor(emp) })), [equipo]);
+    // Centro de costo y cargo (§85) filtran todo: mosaicos y tabla.
+    const filtroCC = useFiltroCentroCargo(equipo);
+    const filas = useMemo(() => filtroCC.filtrados.map((emp) => ({ emp, est: estadoMonitor(emp) })), [filtroCC.filtrados]);
 
     const conteo = useMemo(() => {
         const c = {};
@@ -162,10 +166,11 @@ const MonitorEquipo = () => {
 
             <BarraFiltros>
                 <CampoBusqueda value={busqueda} onChange={setBusqueda} />
+                <SelectoresCentroCargo filtro={filtroCC} />
                 <Leyenda items={MOSAICOS.map((m) => ({ id: m.id, color: colorMonitor(m.id), label: m.leyenda }))} />
                 {filtro && (
                     <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => setFiltro(null)}>
-                        Ver todos ({equipo.length})
+                        Ver todos ({filas.length})
                     </button>
                 )}
             </BarraFiltros>
