@@ -190,10 +190,10 @@ const Layout = () => {
             )}
             {/* Sidebar */}
             <div
-                className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 ${getSidebarClass()} shadow-lg transform lg:translate-x-0 lg:static lg:inset-0 transition-transform duration-300`}
+                className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 ${getSidebarClass()} shadow-lg transform lg:translate-x-0 lg:static lg:inset-0 transition-transform duration-300 flex flex-col`}
                 style={isIronManTheme ? { backgroundColor: '#0F172A' } : {}}
             >
-                <div className={`flex items-center justify-between p-4 ${isHannyTheme ? 'border-gray-700' : isIronManTheme ? 'border-b border-cyan-500/20' : 'border-b'}`}>
+                <div className={`flex-shrink-0 flex items-center justify-between p-4 ${isHannyTheme ? 'border-gray-700' : isIronManTheme ? 'border-b border-cyan-500/20' : 'border-b'}`}>
                     <h1 className={`text-lg sm:text-xl font-bold ${getTitleClass()} truncate`}>
                     {getTitle()}
                     </h1>
@@ -207,12 +207,14 @@ const Layout = () => {
 
                 {/* Imagen Iron Man */}
                 {isIronManTheme && (
-                    <div className="ironman-avatar-container">
+                    <div className="ironman-avatar-container" style={{ flexShrink: 0 }}>
                         <img src="/man.jpg" alt="Iron Man" className="ironman-avatar" />
                     </div>
                 )}
 
-                <nav className="mt-5 px-2 space-y-1">
+                {/* El menú se desplaza si no cabe en la altura de la pantalla: antes la tarjeta del usuario
+                    (absoluta abajo) tapaba las últimas opciones, p. ej. Red Maestra e Historial de componentes. */}
+                <nav className="mt-5 px-2 pb-4 space-y-1 flex-1 min-h-0 overflow-y-auto">
                     {filteredNavigation.map((item) => {
                         const Icon = item.icon;
                         const getNavActiveClass = () => {
@@ -276,7 +278,7 @@ const Layout = () => {
 
                 {/* User info and logout */}
                 <div
-                    className={`absolute bottom-0 w-full p-4 ${isHannyTheme ? 'border-gray-700 bg-gray-800' : isIronManTheme ? 'border-t border-cyan-500/20' : 'border-t bg-gray-50'}`}
+                    className={`flex-shrink-0 w-full p-4 ${isHannyTheme ? 'border-gray-700 bg-gray-800' : isIronManTheme ? 'border-t border-cyan-500/20' : 'border-t bg-gray-50'}`}
                     style={isIronManTheme ? { backgroundColor: '#0F172A' } : {}}
                 >
                     <div className="flex items-center">

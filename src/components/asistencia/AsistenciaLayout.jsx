@@ -78,6 +78,11 @@ const AsistenciaLayout = () => {
         { to: `${base}/equipo`, label: 'Equipo', icon: Users, count: alertasEquipo, alert: true }
     ] : [];
 
+    // Con más de 6 opciones (el jefe tiene 11, el coordinador 7) no caben junto a la marca, el reloj y el
+    // usuario: van en una segunda fila que se parte en dos renglones si la pantalla es angosta, como en
+    // RRHH/financiera, para que siempre se vean todas.
+    const navEnSegundaFila = navPersonal.length + navEquipo.length > 6;
+
     useEffect(() => {
         if (!user || isDirectorOperaciones) return;
         asistenciaService.getPermisosEquipo()
@@ -181,6 +186,18 @@ const AsistenciaLayout = () => {
         </NavLink>
     );
 
+    const enlacesNav = (
+        <>
+            {navPersonal.map(renderLink)}
+            {navEquipo.length > 0 && (
+                <>
+                    <span className="ai-topnav-sep" />
+                    {navEquipo.map(renderLink)}
+                </>
+            )}
+        </>
+    );
+
     return (
         <div className="ai-scope" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <nav className="ai-topnav">
@@ -192,15 +209,11 @@ const AsistenciaLayout = () => {
                     </div>
                 </NavLink>
 
-                <div className="ai-topnav-links" style={{ display: 'none' }} data-desktop-nav ref={navLinksRef}>
-                    {navPersonal.map(renderLink)}
-                    {navEquipo.length > 0 && (
-                        <>
-                            <span className="ai-topnav-sep" />
-                            {navEquipo.map(renderLink)}
-                        </>
-                    )}
-                </div>
+                {!navEnSegundaFila && (
+                    <div className="ai-topnav-links" style={{ display: 'none' }} data-desktop-nav ref={navLinksRef}>
+                        {enlacesNav}
+                    </div>
+                )}
 
                 <button
                     type="button"
@@ -267,6 +280,12 @@ const AsistenciaLayout = () => {
                 </div>
             </nav>
 
+            {navEnSegundaFila && (
+                <div className="ai-subnav" style={{ display: 'none' }} data-desktop-nav>
+                    {enlacesNav}
+                </div>
+            )}
+
             {mobileNavOpen && (
                 <div style={{ background: 'var(--sidebar-bg)', padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: 4 }} data-mobile-nav>
                     {[...navPersonal, ...navEquipo].map(({ to, label, icon: Icon, end, count, alert }) => (
@@ -311,6 +330,11 @@ const AsistenciaLayout = () => {
                 [data-desktop-nav] { display: none; }
                 [data-mobile-toggle] { display: none; }
                 [data-topnav-actions] { flex: none; }
+                .ai-subnav {
+                    flex-wrap: wrap; gap: 2px 4px; padding: 0 var(--space-8);
+                    background: var(--sidebar-bg); border-top: 1px solid rgba(255,255,255,.08);
+                }
+                .ai-subnav .ai-topnav-link { height: 44px; }
                 @media (min-width: 768px) {
                     [data-desktop-nav] { display: flex !important; }
                     [data-mobile-nav] { display: none !important; }
@@ -320,7 +344,7 @@ const AsistenciaLayout = () => {
                     [data-topnav-actions] { display: none !important; }
                 }
                 @media (min-width: 768px) and (max-width: 1279px) {
-                    .ai-topnav-link-text { display: none; }
+                    .ai-topnav-links .ai-topnav-link-text { display: none; }
                 }
             `}</style>
         </div>
