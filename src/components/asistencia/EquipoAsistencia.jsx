@@ -19,6 +19,8 @@ import { claseDia, tardeExacto } from '../../utils/llegadaAsistencia';
 import NovedadChip from './NovedadChip';
 import { etiquetaNovedad, noAsistioPorNovedad } from '../../utils/novedadesAsistencia';
 import { CeldaLogin, CeldaTiempoTotal, CeldasEstado } from './CeldasMonitor';
+import { SelectoresCentroCargo } from './FiltroCentroCargo';
+import { useFiltroCentroCargo, SIN_CENTRO } from '../../hooks/useFiltroCentroCargo';
 import { estadoMonitor, colorMonitor, COLUMNAS_ESTADO, horaLoginDe, usaAsislock, columnasMonitor } from '../../utils/monitorAsistencia';
 import { useTiemposEnVivo } from '../../hooks/useTiemposEnVivo';
 import {
@@ -68,7 +70,6 @@ const LEYENDA = [
 const PAUSAS_LEYENDA = new Set(['break', 'bano', 'almuerzo', 'capacitacion', 'desconectado']);
 const LEYENDA_STAFF = LEYENDA.filter((l) => !PAUSAS_LEYENDA.has(l.id)).map((l) => (l.id === 'conectado' ? { ...l, label: 'Presente' } : l));
 
-const SIN_CENTRO = 'Sin centro de costo';
 
 // Detalle de cada mosaico (va en su title): lo que explica el número.
 function detalleKpi(estado, k) {
@@ -140,7 +141,6 @@ const EquipoAsistencia = ({ financiera = false }) => {
     const [haceSegundos, setHaceSegundos] = useState(0);
     const [filtro, setFiltro] = useState(null);
     const [busqueda, setBusqueda] = useState('');
-    const [centro, setCentro] = useState('');
     const [campanias, setCampanias] = useState([]);
     const [campaniaId, setCampaniaId] = useState('');
     const [orden, setOrden] = useState({ col: 'estado', asc: true });
@@ -192,21 +192,10 @@ const EquipoAsistencia = ({ financiera = false }) => {
         return () => clearInterval(id);
     }, [cargadoEn]);
 
-    // Centros de costo presentes, con su conteo: los turnos se definen por centro (§45).
-    const centros = useMemo(() => {
-        const conteo = new Map();
-        for (const e of equipo) {
-            const nombreCentro = e.centro_costo || SIN_CENTRO;
-            conteo.set(nombreCentro, (conteo.get(nombreCentro) || 0) + 1);
-        }
-        return [...conteo.entries()].sort(([a], [b]) => a.localeCompare(b));
-    }, [equipo]);
-
-    // Lo que cuentan los mosaicos: el filtro de centro de costo aplica a todo el tablero.
-    const delCentro = useMemo(
-        () => (centro ? equipo.filter((e) => (e.centro_costo || SIN_CENTRO) === centro) : equipo),
-        [equipo, centro]
-    );
+    // Filtros de centro de costo (los turnos se definen por centro, §45) y de cargo (§85). Aplican a todo el
+    // tablero: mosaicos, franja de llegada y tabla.
+    const filtroCC = useFiltroCentroCargo(equipo);
+    const delCentro = filtroCC.filtrados;
 
     const kpis = useMemo(() => {
         const porEstado = Object.fromEntries(ESTADOS_DIA.map((e) => [e.id, 0]));
@@ -281,13 +270,13 @@ const EquipoAsistencia = ({ financiera = false }) => {
 
     const cambiarCampania = (id) => {
         setCampaniaId(id);
-        setCentro('');
+        filtroCC.limpiar();
         setLoading(true);
     };
 
     const cambiarAlcanceEquipo = (valor) => {
         cambiarAlcance(valor);
-        setCentro('');
+        filtroCC.limpiar();
         setLoading(true);
     };
 
@@ -390,12 +379,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                         {campanias.map((c) => <option key={c.idcampania} value={c.idcampania}>{primeraMayuscula(c.nombre)} ({c.empleados})</option>)}
                     </select>
                 )}
-                {centros.length > 1 && (
-                    <select className="ai-input ai-monitor-select" value={centro} onChange={(e) => setCentro(e.target.value)} aria-label="Centro de costo">
-                        <option value="">Todos los centros de costo ({equipo.length})</option>
-                        {centros.map(([nombreCentro, total]) => <option key={nombreCentro} value={nombreCentro}>{nombreCentro} ({total})</option>)}
-                    </select>
-                )}
+                <SelectoresCentroCargo filtro={filtroCC} />
                 <Leyenda items={visibles.some((f) => usaAsislock(f.emp)) ? LEYENDA : LEYENDA_STAFF} />
                 {filtro && (
                     <button type="button" className="ai-btn ai-btn--secondary ai-btn--sm" onClick={() => setFiltro(null)}>
