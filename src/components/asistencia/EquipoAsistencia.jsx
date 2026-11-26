@@ -9,7 +9,7 @@ import { nombrePropio, primeraMayuscula } from '../../utils/formatoRRHH';
 import { formatearDuracion, formatearHora12 } from '../../utils/tiempoAsistencia';
 import { descargarCsv } from '../../utils/csv';
 import { BadgeIngreso } from './IngresoAsislock';
-import { MODALIDAD_INGRESO, textoConexion } from '../../utils/asislock';
+import { MODALIDAD_INGRESO, textoConexion, modalidadIngreso } from '../../utils/asislock';
 import { escucharAsistencia, escucharCambiosEmpleados } from '../../utils/socketAsistencia';
 import SelectorVistaEquipo from './SelectorVistaEquipo';
 import { useBaseEquipo } from '../../utils/rutaEquipo';
@@ -216,7 +216,8 @@ const EquipoAsistencia = ({ financiera = false }) => {
         return {
             porEstado,
             // Modalidad solo de quienes están en turno ahora.
-            presencial: enTurno.filter((e) => e.asislock?.modalidad === 'presencial').length,
+            // El biométrico (molinete) también es presencial (§89).
+            presencial: enTurno.filter((e) => ['presencial', 'biometrico'].includes(modalidadIngreso(e))).length,
             teletrabajo: enTurno.filter((e) => e.asislock?.modalidad === 'teletrabajo').length,
             bano: pausa('bano'),
             breaks: pausa('break'),
@@ -257,7 +258,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
         const filas = visibles.map(({ emp: e }) => [
             nombrePropio(e.nombre), e.cedula || '', primeraMayuscula(e.cargo || ''),
             primeraMayuscula(e.campania || ''), e.centro_costo || '', e.jefe_area ? nombrePropio(e.jefe_area) : '', textoTurno(e.turno),
-            MODALIDAD_INGRESO[e.asislock?.modalidad]?.label || '',
+            MODALIDAD_INGRESO[modalidadIngreso(e)]?.label || '',
             e.asislock?.primer_login ? formatearHora12(e.asislock.primer_login) : '',
             textoConexion(e.asislock) || '',
             textoLlegada(e), formatearDuracion(e.minutos_trabajados), (noAsistioPorNovedad(e) ? `Novedad: ${e.novedad.tipo}` : ESTADO_LABEL[estadoVista(e)] || e.estado),
@@ -425,7 +426,7 @@ const EquipoAsistencia = ({ financiera = false }) => {
                                     {jefatura && <span className="ai-monitor-sub" style={{ whiteSpace: 'nowrap' }}>{jefatura}</span>}
                                 </td>
                                 <td className="ai-monitor-centro" title={emp.asislock ? textoConexion(emp.asislock) : usaAsislock(emp) ? 'Sin registros de AsisLock hoy' : 'No usa AsisLock: marca por molinete o portal'}>
-                                    <BadgeIngreso modalidad={emp.asislock?.modalidad} />
+                                    <BadgeIngreso modalidad={modalidadIngreso(emp)} />
                                 </td>
                                 <td className="ai-monitor-centro">
                                     <Pastilla color={colorMonitor(est.clave)} punto>{est.label}</Pastilla>
