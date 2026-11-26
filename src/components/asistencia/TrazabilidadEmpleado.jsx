@@ -139,7 +139,7 @@ const TrazabilidadEmpleado = ({ financiera = false }) => {
                     // El turno programado del día, con el nombre de su plantilla (§46).
                     horario
                         ? (horario.es_descanso
-                            ? 'Turno: descanso'
+                            ? (horario.es_libre ? 'Turno: libre' : 'Turno: descanso')
                             : `Turno ${horario.plantilla ? `${horario.plantilla} ` : ''}${horario.hora_entrada.slice(0, 5)}–${horario.hora_salida.slice(0, 5)}`)
                         : 'Sin horario ese día'
                 ].filter(Boolean).join(' · ')}

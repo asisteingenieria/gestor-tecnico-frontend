@@ -4,6 +4,7 @@ import { formatearHora12, formatearDuracion, minutosDesdeMedianoche, minutosBogo
 import { tardeExacto } from '../../utils/llegadaAsistencia';
 import { RegistrosAsislock } from './IngresoAsislock';
 import MarcacionesMolinete from './MarcacionesMolinete';
+import { NovedadesAsistenciaDia } from './TrazaSolicitud';
 import { MODALIDAD_INGRESO } from '../../utils/asislock';
 import { Mosaicos, Mosaico, PanelVista, Leyenda, Pastilla, CargandoVista, VistaVacia, TONO } from '../ui';
 
@@ -278,6 +279,8 @@ const TrazabilidadView = ({ datos, loading, error, horario, esHoy }) => {
                 </table>
             </div>
 
+            {/* Cambios de turno y libres que tocan el día, con a qué hora se pidieron y se resolvieron (§86). */}
+            <NovedadesAsistenciaDia novedades={datos.novedades_asistencia} />
             <RegistrosAsislock registros={asislock?.registros} />
             <MarcacionesMolinete molinete={datos.molinete} />
         </>

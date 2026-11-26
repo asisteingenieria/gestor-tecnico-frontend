@@ -33,7 +33,7 @@ const NAV_FINANCIERA = [
     // Reporte + trazabilidad en una sola pestaña: comparativo, calendario diario y detalle por empleado.
     { to: '/recursos-humanos/asistencia-mensual', label: 'Reporte Asistencia', icon: BarChart3 },
     // Solicitudes de cambio de turno de los coordinadores y su respuesta, solo lectura (§50).
-    { to: '/recursos-humanos/cambios-turno', label: 'Cambios de turno', icon: Repeat }
+    { to: '/recursos-humanos/cambios-turno', label: 'Turnos y libres', icon: Repeat }
 ];
 
 const RecursosHumanosLayout = () => {

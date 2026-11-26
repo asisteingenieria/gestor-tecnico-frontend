@@ -45,6 +45,7 @@ const MOSAICOS = [
 // "08:00 – 17:00" del turno de hoy; descanso o sin horario asignado.
 function textoHorario(turno) {
     if (!turno) return 'Sin horario';
+    if (turno.es_libre) return 'Libre';
     if (turno.es_descanso) return 'Descanso';
     const hm = (t) => (t || '').slice(0, 5);
     return `${hm(turno.hora_entrada)} – ${hm(turno.hora_salida)}`;

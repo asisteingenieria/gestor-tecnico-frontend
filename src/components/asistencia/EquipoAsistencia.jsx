@@ -54,7 +54,7 @@ const ESTADOS_DIA = [
     { id: 'finalizada', label: 'Terminaron', color: 'finalizado', icono: LogOut, titulo: 'Ya marcaron salida o su jornada de hoy se cerró' },
     { id: 'ausente', label: 'Ausentes', color: 'no_llego', icono: UserX, titulo: 'Tenían turno y no se loguearon (se marca al cierre del día)' },
     { id: 'novedad', label: 'Con novedad', color: 'novedad', icono: ClipboardList, titulo: 'Incapacidades, vacaciones, licencias y suspensiones de RRHH que cubren hoy; no cuentan como ausentes' },
-    { id: 'descanso', label: 'Descanso', color: 'descanso', icono: Moon, titulo: 'Hoy tienen día de descanso en su malla' }
+    { id: 'descanso', label: 'Descanso', color: 'descanso', icono: Moon, titulo: 'Hoy tienen día de descanso en su malla o un libre aprobado' }
 ];
 const ESTADO_LABEL = { ...Object.fromEntries(ESTADOS_DIA.map((e) => [e.id, e.label])), pendiente: 'Sin iniciar', finalizada: 'Terminó', ausente: 'Ausente' };
 
@@ -97,7 +97,7 @@ const otrasAlertas = (emp) => (emp.alertas || []).filter((a) => a !== 'llegada_t
 // Cómo llegó hoy (para la descarga). Sin turno, o en su día de descanso, no se sabe si llegó tarde.
 function textoLlegada(emp) {
     if (noAsistioPorNovedad(emp)) return `Novedad · ${etiquetaNovedad(emp.novedad.tipo)}`;
-    if (estadoVista(emp) === 'descanso') return 'Día de descanso';
+    if (estadoVista(emp) === 'descanso') return emp.turno?.es_libre ? 'Libre aprobado' : 'Día de descanso';
     const clase = claseDia(emp);
     if (!clase) return '';
     if (clase === 'pendiente') return 'Aún no llega';
@@ -111,6 +111,8 @@ function textoLlegada(emp) {
 // "Outbound 7-4 · 07:00–16:00", "Descanso" o "Sin horario" (§46).
 function textoTurno(turno) {
     if (!turno) return 'Sin horario hoy';
+    // Día libre aprobado (novedad de asistencia, §86): un descanso que se muestra como "Libre".
+    if (turno.es_libre) return 'Libre';
     if (turno.es_descanso) return 'Descanso';
     const horas = `${turno.hora_entrada.slice(0, 5)}–${turno.hora_salida.slice(0, 5)}`;
     return turno.plantilla ? `${turno.plantilla} · ${horas}` : horas;
