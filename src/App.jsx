@@ -391,6 +391,14 @@ const DirectivoFinancieroRoute = ({ children }) => {
 };
 
 // Componente para rutas que requieren rol de recursosHumanos
+// Solo el rol recursosHumanos, sin financiera: el catálogo de cargos (§61.4).
+const SoloRecursosHumanosRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user?.role !== 'recursosHumanos') return <Navigate to="/recursos-humanos" replace />;
+  return children;
+};
+
 const RecursosHumanosRoute = ({ children }) => {
   const { isRecursosHumanos, loading } = useAuth();
 
@@ -571,7 +579,7 @@ function App() {
               <Route path="recursos-humanos" element={<RecursosHumanosRoute><AgentManagement /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/novedades" element={<RecursosHumanosRoute><NovedadesRRHH /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/traspasos" element={<RecursosHumanosRoute><Traspasos /></RecursosHumanosRoute>} />
-              <Route path="recursos-humanos/cargos" element={<RecursosHumanosRoute><CatalogoCargos /></RecursosHumanosRoute>} />
+              <Route path="recursos-humanos/cargos" element={<SoloRecursosHumanosRoute><CatalogoCargos /></SoloRecursosHumanosRoute>} />
               <Route path="recursos-humanos/vacaciones" element={<RecursosHumanosRoute><PasivoVacacional /></RecursosHumanosRoute>} />
               <Route path="recursos-humanos/contratacion-hydra" element={<ContratacionHydraRoute><ContratacionHydra /></ContratacionHydraRoute>} />
               <Route path="recursos-humanos/contratacion-hydra/:id" element={<ContratacionHydraRoute><LoteHydra /></ContratacionHydraRoute>} />
