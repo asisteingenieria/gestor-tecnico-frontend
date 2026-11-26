@@ -2,15 +2,20 @@
 // mitad cómo llegó (verde puntual / amarillo tarde) y mitad azul mientras sigue en turno.
 
 /**
- * Retraso exacto, sin redondear (asistencia.md §72): "45:41 min" o, desde una hora, "1:05:41 h". Usa los
- * segundos que manda el servidor; si no vienen (o vienen en 0 con minutos tarde), cae a los minutos.
+ * Retraso exacto, sin redondear (asistencia.md §72), con cada unidad escrita: "5 min 13 s", "45 min",
+ * "1 h 5 min 41 s", "40 s". Antes salía "5:13 min", que se leía como 5 horas 13 minutos. Usa los segundos
+ * que manda el servidor; si no vienen (o vienen en 0 con minutos tarde), cae a los minutos.
  */
 export function tardeExacto(segundos, minutos) {
     const total = Number(segundos) > 0 ? Math.floor(Number(segundos)) : Math.round((Number(minutos) || 0) * 60);
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
-    const s = String(total % 60).padStart(2, '0');
-    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s} h` : `${m}:${s} min`;
+    const s = total % 60;
+    const partes = [];
+    if (h > 0) partes.push(`${h} h`);
+    if (m > 0) partes.push(`${m} min`);
+    if (s > 0 || partes.length === 0) partes.push(`${s} s`);
+    return partes.join(' ');
 }
 
 const VERDE = 'var(--success)';
