@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Clock3, Check, X, Plus, Search, CheckCircle2, XCircle, Inbox, Send, FileSpreadsheet } from 'lucide-react';
+import { Clock3, Check, CheckCheck, X, Plus, Search, CheckCircle2, XCircle, Inbox, Send, FileSpreadsheet } from 'lucide-react';
 import HorasExtraExcelModal from './HorasExtraExcelModal';
 import { useAuth } from '../../context/AuthContext';
 import { asistenciaService, cambioTurnoService } from '../../services/api';
@@ -218,6 +218,9 @@ const HorasExtra = () => {
     const [tramosAjuste, setTramosAjuste] = useState([]);
     const [rechazandoId, setRechazandoId] = useState(null);
     const [comentarioRechazo, setComentarioRechazo] = useState('');
+    // Aprobar todas (§93): confirmación en la misma pantalla y envío en curso.
+    const [confirmandoTodas, setConfirmandoTodas] = useState(false);
+    const [aprobandoTodas, setAprobandoTodas] = useState(false);
 
     const cargar = useCallback(async () => {
         try {
@@ -244,6 +247,8 @@ const HorasExtra = () => {
     }, [isDirectorOperaciones]);
 
     useEffect(() => { cargar(); }, [cargar]);
+    // La confirmación de "Aprobar todas" no sobrevive a un cambio de pestaña o de filtro.
+    useEffect(() => { setConfirmandoTodas(false); }, [tab, estado]);
     useEffect(() => escucharAsistencia('asistencia:notificacion', cargar), [cargar]);
 
     const fuente = !isDirectorOperaciones ? propias : tab === 'bandeja' ? bandeja : solicitadas;
@@ -275,6 +280,24 @@ const HorasExtra = () => {
             setMensaje(err.response?.data?.message || 'No se pudo aprobar');
         } finally {
             setProcesando(null);
+        }
+    };
+
+    // Aprueba de una vez las pendientes que se ven en "Por aprobar", cada una con la clasificación que
+    // calculó el servidor. Se mandan los ids en pantalla: una que llegue después no se aprueba sin verla.
+    const aprobarTodas = async () => {
+        const ids = visibles.filter((h) => h.estado === 'pendiente').map((h) => h.idhora_extra);
+        if (ids.length === 0) return;
+        setAprobandoTodas(true);
+        try {
+            const { data } = await asistenciaService.aprobarHorasExtraVarias({ ids });
+            const omitidas = data?.omitidas?.length || 0;
+            setConfirmandoTodas(false);
+            await terminar(`Se aprobaron ${data?.aprobadas ?? 0} horas extra.${omitidas ? ` ${omitidas} no se aprobaron (ya estaban resueltas o hay que revisarlas una por una).` : ''}`);
+        } catch (err) {
+            setMensaje(err.response?.data?.message || 'No se pudieron aprobar');
+        } finally {
+            setAprobandoTodas(false);
         }
     };
 
@@ -429,6 +452,29 @@ const HorasExtra = () => {
                         ))}
                     </div>
                 </BarraFiltros>
+            )}
+
+            {/* Aprobar todas (§93): solo en "Por aprobar" con pendientes, y con confirmación. */}
+            {tab === 'bandeja' && estado === 'pendiente' && visibles.length > 1 && (
+                <div className="ai-row" style={{ justifyContent: 'flex-end', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                    {confirmandoTodas ? (
+                        <>
+                            <span style={{ fontSize: 13 }}>
+                                ¿Aprobar las <strong>{visibles.length}</strong> solicitudes
+                                ({formatearDuracion(visibles.reduce((acc, h) => acc + (h.minutos_estimados || 0), 0))}) con la clasificación calculada?
+                            </span>
+                            <button type="button" className="ai-btn ai-btn--sm ai-btn--secondary" onClick={() => setConfirmandoTodas(false)} disabled={aprobandoTodas}>Cancelar</button>
+                            <button type="button" className="ai-btn ai-btn--sm ai-btn--primary" onClick={aprobarTodas} disabled={aprobandoTodas}>
+                                <Check size={14} strokeWidth={1.75} /> {aprobandoTodas ? 'Aprobando…' : 'Sí, aprobar todas'}
+                            </button>
+                        </>
+                    ) : (
+                        <button type="button" className="ai-btn ai-btn--sm ai-btn--primary"
+                            onClick={() => { setAprobandoId(null); setRechazandoId(null); setAviso(null); setConfirmandoTodas(true); }}>
+                            <CheckCheck size={14} strokeWidth={1.75} /> Aprobar todas ({visibles.length})
+                        </button>
+                    )}
+                </div>
             )}
 
             {visibles.length === 0 ? (
