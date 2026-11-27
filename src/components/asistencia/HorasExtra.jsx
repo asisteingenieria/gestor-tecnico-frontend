@@ -37,7 +37,7 @@ const Tramos = ({ tramos }) => (tramos?.length > 0 ? (
 
 // ---------------------------------------------------------------------------------------------
 // Modal del jefe: pide horas extra para una o varias personas de su equipo, en la misma franja.
-const ModalSolicitud = ({ onCerrar, onEnviada }) => {
+const ModalSolicitud = ({ onCerrar, onEnviada, autoaprobada = false }) => {
     const [equipo, setEquipo] = useState(null);
     const [seleccion, setSeleccion] = useState([]);
     const [busqueda, setBusqueda] = useState('');
@@ -46,15 +46,16 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
     const [error, setError] = useState(null);
     const [enviando, setEnviando] = useState(false);
 
-    // Su equipo directo, con quién aprueba (su director).
+    // Su equipo directo, con quién aprueba (su director, o él mismo si es director: §94).
     useEffect(() => {
-        cambioTurnoService.getEmpleados()
+        asistenciaService.getEquipoHorasExtra()
             .then(({ data }) => setEquipo(data))
             .catch((err) => { setEquipo([]); setError(err.response?.data?.message || 'No se pudo cargar tu equipo'); });
     }, []);
 
     const director = equipo?.[0]?.gestor || null;
-    const sinDirector = equipo && equipo.length > 0 && !equipo[0].gestor_id;
+    // Un director no necesita quién le apruebe: sus solicitudes nacen aprobadas (§94).
+    const sinDirector = !autoaprobada && equipo && equipo.length > 0 && !equipo[0].gestor_id;
     const filtrados = useMemo(() => {
         const q = busqueda.trim().toLowerCase();
         return (equipo || []).filter((e) => !q || e.nombre.toLowerCase().includes(q) || String(e.cedula).includes(q)
@@ -108,7 +109,7 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
                     <span className="ai-modal-icon"><Clock3 size={20} strokeWidth={1.75} /></span>
                     <div>
                         <h3 className="ai-modal-title">Solicitar horas extra</h3>
-                        <p className="ai-modal-sub">{director ? <>La aprueba <strong>{nombrePropio(director)}</strong></> : 'Queda pendiente de aprobación de tu director'}</p>
+                        <p className="ai-modal-sub">{autoaprobada ? 'Como director, quedan aprobadas al enviarlas' : director ? <>La aprueba <strong>{nombrePropio(director)}</strong></> : 'Queda pendiente de aprobación de tu director'}</p>
                     </div>
                     <button type="button" className="ai-icon-btn" onClick={onCerrar} aria-label="Cerrar"><X size={18} strokeWidth={1.75} /></button>
                 </div>
@@ -167,7 +168,7 @@ const ModalSolicitud = ({ onCerrar, onEnviada }) => {
                                             </div>
                                         ))}
                                         {seleccion.length > MAX_PREVIA && <p className="ai-help">… y {seleccion.length - MAX_PREVIA} personas más.</p>}
-                                        <p className="ai-help">La determina el sistema según el turno de cada persona, la fecha y el umbral nocturno. El director puede ajustarla al aprobar.</p>
+                                        <p className="ai-help">La determina el sistema según el turno de cada persona, la fecha y el umbral nocturno. {autoaprobada ? 'Queda aprobada con esta clasificación.' : 'El director puede ajustarla al aprobar.'}</p>
                                     </>
                                 )}
                             </div>
@@ -221,6 +222,8 @@ const HorasExtra = () => {
     // Aprobar todas (§93): confirmación en la misma pantalla y envío en curso.
     const [confirmandoTodas, setConfirmandoTodas] = useState(false);
     const [aprobandoTodas, setAprobandoTodas] = useState(false);
+    // Director (§94): lo que pide nace aprobado.
+    const [autoaprobada, setAutoaprobada] = useState(false);
 
     const cargar = useCallback(async () => {
         try {
@@ -238,6 +241,7 @@ const HorasExtra = () => {
             // "Por aprobar" es del director; un jefe la ve solo si le quedan pendientes del flujo anterior.
             const aprueba = p.data.puede_aprobar || b.data.length > 0;
             setPuedeAprobar(aprueba);
+            setAutoaprobada(Boolean(p.data.horas_extra_autoaprobadas));
             setTab((t) => t || (aprueba ? 'bandeja' : 'mias'));
         } catch (err) {
             setMensaje(err.response?.data?.message || 'No se pudo cargar la información');
@@ -406,7 +410,7 @@ const HorasExtra = () => {
             <EncabezadoVista
                 icono={Clock3}
                 titulo="Horas extra"
-                subtitulo={isDirectorOperaciones ? 'Las solicitas para tu equipo y las aprueba tu director' : 'Las solicita tu jefe y las aprueba su director'}
+                subtitulo={isDirectorOperaciones ? (autoaprobada ? 'Las solicitas para tu equipo y quedan aprobadas al enviarlas' : 'Las solicitas para tu equipo y las aprueba tu director') : 'Las solicita tu jefe y las aprueba su director'}
             >
                 {isDirectorOperaciones && (
                     <>
@@ -498,8 +502,10 @@ const HorasExtra = () => {
                     onEnviada={async (data) => {
                         setModalExcel(false);
                         setTab('mias');
-                        setEstado('pendiente');
-                        setAviso(`Se enviaron ${data?.enviadas ?? 0} horas extra de ${data?.personas ?? 0} personas (${data?.horas ?? ''})${data?.aprobador ? ` a ${nombrePropio(data.aprobador)}` : ''}. Te llegará un aviso cuando las responda.`);
+                        setEstado(data?.autoaprobada ? 'aprobada' : 'pendiente');
+                        setAviso(data?.autoaprobada
+                            ? `Se registraron y aprobaron ${data?.enviadas ?? 0} horas extra de ${data?.personas ?? 0} personas (${data?.horas ?? ''}).`
+                            : `Se enviaron ${data?.enviadas ?? 0} horas extra de ${data?.personas ?? 0} personas (${data?.horas ?? ''})${data?.aprobador ? ` a ${nombrePropio(data.aprobador)}` : ''}. Te llegará un aviso cuando las responda.`);
                         await cargar();
                     }}
                 />
@@ -507,12 +513,15 @@ const HorasExtra = () => {
 
             {modal && (
                 <ModalSolicitud
+                    autoaprobada={autoaprobada}
                     onCerrar={() => setModal(false)}
                     onEnviada={async (data) => {
                         setModal(false);
                         setTab('mias');
-                        setEstado('pendiente');
-                        setAviso(`Solicitud enviada${data?.aprobador ? ` a ${nombrePropio(data.aprobador)}` : ''}. Te llegará un aviso cuando la responda.`);
+                        setEstado(data?.autoaprobada ? 'aprobada' : 'pendiente');
+                        setAviso(data?.autoaprobada
+                            ? 'Horas extra registradas y aprobadas.'
+                            : `Solicitud enviada${data?.aprobador ? ` a ${nombrePropio(data.aprobador)}` : ''}. Te llegará un aviso cuando la responda.`);
                         await cargar();
                     }}
                 />

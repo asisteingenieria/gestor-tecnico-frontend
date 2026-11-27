@@ -173,7 +173,9 @@ const HorasExtraExcelModal = ({ onClose, onEnviada }) => {
                                 <Kpi label="Tiempo total" valor={r.horas} />
                                 <Kpi label="Filas con error" valor={r.errores} tono={r.errores > 0 ? 'var(--danger)' : undefined} />
                             </div>
-                            {vista.aprobador && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>Le llegan a {nombrePropio(vista.aprobador)} para aprobar.</p>}
+                            {vista.autoaprobada
+                                ? <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>Como director, quedan aprobadas al enviarlas.</p>
+                                : vista.aprobador && <p className="ai-muted" style={{ fontSize: 12, margin: 0 }}>Le llegan a {nombrePropio(vista.aprobador)} para aprobar.</p>}
 
                             {r.errores > 0 && (
                                 <div className="ai-row" style={{ gap: 10, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', fontSize: 13 }}>

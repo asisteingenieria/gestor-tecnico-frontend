@@ -401,6 +401,8 @@ export const asistenciaService = {
     getBandejaHorasExtra: (params = {}) => api.get('/asistencia/horas-extra', { params }),
     aprobarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/aprobar`, data),
     // Aprobar todas las pendientes que el director tiene en pantalla (§93): { ids, comentario? }.
+    // Equipo del formulario de horas extra (§94): la gente que gestiona el jefe, con quién aprueba.
+    getEquipoHorasExtra: () => api.get('/asistencia/horas-extra/equipo'),
     aprobarHorasExtraVarias: (data) => api.put('/asistencia/horas-extra/aprobar-varias', data),
     rechazarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/rechazar`, data),
 
