@@ -45,7 +45,12 @@ export const userService = {
     getById: (id) => api.get(`/users/${id}`),
     create: (userData) => api.post('/users', userData),
     update: (id, userData) => api.put(`/users/${id}`, userData),
-    delete: (id) => api.delete(`/users/${id}`)
+    delete: (id) => api.delete(`/users/${id}`),
+    // Restablecer contraseñas desde el panel del admin: { modo: 'cedula'|'temporal', password? }.
+    // La cuenta queda con cambio obligatorio en el próximo ingreso.
+    restablecerPassword: (id, data) => api.post(`/users/${id}/restablecer-password`, data),
+    buscarCuentasEmpleado: (q) => api.get('/users/cuentas-empleado', { params: { q } }),
+    restablecerPasswordCuentaEmpleado: (id, data) => api.post(`/users/cuentas-empleado/${id}/restablecer-password`, data)
 };
 
 // === SERVICIOS DE ESTACIONES DE TRABAJO ===

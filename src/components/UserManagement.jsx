@@ -14,11 +14,17 @@ import {
     UserPlus,
     Shield,
     Settings,
-    MapPin
+    MapPin,
+    KeyRound,
+    Contact
 } from 'lucide-react';
+import RestablecerPasswordModal from './usuarios/RestablecerPasswordModal';
+import CuentasPorCedula from './usuarios/CuentasPorCedula';
 
 const UserManagement = () => {
     const { user } = useAuth();
+    // La lista usa `user` como variable de cada fila: este es el admin con la sesión abierta.
+    const currentUser = user;
     const isIronManTheme = user?.username === 'davidlopez10';
     const [users, setUsers] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
@@ -31,6 +37,10 @@ const UserManagement = () => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    // Pestaña: usuarios del sistema (`users`) o cuentas por cédula (`cuenta_empleado`).
+    const [pestana, setPestana] = useState('usuarios');
+    // Cuenta a la que se le restablece la contraseña (modal).
+    const [cuentaRestablecer, setCuentaRestablecer] = useState(null);
 
     // Form data para crear/editar usuario
     const [formData, setFormData] = useState({
@@ -408,6 +418,26 @@ const UserManagement = () => {
                 </button>
             </div>
 
+            {/* Pestañas */}
+            <div className="flex gap-2 border-b border-gray-200">
+                {[
+                    { id: 'usuarios', label: 'Usuarios del sistema', icon: Users },
+                    { id: 'cedula', label: 'Cuentas por cédula', icon: Contact }
+                ].map(({ id, label, icon: IconoPestana }) => (
+                    <button
+                        key={id}
+                        onClick={() => setPestana(id)}
+                        className={`inline-flex items-center px-4 py-2 -mb-px border-b-2 text-sm font-medium ${pestana === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <IconoPestana className="h-4 w-4 mr-2" />
+                        {label}
+                    </button>
+                ))}
+            </div>
+
+            {pestana === 'cedula' ? (
+                <CuentasPorCedula />
+            ) : (<>
             {/* Alertas */}
             {error && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-3">
@@ -521,6 +551,11 @@ const UserManagement = () => {
                                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleInfo(user.role).color}`}>
                                                     {getRoleInfo(user.role).label}
                                                 </span>
+                                                {user.debe_cambiar_password ? (
+                                                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">
+                                                        Debe cambiar contraseña
+                                                    </span>
+                                                ) : null}
                                             </div>
                                             
                                             <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4 text-sm text-gray-500">
@@ -547,6 +582,16 @@ const UserManagement = () => {
                                                 <Edit className="h-4 w-4 mr-1" />
                                                 Editar
                                             </button>
+                                            {user.id !== currentUser?.id && (
+                                                <button
+                                                    onClick={() => setCuentaRestablecer({ tipo: 'usuario', id: user.id, nombre: user.full_name, usuario: user.username, cedula: user.cedula })}
+                                                    title="Restablecer contraseña"
+                                                    className="inline-flex items-center px-3 py-1 border border-amber-300 text-sm font-medium rounded-md text-amber-700 bg-white hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                                                >
+                                                    <KeyRound className="h-4 w-4 mr-1" />
+                                                    Contraseña
+                                                </button>
+                                            )}
                                             {user.role !== 'admin' && (
                                                 <button
                                                     onClick={() => handleDeleteUser(user.id, user.username)}
@@ -564,6 +609,16 @@ const UserManagement = () => {
                     )}
                 </div>
             </div>
+            </>)}
+
+            {cuentaRestablecer && (
+                <RestablecerPasswordModal
+                    cuenta={cuentaRestablecer}
+                    // Recarga al cerrar, no al restablecer: loadUsers pone el spinner de pantalla
+                    // completa y desmontaría el modal antes de mostrar la contraseña.
+                    onClose={(restablecida) => { setCuentaRestablecer(null); if (restablecida) loadUsers(); }}
+                />
+            )}
 
             {/* Modal para crear/editar usuario */}
             {(showCreateModal || showEditModal) && (
