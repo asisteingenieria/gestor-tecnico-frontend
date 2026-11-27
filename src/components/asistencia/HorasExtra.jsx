@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Clock3, Check, X, Plus, Search, CheckCircle2, XCircle, Inbox, Send } from 'lucide-react';
+import { Clock3, Check, X, Plus, Search, CheckCircle2, XCircle, Inbox, Send, FileSpreadsheet } from 'lucide-react';
+import HorasExtraExcelModal from './HorasExtraExcelModal';
 import { useAuth } from '../../context/AuthContext';
 import { asistenciaService, cambioTurnoService } from '../../services/api';
 import { formatearFecha } from '../../utils/fecha';
@@ -209,6 +210,7 @@ const HorasExtra = () => {
     const [tab, setTab] = useState(null);
     const [estado, setEstado] = useState('pendiente');
     const [modal, setModal] = useState(false);
+    const [modalExcel, setModalExcel] = useState(false);
 
     // Al aprobar, el director confirma la clasificación del servidor o la ajusta (editor de tramos con
     // la propuesta ya cargada). asistencia.md §32.
@@ -384,9 +386,15 @@ const HorasExtra = () => {
                 subtitulo={isDirectorOperaciones ? 'Las solicitas para tu equipo y las aprueba tu director' : 'Las solicita tu jefe y las aprueba su director'}
             >
                 {isDirectorOperaciones && (
-                    <button type="button" className="ai-monitor-btn" onClick={() => { setAviso(null); setModal(true); }}>
-                        <Plus size={15} strokeWidth={2} /> Solicitar horas extra
-                    </button>
+                    <>
+                        {/* Masiva en Excel para todo el equipo (§91). */}
+                        <button type="button" className="ai-monitor-btn" onClick={() => { setAviso(null); setModalExcel(true); }}>
+                            <FileSpreadsheet size={15} strokeWidth={2} /> Solicitar en Excel
+                        </button>
+                        <button type="button" className="ai-monitor-btn" onClick={() => { setAviso(null); setModal(true); }}>
+                            <Plus size={15} strokeWidth={2} /> Solicitar horas extra
+                        </button>
+                    </>
                 )}
             </EncabezadoVista>
 
@@ -436,6 +444,19 @@ const HorasExtra = () => {
                 >
                     {visibles.map(fila)}
                 </PanelVista>
+            )}
+
+            {modalExcel && (
+                <HorasExtraExcelModal
+                    onClose={() => setModalExcel(false)}
+                    onEnviada={async (data) => {
+                        setModalExcel(false);
+                        setTab('mias');
+                        setEstado('pendiente');
+                        setAviso(`Se enviaron ${data?.enviadas ?? 0} horas extra de ${data?.personas ?? 0} personas (${data?.horas ?? ''})${data?.aprobador ? ` a ${nombrePropio(data.aprobador)}` : ''}. Te llegará un aviso cuando las responda.`);
+                        await cargar();
+                    }}
+                />
             )}
 
             {modal && (

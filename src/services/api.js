@@ -380,6 +380,18 @@ export const asistenciaService = {
     // Horas extra (§51): el jefe las solicita por su equipo y las aprueba su director.
     solicitarHoraExtra: (data) => api.post('/asistencia/horas-extra/solicitar', data),
     previsualizarHoraExtra: (data) => api.post('/asistencia/horas-extra/previsualizar', data),
+    // Solicitud masiva en Excel (backend asistencia.md §91): plantilla, vista previa y envío con el mismo archivo.
+    descargarPlantillaHorasExtra: (params = {}) => api.get('/asistencia/horas-extra/excel/plantilla', { params, responseType: 'blob', timeout: 60000 }),
+    previsualizarHorasExtraExcel: (archivo) => {
+        const formData = new FormData();
+        formData.append('archivo', archivo);
+        return api.post('/asistencia/horas-extra/excel/previsualizar', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 });
+    },
+    enviarHorasExtraExcel: (archivo) => {
+        const formData = new FormData();
+        formData.append('archivo', archivo);
+        return api.post('/asistencia/horas-extra/excel/enviar', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 });
+    },
     getHorasExtraSolicitadas: (params = {}) => api.get('/asistencia/horas-extra/mias', { params }),
     getBandejaHorasExtra: (params = {}) => api.get('/asistencia/horas-extra', { params }),
     aprobarHoraExtra: (id, data) => api.put(`/asistencia/horas-extra/${id}/aprobar`, data),
